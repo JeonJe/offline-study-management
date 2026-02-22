@@ -66,16 +66,6 @@
 - 엔젤 디렉터리 관리
 - 자동 저장 상태 표시(저장 중/완료/실패)
 
-## 데이터 모델 요약
-
-- `meetings`, `rsvps`
-  - 오프라인 스터디 모임 및 참여자
-- `afterparties`, `afterparty_participants`
-  - 뒷풀이 모임, 참여자, 정산 상태(`is_settled`)
-  - 정산자(`settlement_manager`), 계좌(`settlement_account`)
-- `member_teams`, `member_team_members`, `member_angels`
-  - 팀/멤버/엔젤 기준 데이터
-
 ## 기술 스택
 
 - Next.js App Router + TypeScript
