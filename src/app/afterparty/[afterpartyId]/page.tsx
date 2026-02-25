@@ -115,8 +115,6 @@ function ParticipantRow({
           <SettlementToggle
             afterpartyId={afterpartyId}
             participantId={row.id}
-            returnDate={returnDate}
-            returnPath={returnPath}
             isSettled={row.isSettled}
           />
 
@@ -150,25 +148,34 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
     redirect("/?auth=required");
   }
 
-  const afterparties = await listAfterparties();
+  const [afterparties, participantsByAfterparty, memberPreset, allMeetingsRaw] = await Promise.all([
+    listAfterparties(),
+    listParticipantsForAfterparties([afterpartyId], ""),
+    loadMemberPreset(),
+    listMeetings(),
+  ]);
+
   const afterparty = afterparties.find((item) => item.id === afterpartyId);
   if (!afterparty) {
     redirect(date ? `/afterparty?date=${date}` : "/afterparty");
   }
 
-  const participantsByAfterparty = await listParticipantsForAfterparties([afterpartyId], "");
   const participants = participantsByAfterparty[afterpartyId] ?? [];
   const settledCount = participants.filter((row) => row.isSettled).length;
-  const memberPreset = await loadMemberPreset();
   const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
 
   const sameDateAfterparties = afterparties.filter(
     (item) => item.eventDate === afterparty.eventDate
   );
-  const participantsByAllAfterparty = await listParticipantsForAfterparties(
-    sameDateAfterparties.map((item) => item.id),
-    ""
+  const allMeetings = allMeetingsRaw.filter(
+    (item) => item.meetingDate === afterparty.eventDate
   );
+
+  const [participantsByAllAfterparty, rsvpsByMeeting] = await Promise.all([
+    listParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
+    listRsvpsForMeetings(allMeetings.map((item) => item.id), ""),
+  ]);
+
   for (const row of sameDateAfterparties) {
     const names = participantsByAllAfterparty[row.id] ?? [];
     for (const participant of names) {
@@ -176,13 +183,6 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
     }
   }
 
-  const allMeetings = (await listMeetings()).filter(
-    (item) => item.meetingDate === afterparty.eventDate
-  );
-  const rsvpsByMeeting = await listRsvpsForMeetings(
-    allMeetings.map((item) => item.id),
-    ""
-  );
   for (const meeting of allMeetings) {
     const rows = rsvpsByMeeting[meeting.id] ?? [];
     for (const row of rows) {

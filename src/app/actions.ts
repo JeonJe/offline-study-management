@@ -258,6 +258,24 @@ export async function deleteAfterpartyParticipantAction(formData: FormData): Pro
   redirect(returnPath ?? afterpartyPath({ date }));
 }
 
+export async function updateSettlementAction(
+  participantId: string,
+  afterpartyId: string,
+  isSettled: boolean
+): Promise<{ ok: boolean }> {
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    return { ok: false };
+  }
+  try {
+    await updateAfterpartyParticipantSettlement(participantId, afterpartyId, isSettled);
+    revalidatePath("/afterparty");
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function updateAfterpartyParticipantSettlementAction(formData: FormData): Promise<void> {
   const afterpartyId = textFrom(formData, "afterpartyId").trim();
   const participantId = textFrom(formData, "participantId").trim();

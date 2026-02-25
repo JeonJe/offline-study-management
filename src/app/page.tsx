@@ -430,14 +430,17 @@ export default async function Home({ searchParams }: HomePageProps) {
   let selectedDate = isIsoDate(requestDate) ? requestDate : toIsoDate(new Date());
 
   try {
-    meetings = await listMeetings();
+    const [fetchedMeetings, memberPreset] = await Promise.all([
+      listMeetings(),
+      loadMemberPreset(),
+    ]);
+    meetings = fetchedMeetings;
     if (!isIsoDate(requestDate)) {
       selectedDate = meetings[0]?.meetingDate ?? selectedDate;
     }
 
     meetingsOnDate = meetings.filter((meeting) => meeting.meetingDate === selectedDate);
     rsvpsByMeeting = await listRsvpsForMeetings(meetingsOnDate.map((meeting) => meeting.id), "");
-    const memberPreset = await loadMemberPreset();
 
     const knownMemberNames = new Set<string>();
     for (const group of memberPreset.teamGroups) {

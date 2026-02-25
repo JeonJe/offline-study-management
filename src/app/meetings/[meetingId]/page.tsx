@@ -152,19 +152,30 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     redirect("/?auth=required");
   }
 
-  const meetings = await listMeetings();
+  const [meetings, memberPreset, allAfterparties] = await Promise.all([
+    listMeetings(),
+    loadMemberPreset(),
+    listAfterparties(),
+  ]);
+
   const meeting = meetings.find((item) => item.id === meetingId);
   if (!meeting) {
     redirect(date ? `/?date=${date}` : "/");
   }
 
   const sameDateMeetings = meetings.filter((item) => item.meetingDate === meeting.meetingDate);
-  const sameDateMeetingIds = sameDateMeetings.map((item) => item.id);
-  const rsvpsByMeeting = await listRsvpsForMeetings(sameDateMeetingIds, "");
+  const sameDateAfterparties = allAfterparties.filter(
+    (item) => item.eventDate === meeting.meetingDate
+  );
+
+  const [rsvpsByMeeting, participantsByAfterparty] = await Promise.all([
+    listRsvpsForMeetings(sameDateMeetings.map((item) => item.id), ""),
+    listParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
+  ]);
+
   const rsvps = rsvpsByMeeting[meetingId] ?? [];
   const angels = rsvps.filter((row) => row.role === "angel");
   const members = rsvps.filter((row) => row.role === "student");
-  const memberPreset = await loadMemberPreset();
 
   const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
   for (const meetingRow of sameDateMeetings) {
@@ -174,14 +185,6 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     }
   }
 
-  const allAfterparties = await listAfterparties();
-  const sameDateAfterparties = allAfterparties.filter(
-    (item) => item.eventDate === meeting.meetingDate
-  );
-  const participantsByAfterparty = await listParticipantsForAfterparties(
-    sameDateAfterparties.map((item) => item.id),
-    ""
-  );
   for (const afterparty of sameDateAfterparties) {
     const participants = participantsByAfterparty[afterparty.id] ?? [];
     for (const participant of participants) {
