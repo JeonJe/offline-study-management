@@ -1,4 +1,4 @@
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 
 export type TeamMemberGroup = {
   teamName: string;
@@ -226,57 +226,64 @@ export async function saveMemberPresetToDb(
 
   const normalizedGroups = normalizeTeamGroups(teamGroups);
   const normalizedAngels = normalizeAngels(fixedAngels);
+
+  if (normalizedGroups.length === 0 || normalizedAngels.length === 0) {
+    throw new Error("팀 그룹 또는 엔젤 목록이 비어 있어 저장할 수 없습니다.");
+  }
+
   const teamNames = normalizedGroups.map((group) => group.teamName);
 
-  for (const [teamOrder, group] of normalizedGroups.entries()) {
-    await query(
-      `insert into public.member_teams (team_name, angel_name, team_order)
-       values ($1, $2, $3)
-       on conflict (team_name)
-       do update set
-         angel_name = excluded.angel_name,
-         team_order = excluded.team_order,
-         updated_at = now()`,
-      [group.teamName, group.angel, teamOrder]
-    );
-
-    await query(
-      `delete from public.member_team_members
-       where team_name = $1
-         and not (member_name = any($2::text[]))`,
-      [group.teamName, group.members]
-    );
-
-    for (const [memberOrder, memberName] of group.members.entries()) {
-      await query(
-        `insert into public.member_team_members (team_name, member_name, member_order)
+  await withTransaction(async (tq) => {
+    for (const [teamOrder, group] of normalizedGroups.entries()) {
+      await tq(
+        `insert into public.member_teams (team_name, angel_name, team_order)
          values ($1, $2, $3)
-         on conflict (team_name, member_name)
-         do update set member_order = excluded.member_order`,
-        [group.teamName, memberName, memberOrder]
+         on conflict (team_name)
+         do update set
+           angel_name = excluded.angel_name,
+           team_order = excluded.team_order,
+           updated_at = now()`,
+        [group.teamName, group.angel, teamOrder]
+      );
+
+      await tq(
+        `delete from public.member_team_members
+         where team_name = $1
+           and not (member_name = any($2::text[]))`,
+        [group.teamName, group.members]
+      );
+
+      for (const [memberOrder, memberName] of group.members.entries()) {
+        await tq(
+          `insert into public.member_team_members (team_name, member_name, member_order)
+           values ($1, $2, $3)
+           on conflict (team_name, member_name)
+           do update set member_order = excluded.member_order`,
+          [group.teamName, memberName, memberOrder]
+        );
+      }
+    }
+
+    await tq(
+      `delete from public.member_teams
+       where not (team_name = any($1::text[]))`,
+      [teamNames]
+    );
+
+    await tq(
+      `delete from public.member_angels
+       where not (angel_name = any($1::text[]))`,
+      [normalizedAngels]
+    );
+
+    for (const [angelOrder, angelName] of normalizedAngels.entries()) {
+      await tq(
+        `insert into public.member_angels (angel_name, angel_order)
+         values ($1, $2)
+         on conflict (angel_name)
+         do update set angel_order = excluded.angel_order`,
+        [angelName, angelOrder]
       );
     }
-  }
-
-  await query(
-    `delete from public.member_teams
-     where not (team_name = any($1::text[]))`,
-    [teamNames]
-  );
-
-  await query(
-    `delete from public.member_angels
-     where not (angel_name = any($1::text[]))`,
-    [normalizedAngels]
-  );
-
-  for (const [angelOrder, angelName] of normalizedAngels.entries()) {
-    await query(
-      `insert into public.member_angels (angel_name, angel_order)
-       values ($1, $2)
-       on conflict (angel_name)
-       do update set angel_order = excluded.angel_order`,
-      [angelName, angelOrder]
-    );
-  }
+  });
 }

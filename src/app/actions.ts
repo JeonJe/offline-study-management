@@ -99,6 +99,7 @@ function safeReturnPath(formData: FormData): string | null {
   const raw = textFrom(formData, "returnPath").trim();
   if (!raw.startsWith("/")) return null;
   if (raw.startsWith("//")) return null;
+  if (raw.startsWith("/\\")) return null;
   return raw;
 }
 
@@ -198,6 +199,10 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
 
   if (!title || !eventDate || !location) {
+    redirect(afterpartyPath(state));
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
     redirect(afterpartyPath(state));
   }
 
@@ -308,6 +313,10 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
 
   if (!afterpartyId || !title || !eventDate || !startTime || !location) {
+    redirect(afterpartyPath({ date }));
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
     redirect(afterpartyPath({ date }));
   }
 

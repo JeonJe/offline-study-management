@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 
 export type AfterpartySummary = {
   id: string;
@@ -133,6 +133,11 @@ export async function ensureAfterpartySchema(): Promise<void> {
 
     await query(
       `create index if not exists idx_afterparty_participants_name
+       on public.afterparty_participants (afterparty_id, lower(name))`
+    );
+
+    await query(
+      `create unique index if not exists idx_afterparty_participants_unique_name
        on public.afterparty_participants (afterparty_id, lower(name))`
     );
 
@@ -295,21 +300,27 @@ export async function createAfterpartyParticipantsBulk(
     return 0;
   }
 
-  for (const name of normalized) {
-    await query(
-      `insert into public.afterparty_participants (id, afterparty_id, name)
-       select $1, $2, $3
-       where not exists (
-         select 1
-         from public.afterparty_participants
-         where afterparty_id = $2
-           and lower(name) = lower($3)
-       )`,
-      [randomUUID(), afterpartyId, name]
-    );
-  }
+  let insertedCount = 0;
 
-  return normalized.length;
+  await withTransaction(async (tq) => {
+    for (const name of normalized) {
+      const rows = await tq<{ id: string }>(
+        `insert into public.afterparty_participants (id, afterparty_id, name)
+         select $1, $2, $3
+         where not exists (
+           select 1
+           from public.afterparty_participants
+           where afterparty_id = $2
+             and lower(name) = lower($3)
+         )
+         returning id`,
+        [randomUUID(), afterpartyId, name]
+      );
+      insertedCount += rows.length;
+    }
+  });
+
+  return insertedCount;
 }
 
 export async function deleteAfterpartyParticipant(

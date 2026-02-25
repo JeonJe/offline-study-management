@@ -10,11 +10,16 @@ type MemberAdminFormProps = {
 };
 
 type TeamDraft = {
+  id: string;
   teamName: string;
   angel: string;
   members: string[];
   memberInput: string;
 };
+
+function generateTeamId(): string {
+  return `team-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 function uniq(values: string[]): string[] {
   const seen = new Set<string>();
@@ -37,6 +42,7 @@ export function MemberAdminForm({ initialFixedAngels, initialTeamGroups }: Membe
   const [angelInput, setAngelInput] = useState("");
   const [teams, setTeams] = useState<TeamDraft[]>(
     initialTeamGroups.map((team) => ({
+      id: generateTeamId(),
       teamName: team.teamName,
       angel: team.angel,
       members: uniq(team.members),
@@ -48,6 +54,7 @@ export function MemberAdminForm({ initialFixedAngels, initialTeamGroups }: Membe
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
   const initialRenderRef = useRef(true);
+  const savingRef = useRef(false);
 
   const payload = useMemo(
     () => ({
@@ -68,6 +75,8 @@ export function MemberAdminForm({ initialFixedAngels, initialTeamGroups }: Membe
   }, [payload]);
 
   const saveNow = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setSaveState("idle");
 
@@ -81,6 +90,7 @@ export function MemberAdminForm({ initialFixedAngels, initialTeamGroups }: Membe
     } catch {
       setSaveState("error");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }, [payload]);
@@ -111,6 +121,7 @@ export function MemberAdminForm({ initialFixedAngels, initialTeamGroups }: Membe
     setTeams((prev) => [
       ...prev,
       {
+        id: generateTeamId(),
         teamName: `${prev.length + 1}팀`,
         angel: "",
         members: [],
@@ -238,7 +249,7 @@ export function MemberAdminForm({ initialFixedAngels, initialTeamGroups }: Membe
           ) : (
             <div className="grid gap-3 stagger-children">
               {teams.map((team, index) => (
-                <article key={`${team.teamName}-${index}`} className="card-static p-4">
+                <article key={team.id} className="card-static p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span

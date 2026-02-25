@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { updateAfterpartyParticipantSettlementAction } from "@/app/actions";
 
 type SettlementToggleProps = {
@@ -21,6 +21,10 @@ export function SettlementToggle({
   const formRef = useRef<HTMLFormElement>(null);
   const [checked, setChecked] = useState(isSettled);
 
+  useEffect(() => {
+    setChecked(isSettled);
+  }, [isSettled]);
+
   return (
     <form ref={formRef} action={updateAfterpartyParticipantSettlementAction} className="inline-flex items-center">
       <input type="hidden" name="afterpartyId" value={afterpartyId} />
@@ -36,6 +40,8 @@ export function SettlementToggle({
           onChange={(event) => {
             const nextChecked = event.currentTarget.checked;
             setChecked(nextChecked);
+            const hidden = formRef.current?.querySelector<HTMLInputElement>('input[name="isSettled"]');
+            if (hidden) hidden.value = nextChecked ? "true" : "false";
             formRef.current?.requestSubmit();
           }}
           className="peer sr-only"

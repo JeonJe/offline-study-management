@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
+import { isAuthenticated } from "@/lib/auth";
 import { query } from "@/lib/db";
 
 export async function GET() {
+  const authed = await isAuthenticated();
+  if (!authed) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
   try {
-    const [row] = await query<{ now: string; version: string }>(
-      "SELECT NOW() AS now, VERSION() AS version"
+    const [row] = await query<{ now: string }>(
+      "SELECT NOW() AS now"
     );
     return NextResponse.json({
       ok: true,
       now: row?.now,
-      version: row?.version,
     });
   } catch (error) {
     const message =

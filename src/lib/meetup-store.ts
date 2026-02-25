@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 
 export type ParticipantRole = "student" | "angel";
 
@@ -263,22 +263,28 @@ export async function createRsvpsBulk(
   }
 
   const trimmedNote = note?.trim() ?? "";
-  for (const name of normalized) {
-    await query(
-      `insert into public.rsvps (id, meeting_id, name, role, note)
-       select $1, $2, $3, $4, nullif($5, '')
-       where not exists (
-         select 1
-         from public.rsvps
-         where meeting_id = $2
-           and role = $4
-           and lower(name) = lower($3)
-       )`,
-      [randomUUID(), meetingId, name, role, trimmedNote]
-    );
-  }
+  let insertedCount = 0;
 
-  return normalized.length;
+  await withTransaction(async (tq) => {
+    for (const name of normalized) {
+      const rows = await tq<{ id: string }>(
+        `insert into public.rsvps (id, meeting_id, name, role, note)
+         select $1, $2, $3, $4, nullif($5, '')
+         where not exists (
+           select 1
+           from public.rsvps
+           where meeting_id = $2
+             and role = $4
+             and lower(name) = lower($3)
+         )
+         returning id`,
+        [randomUUID(), meetingId, name, role, trimmedNote]
+      );
+      insertedCount += rows.length;
+    }
+  });
+
+  return insertedCount;
 }
 
 export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
@@ -341,7 +347,14 @@ export async function updateRsvp(input: {
          role = $4,
          note = nullif($5, '')
      where id = $1
-       and meeting_id = $2`,
+       and meeting_id = $2
+       and not exists (
+         select 1 from public.rsvps
+         where meeting_id = $2
+           and role = $4
+           and lower(name) = lower($3)
+           and id != $1
+       )`,
     [
       input.id,
       input.meetingId,

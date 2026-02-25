@@ -19,6 +19,7 @@ import {
 import { loadMemberPreset } from "@/lib/member-store";
 import { redirect } from "next/navigation";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
+import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-button";
 import type { CSSProperties } from "react";
 
 type PageProps = {
@@ -108,15 +109,15 @@ function ParticipantChip({
         <input type="hidden" name="meetingId" value={meetingId} />
         <input type="hidden" name="rsvpId" value={row.id} />
         <input type="hidden" name="returnPath" value={returnPath} />
-        <button
-          type="submit"
+        <DeleteConfirmButton
+          confirmMessage={`${row.name}을(를) 참여자 목록에서 제거합니다.`}
           className="rounded-full px-1 text-[11px] font-semibold transition hover:text-rose-600"
           style={{ color: "var(--ink-muted)" }}
           aria-label="참여자 제거"
           title="제거"
         >
           ×
-        </button>
+        </DeleteConfirmButton>
       </form>
     </li>
   );
@@ -353,13 +354,13 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                   <form action={deleteMeetingAction} className="mt-3">
                     <input type="hidden" name="meetingId" value={meeting.id} />
                     <input type="hidden" name="returnDate" value={meeting.meetingDate} />
-                    <button
-                      type="submit"
+                    <DeleteConfirmButton
+                      confirmMessage={`"${meeting.title}" 모임과 모든 참여자 데이터가 삭제됩니다. 계속하시겠습니까?`}
                       className="btn-press h-9 rounded-lg px-3 text-xs font-semibold text-white"
                       style={{ backgroundColor: "var(--danger)" }}
                     >
                       이 모임 삭제
-                    </button>
+                    </DeleteConfirmButton>
                   </form>
                 </section>
               </EditManageModal>

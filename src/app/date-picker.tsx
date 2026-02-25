@@ -17,7 +17,7 @@ export function DatePicker({ selectedDate, basePath = "/" }: DatePickerProps) {
       value={selectedDate}
       onChange={(event) => {
         const nextDate = event.currentTarget.value;
-        router.push(nextDate ? `${basePath}?date=${nextDate}` : basePath);
+        router.push(nextDate ? `${basePath}?date=${encodeURIComponent(nextDate)}` : basePath);
       }}
       className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
       style={{

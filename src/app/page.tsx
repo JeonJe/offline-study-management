@@ -30,9 +30,12 @@ function isIsoDate(value: string): boolean {
 }
 
 function toIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
+  // Use KST (UTC+9) so Korean users near midnight see the correct local date
+  const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const kst = new Date(value.getTime() + KST_OFFSET_MS);
+  const year = kst.getUTCFullYear();
+  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(kst.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 

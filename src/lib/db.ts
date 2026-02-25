@@ -3,11 +3,14 @@ type QueryResult<T> = {
   rowCount: number;
 };
 
+type PgClient = {
+  query: <T>(text: string, params?: unknown[]) => Promise<QueryResult<T>>;
+  release: () => void;
+};
+
 type PgPool = {
-  query: <T>(
-    text: string,
-    params?: unknown[]
-  ) => Promise<QueryResult<T>>;
+  query: <T>(text: string, params?: unknown[]) => Promise<QueryResult<T>>;
+  connect: () => Promise<PgClient>;
   end: () => Promise<void>;
 };
 
@@ -57,11 +60,11 @@ function normalizeDatabaseUrl(raw: string): string {
   const password = match[3];
   const host = match[4];
   const path = match[5] ?? "/postgres";
-  const query = match[6] ?? "";
+  const queryStr = match[6] ?? "";
 
   return `${scheme}://${user}:${encodeURIComponent(
     decodeSafe(password)
-  )}@${host}${path}${query}`;
+  )}@${host}${path}${queryStr}`;
 }
 
 function getNormalizedDatabaseUrl(): string {
@@ -77,16 +80,44 @@ async function getPool(): Promise<PgPool> {
   const nextPool = new Pool({
     connectionString: getNormalizedDatabaseUrl(),
     ssl: { rejectUnauthorized: false },
+    max: 5,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
   });
 
-  pool = nextPool;
-  return nextPool;
+  pool = nextPool as unknown as PgPool;
+  return pool;
 }
 
 export async function query<T>(text: string, params: unknown[] = []): Promise<T[]> {
   const client = await getPool();
   const result = await client.query<T>(text, params);
   return result.rows;
+}
+
+export async function withTransaction<T>(
+  fn: (tq: <R>(text: string, params?: unknown[]) => Promise<R[]>) => Promise<T>
+): Promise<T> {
+  const pgPool = await getPool();
+  const client = await pgPool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const tq = async <R>(text: string, params: unknown[] = []): Promise<R[]> => {
+      const result = await client.query<R>(text, params);
+      return result.rows;
+    };
+
+    const result = await fn(tq);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function closeDbPool(): Promise<void> {

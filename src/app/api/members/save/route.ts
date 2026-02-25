@@ -47,12 +47,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as BodyShape;
+  let body: BodyShape;
+  try {
+    body = (await request.json()) as BodyShape;
+  } catch {
+    return NextResponse.json({ ok: false, error: "invalid json" }, { status: 400 });
+  }
+
   const parsed = parseBody(body);
   if (!parsed) {
     return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   }
 
-  await saveMemberPresetToDb(parsed.teamGroups, parsed.fixedAngels);
+  try {
+    await saveMemberPresetToDb(parsed.teamGroups, parsed.fixedAngels);
+  } catch {
+    return NextResponse.json({ ok: false, error: "save failed" }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }
