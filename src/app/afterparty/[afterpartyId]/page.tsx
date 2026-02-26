@@ -17,7 +17,8 @@ import {
   withTeamLabel,
 } from "@/lib/member-label-utils";
 import {
-  listAfterparties,
+  getAfterpartyById,
+  listAfterpartiesByDate,
   listParticipantsForAfterparties,
   listParticipantsForSettlement,
   listSettlementsForAfterparty,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/afterparty-store";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
 import {
-  listMeetings,
+  listMeetingsByDate,
   listRsvpsForMeetings,
   type ParticipantRole,
 } from "@/lib/meetup-store";
@@ -226,14 +227,12 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
     redirect("/?auth=required");
   }
 
-  const [afterparties, settlements, memberPreset, allMeetingsRaw] = await Promise.all([
-    listAfterparties(),
+  const [afterparty, settlements, memberPreset] = await Promise.all([
+    getAfterpartyById(afterpartyId),
     listSettlementsForAfterparty(afterpartyId),
     loadMemberPreset(),
-    listMeetings(),
   ]);
 
-  const afterparty = afterparties.find((item) => item.id === afterpartyId);
   if (!afterparty) {
     redirect(date ? `/afterparty?date=${date}` : "/afterparty");
   }
@@ -270,12 +269,10 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
 
   const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
 
-  const sameDateAfterparties = afterparties.filter(
-    (item) => item.eventDate === afterparty.eventDate
-  );
-  const allMeetings = allMeetingsRaw.filter(
-    (item) => item.meetingDate === afterparty.eventDate
-  );
+  const [sameDateAfterparties, allMeetings] = await Promise.all([
+    listAfterpartiesByDate(afterparty.eventDate),
+    listMeetingsByDate(afterparty.eventDate),
+  ]);
 
   const [participantsByAllAfterparty, rsvpsByMeeting] = await Promise.all([
     listParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),

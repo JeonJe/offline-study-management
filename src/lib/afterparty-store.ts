@@ -78,12 +78,43 @@ type CreateAfterpartyParticipantInput = {
 
 let schemaReady = false;
 let schemaPromise: Promise<void> | null = null;
+const runtimeMigrationsEnabled =
+  process.env.DB_RUNTIME_MIGRATIONS === "1" ||
+  process.env.DB_RUNTIME_MIGRATIONS === "true";
+
+async function hasAfterpartySchema(): Promise<boolean> {
+  const [row] = await query<{
+    afterparties: string | null;
+    participants: string | null;
+    settlements: string | null;
+    settlementParticipants: string | null;
+  }>(
+    `select
+       to_regclass('public.afterparties')::text as afterparties,
+       to_regclass('public.afterparty_participants')::text as participants,
+       to_regclass('public.afterparty_settlements')::text as settlements,
+       to_regclass('public.afterparty_settlement_participants')::text as "settlementParticipants"`
+  );
+
+  return Boolean(
+    row?.afterparties &&
+      row?.participants &&
+      row?.settlements &&
+      row?.settlementParticipants
+  );
+}
 
 export async function ensureAfterpartySchema(): Promise<void> {
   if (schemaReady) return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {
+    const schemaExists = await hasAfterpartySchema();
+    if (schemaExists && !runtimeMigrationsEnabled) {
+      schemaReady = true;
+      return;
+    }
+
     await query(`create extension if not exists pgcrypto`);
 
     await query(
@@ -479,6 +510,93 @@ export async function listAfterparties(): Promise<AfterpartySummary[]> {
      ) settlement_stats on true
      order by a.event_date desc, a.start_time desc, a.created_at desc`
   );
+}
+
+export async function listAfterpartiesByDate(
+  eventDate: string
+): Promise<AfterpartySummary[]> {
+  await ensureAfterpartySchema();
+
+  return query<AfterpartySummary>(
+    `select
+       a.id,
+       a.title,
+       a.event_date::text as "eventDate",
+       to_char(a.start_time, 'HH24:MI') as "startTime",
+       a.location,
+       a.description,
+       coalesce(primary_settlement.settlement_manager, a.settlement_manager) as "settlementManager",
+       coalesce(primary_settlement.settlement_account, a.settlement_account) as "settlementAccount",
+       coalesce(participant_stats.participant_count, 0)::int as "participantCount",
+       coalesce(settlement_stats.settlement_count, 0)::int as "settlementCount"
+     from public.afterparties a
+     left join lateral (
+       select
+         s.settlement_manager,
+         s.settlement_account
+       from public.afterparty_settlements s
+       where s.afterparty_id = a.id
+       order by s.sort_order asc, s.created_at asc, s.id asc
+       limit 1
+     ) primary_settlement on true
+     left join lateral (
+       select count(*)::int as participant_count
+       from public.afterparty_participants p
+       where p.afterparty_id = a.id
+     ) participant_stats on true
+     left join lateral (
+       select count(*)::int as settlement_count
+       from public.afterparty_settlements s
+       where s.afterparty_id = a.id
+     ) settlement_stats on true
+     where a.event_date = $1
+     order by a.event_date desc, a.start_time desc, a.created_at desc`,
+    [eventDate]
+  );
+}
+
+export async function getAfterpartyById(afterpartyId: string): Promise<AfterpartySummary | null> {
+  await ensureAfterpartySchema();
+
+  const [row] = await query<AfterpartySummary>(
+    `select
+       a.id,
+       a.title,
+       a.event_date::text as "eventDate",
+       to_char(a.start_time, 'HH24:MI') as "startTime",
+       a.location,
+       a.description,
+       coalesce(primary_settlement.settlement_manager, a.settlement_manager) as "settlementManager",
+       coalesce(primary_settlement.settlement_account, a.settlement_account) as "settlementAccount",
+       coalesce(participant_stats.participant_count, 0)::int as "participantCount",
+       coalesce(settlement_stats.settlement_count, 0)::int as "settlementCount"
+     from public.afterparties a
+     left join lateral (
+       select
+         s.settlement_manager,
+         s.settlement_account
+       from public.afterparty_settlements s
+       where s.afterparty_id = a.id
+       order by s.sort_order asc, s.created_at asc, s.id asc
+       limit 1
+     ) primary_settlement on true
+     left join lateral (
+       select count(*)::int as participant_count
+       from public.afterparty_participants p
+       where p.afterparty_id = a.id
+     ) participant_stats on true
+     left join lateral (
+       select count(*)::int as settlement_count
+       from public.afterparty_settlements s
+       where s.afterparty_id = a.id
+     ) settlement_stats on true
+     where a.id = $1
+     order by a.event_date desc, a.start_time desc, a.created_at desc
+     limit 1`,
+    [afterpartyId]
+  );
+
+  return row ?? null;
 }
 
 export async function listParticipantsForAfterparties(
@@ -902,79 +1020,90 @@ export async function createAfterpartyParticipantsBulk(
     return 0;
   }
 
+  const names = normalized.map((participant) => participant.name);
+  const roles = normalized.map((participant) => participant.role);
+  const generatedIds = normalized.map(() => randomUUID());
   let insertedCount = 0;
 
   await withTransaction(async (tq) => {
     const targetSettlementId = await ensureTargetSettlementId(tq, afterpartyId, settlementId);
 
-    for (const participant of normalized) {
-      const name = participant.name;
-      const role = participant.role;
-      let participantId: string | null = null;
+    await tq(
+      `with incoming as (
+         select
+           i.name,
+           i.role,
+           i.id
+         from unnest($1::text[], $2::text[], $3::uuid[]) as i(name, role, id)
+       )
+       insert into public.afterparty_participants (id, afterparty_id, name, role)
+       select
+         i.id,
+         $4,
+         i.name,
+         i.role
+       from incoming i
+       where not exists (
+         select 1
+         from public.afterparty_participants p
+         where p.afterparty_id = $4
+           and lower(p.name) = lower(i.name)
+       )`,
+      [names, roles, generatedIds, afterpartyId]
+    );
 
-      const insertedParticipant = await tq<{ id: string }>(
-        `insert into public.afterparty_participants (id, afterparty_id, name, role)
-         select $1, $2, $3, $4
-         where not exists (
-           select 1
-           from public.afterparty_participants
-           where afterparty_id = $2
-             and lower(name) = lower($3)
-         )
-         returning id`,
-        [randomUUID(), afterpartyId, name, role]
-      );
+    await tq(
+      `with incoming as (
+         select
+           i.name,
+           i.role
+         from unnest($1::text[], $2::text[]) as i(name, role)
+       )
+       update public.afterparty_participants p
+       set role = i.role
+       from incoming i
+       where p.afterparty_id = $3
+         and lower(p.name) = lower(i.name)
+         and p.role = 'student'
+         and i.role <> 'student'`,
+      [names, roles, afterpartyId]
+    );
 
-      if (insertedParticipant[0]) {
-        participantId = insertedParticipant[0].id;
-      } else {
-        const [existingParticipant] = await tq<{ id: string; role: ParticipantRole }>(
-          `select
-             id,
-             coalesce(nullif(role, ''), 'student') as role
-           from public.afterparty_participants
-           where afterparty_id = $1
-             and lower(name) = lower($2)
-           limit 1`,
-          [afterpartyId, name]
-        );
-        participantId = existingParticipant?.id ?? null;
-
-        if (
-          existingParticipant &&
-          existingParticipant.role !== role &&
-          existingParticipant.role === "student"
-        ) {
-          await tq(
-            `update public.afterparty_participants
-             set role = $3
-             where id = $1
-               and afterparty_id = $2
-               and role = 'student'`,
-            [existingParticipant.id, afterpartyId, role]
-          );
-        }
-      }
-
-      if (!participantId) {
-        continue;
-      }
-
-      const insertedLink = await tq<{ participantId: string }>(
-        `insert into public.afterparty_settlement_participants (
+    const [countRow] = await tq<{ insertedCount: number }>(
+      `with incoming as (
+         select
+           i.name
+         from unnest($1::text[]) as i(name)
+       ),
+       matched as (
+         select distinct p.id
+         from incoming i
+         join public.afterparty_participants p
+           on p.afterparty_id = $2
+          and lower(p.name) = lower(i.name)
+       ),
+       inserted_links as (
+         insert into public.afterparty_settlement_participants (
            settlement_id,
            participant_id,
            is_settled,
            settled_at
          )
-         values ($1, $2, false, null)
+         select
+           $3,
+           m.id,
+           false,
+           null
+         from matched m
          on conflict (settlement_id, participant_id) do nothing
-         returning participant_id as "participantId"`,
-        [targetSettlementId, participantId]
-      );
+         returning 1
+       )
+       select count(*)::int as "insertedCount"
+       from inserted_links`,
+      [names, afterpartyId, targetSettlementId]
+    );
 
-      insertedCount += insertedLink.length;
-    }
+    insertedCount = countRow?.insertedCount ?? 0;
   });
 
   return insertedCount;

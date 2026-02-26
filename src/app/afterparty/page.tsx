@@ -12,6 +12,7 @@ import { extractHttpUrl } from "@/lib/location-utils";
 import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
   listAfterparties,
+  listAfterpartiesByDate,
   listParticipantsForAfterparties,
   listSettlementsForAfterparties,
   type AfterpartyParticipant,
@@ -358,7 +359,6 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
   }
 
   let selectedDate = isIsoDate(requestDate) ? requestDate : toKstIsoDate(new Date());
-  let afterparties: AfterpartySummary[] = [];
   let afterpartiesOnDate: AfterpartySummary[] = [];
   let participantsByAfterparty: Record<string, AfterpartyParticipant[]> = {};
   let settlementsByAfterparty: Record<string, AfterpartySettlement[]> = {};
@@ -366,7 +366,6 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
   let loadError = "";
 
   try {
-    afterparties = await listAfterparties();
     const memberPreset = await loadMemberPreset();
     for (const group of memberPreset.teamGroups) {
       const teamLabel = toTeamLabel(group.teamName);
@@ -384,11 +383,14 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
         }
       }
     }
-    if (!isIsoDate(requestDate)) {
-      selectedDate = afterparties[0]?.eventDate ?? selectedDate;
+    if (isIsoDate(requestDate)) {
+      selectedDate = requestDate;
+      afterpartiesOnDate = await listAfterpartiesByDate(selectedDate);
+    } else {
+      const allAfterparties = await listAfterparties();
+      selectedDate = allAfterparties[0]?.eventDate ?? selectedDate;
+      afterpartiesOnDate = await listAfterpartiesByDate(selectedDate);
     }
-
-    afterpartiesOnDate = afterparties.filter((item) => item.eventDate === selectedDate);
     participantsByAfterparty = await listParticipantsForAfterparties(
       afterpartiesOnDate.map((item) => item.id),
       ""

@@ -53,6 +53,10 @@ type LegacyTableRow = {
 
 let schemaReady = false;
 let schemaPromise: Promise<void> | null = null;
+let legacyMigrationChecked = false;
+const runtimeMigrationsEnabled =
+  process.env.DB_RUNTIME_MIGRATIONS === "1" ||
+  process.env.DB_RUNTIME_MIGRATIONS === "true";
 
 function normalizeTeamGroups(groups: TeamMemberGroup[]): TeamMemberGroup[] {
   const seenTeams = new Set<string>();
@@ -113,11 +117,39 @@ function normalizeSpecialRoles(
   return normalized;
 }
 
+async function hasMemberSchema(): Promise<boolean> {
+  const [row] = await query<{
+    memberTeams: string | null;
+    teamMembers: string | null;
+    angels: string | null;
+    specialRoles: string | null;
+  }>(
+    `select
+       to_regclass('public.member_teams')::text as "memberTeams",
+       to_regclass('public.member_team_members')::text as "teamMembers",
+       to_regclass('public.member_angels')::text as angels,
+       to_regclass('public.member_special_roles')::text as "specialRoles"`
+  );
+
+  return Boolean(
+    row?.memberTeams &&
+      row?.teamMembers &&
+      row?.angels &&
+      row?.specialRoles
+  );
+}
+
 async function ensureMemberSchema(): Promise<void> {
   if (schemaReady) return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {
+    const schemaExists = await hasMemberSchema();
+    if (schemaExists && !runtimeMigrationsEnabled) {
+      schemaReady = true;
+      return;
+    }
+
     await query(
       `create table if not exists public.member_teams (
          team_name text primary key,
@@ -200,11 +232,16 @@ async function ensureMemberSchema(): Promise<void> {
 }
 
 async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
+  if (legacyMigrationChecked) {
+    return;
+  }
+
   const memberCountRows = await query<CountRow>(
     `select count(*)::text as count from public.member_teams`
   );
   const memberCount = Number.parseInt(memberCountRows[0]?.count ?? "0", 10);
   if (memberCount > 0) {
+    legacyMigrationChecked = true;
     return;
   }
 
@@ -218,6 +255,7 @@ async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
 
   const allLegacyPresent = legacyTables.every((row) => row.name !== null);
   if (!allLegacyPresent) {
+    legacyMigrationChecked = true;
     return;
   }
 
@@ -248,6 +286,8 @@ async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
      on conflict (angel_name)
      do update set angel_order = excluded.angel_order`
   );
+
+  legacyMigrationChecked = true;
 }
 
 export async function loadMemberPreset(): Promise<MemberPreset> {

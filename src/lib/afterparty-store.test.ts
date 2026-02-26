@@ -44,29 +44,11 @@ describe("afterparty-store settlement flows", () => {
           return [{ id: "settle-1" }];
         }
 
-        if (text.includes("insert into public.afterparty_participants")) {
-          if (params?.[2] === "Alice") {
-            return [{ id: "p-alice" }];
-          }
-          if (params?.[2] === "Bob") {
-            return [];
-          }
-        }
-
         if (
-          text.includes("from public.afterparty_participants") &&
-          text.includes("lower(name) = lower($2)")
+          text.includes("select count(*)::int as \"insertedCount\"") &&
+          text.includes("from inserted_links")
         ) {
-          return [{ id: "p-bob" }];
-        }
-
-        if (text.includes("insert into public.afterparty_settlement_participants")) {
-          if (params?.[1] === "p-alice") {
-            return [{ participantId: "p-alice" }];
-          }
-          if (params?.[1] === "p-bob") {
-            return [];
-          }
+          return [{ insertedCount: 1 }];
         }
 
         return [];
@@ -87,7 +69,9 @@ describe("afterparty-store settlement flows", () => {
     const participantInsertCalls = txCalls.filter((call) =>
       call.text.includes("insert into public.afterparty_participants")
     );
-    expect(participantInsertCalls).toHaveLength(2);
+    expect(participantInsertCalls).toHaveLength(1);
+    const [firstInsertCall] = participantInsertCalls;
+    expect(firstInsertCall?.params?.[0]).toEqual(["Alice", "Bob"]);
   });
 
   it("stores participant role when explicit role input is provided", async () => {
@@ -105,11 +89,13 @@ describe("afterparty-store settlement flows", () => {
 
         if (text.includes("insert into public.afterparty_participants")) {
           participantInsertParams.push(params ?? []);
-          return [{ id: "p-annie" }];
         }
 
-        if (text.includes("insert into public.afterparty_settlement_participants")) {
-          return [{ participantId: "p-annie" }];
+        if (
+          text.includes("select count(*)::int as \"insertedCount\"") &&
+          text.includes("from inserted_links")
+        ) {
+          return [{ insertedCount: 1 }];
         }
 
         return [];
@@ -126,8 +112,8 @@ describe("afterparty-store settlement flows", () => {
 
     expect(inserted).toBe(1);
     expect(participantInsertParams).toHaveLength(1);
-    expect(participantInsertParams[0]?.[2]).toBe("annie");
-    expect(participantInsertParams[0]?.[3]).toBe("manager");
+    expect(participantInsertParams[0]?.[0]).toEqual(["annie"]);
+    expect(participantInsertParams[0]?.[1]).toEqual(["manager"]);
   });
 
   it("rejects settlement deletion when only one settlement remains", async () => {

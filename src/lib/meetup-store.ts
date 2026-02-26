@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { query, withTransaction } from "@/lib/db";
+import { query } from "@/lib/db";
 
 export type ParticipantRole =
   | "student"
@@ -56,12 +56,31 @@ type UpdateMeetingInput = {
 
 let schemaReady = false;
 let schemaPromise: Promise<void> | null = null;
+const runtimeMigrationsEnabled =
+  process.env.DB_RUNTIME_MIGRATIONS === "1" ||
+  process.env.DB_RUNTIME_MIGRATIONS === "true";
+
+async function hasMeetupSchema(): Promise<boolean> {
+  const [row] = await query<{ meetings: string | null; rsvps: string | null }>(
+    `select
+       to_regclass('public.meetings')::text as meetings,
+       to_regclass('public.rsvps')::text as rsvps`
+  );
+
+  return Boolean(row?.meetings && row?.rsvps);
+}
 
 export async function ensureSchema(): Promise<void> {
   if (schemaReady) return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {
+    const schemaExists = await hasMeetupSchema();
+    if (schemaExists && !runtimeMigrationsEnabled) {
+      schemaReady = true;
+      return;
+    }
+
     await query(
       `create table if not exists public.meetings (
         id uuid primary key,
@@ -152,6 +171,69 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
      group by m.id
      order by m.meeting_date desc, m.start_time desc, m.created_at desc`
   );
+}
+
+export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSummary[]> {
+  await ensureSchema();
+
+  return query<MeetingSummary>(
+    `select
+       m.id,
+       m.title,
+       m.meeting_date::text as "meetingDate",
+       to_char(m.start_time, 'HH24:MI') as "startTime",
+       m.location,
+       m.description,
+       count(r.id) filter (where r.role = 'student')::int as "studentCount",
+       count(r.id) filter (where r.role <> 'student')::int as "operationCount",
+       count(r.id)::int as "totalCount"
+     from public.meetings m
+     left join public.rsvps r on r.meeting_id = m.id
+     where m.meeting_date = $1
+     group by m.id
+     order by m.meeting_date desc, m.start_time desc, m.created_at desc`,
+    [meetingDate]
+  );
+}
+
+export async function getMeetingById(meetingId: string): Promise<MeetingSummary | null> {
+  await ensureSchema();
+
+  const [row] = await query<MeetingSummary>(
+    `select
+       m.id,
+       m.title,
+       m.meeting_date::text as "meetingDate",
+       to_char(m.start_time, 'HH24:MI') as "startTime",
+       m.location,
+       m.description,
+       count(r.id) filter (where r.role = 'student')::int as "studentCount",
+       count(r.id) filter (where r.role <> 'student')::int as "operationCount",
+       count(r.id)::int as "totalCount"
+     from public.meetings m
+     left join public.rsvps r on r.meeting_id = m.id
+     where m.id = $1
+     group by m.id
+     order by m.meeting_date desc, m.start_time desc, m.created_at desc
+     limit 1`,
+    [meetingId]
+  );
+
+  return row ?? null;
+}
+
+export async function getMeetingTitle(meetingId: string): Promise<string> {
+  await ensureSchema();
+
+  const [row] = await query<{ title: string }>(
+    `select title
+     from public.meetings
+     where id = $1
+     limit 1`,
+    [meetingId]
+  );
+
+  return row?.title ?? "";
 }
 
 export async function createMeeting(input: CreateMeetingInput): Promise<MeetingSummary> {
@@ -292,29 +374,40 @@ export async function createRsvpsBulk(
     return 0;
   }
 
+  const ids = normalized.map(() => randomUUID());
   const trimmedNote = note?.trim() ?? "";
-  let insertedCount = 0;
 
-  await withTransaction(async (tq) => {
-    for (const name of normalized) {
-      const rows = await tq<{ id: string }>(
-        `insert into public.rsvps (id, meeting_id, name, role, note)
-         select $1, $2, $3, $4, nullif($5, '')
-         where not exists (
-           select 1
-           from public.rsvps
-           where meeting_id = $2
-             and role = $4
-             and lower(name) = lower($3)
-         )
-         returning id`,
-        [randomUUID(), meetingId, name, role, trimmedNote]
-      );
-      insertedCount += rows.length;
-    }
-  });
+  const [row] = await query<{ insertedCount: number }>(
+    `with incoming as (
+       select
+         i.name,
+         i.id
+       from unnest($1::text[], $2::uuid[]) as i(name, id)
+     ),
+     inserted as (
+       insert into public.rsvps (id, meeting_id, name, role, note)
+       select
+         i.id,
+         $3,
+         i.name,
+         $4,
+         nullif($5, '')
+       from incoming i
+       where not exists (
+         select 1
+         from public.rsvps r
+         where r.meeting_id = $3
+           and r.role = $4
+           and lower(r.name) = lower(i.name)
+       )
+       returning 1
+     )
+     select count(*)::int as "insertedCount"
+     from inserted`,
+    [normalized, ids, meetingId, role, trimmedNote]
+  );
 
-  return insertedCount;
+  return row?.insertedCount ?? 0;
 }
 
 export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {

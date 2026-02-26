@@ -7,11 +7,12 @@ import {
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
 import {
-  listAfterparties,
+  listAfterpartiesByDate,
   listParticipantsForAfterparties,
 } from "@/lib/afterparty-store";
 import {
-  listMeetings,
+  getMeetingById,
+  listMeetingsByDate,
   listRsvpsForMeetings,
   type ParticipantRole,
   type RsvpRecord,
@@ -223,21 +224,18 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     redirect("/?auth=required");
   }
 
-  const [meetings, memberPreset, allAfterparties] = await Promise.all([
-    listMeetings(),
+  const [meeting, memberPreset] = await Promise.all([
+    getMeetingById(meetingId),
     loadMemberPreset(),
-    listAfterparties(),
   ]);
-
-  const meeting = meetings.find((item) => item.id === meetingId);
   if (!meeting) {
     redirect(date ? `/?date=${date}` : "/");
   }
 
-  const sameDateMeetings = meetings.filter((item) => item.meetingDate === meeting.meetingDate);
-  const sameDateAfterparties = allAfterparties.filter(
-    (item) => item.eventDate === meeting.meetingDate
-  );
+  const [sameDateMeetings, sameDateAfterparties] = await Promise.all([
+    listMeetingsByDate(meeting.meetingDate),
+    listAfterpartiesByDate(meeting.meetingDate),
+  ]);
 
   const [rsvpsByMeeting, participantsByAfterparty] = await Promise.all([
     listRsvpsForMeetings(sameDateMeetings.map((item) => item.id), ""),

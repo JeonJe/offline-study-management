@@ -23,7 +23,7 @@ import {
   createRsvpsBulk,
   deleteMeeting,
   deleteRsvp,
-  listMeetings,
+  getMeetingTitle,
   type ParticipantRole,
   updateMeeting,
   updateRsvp,
@@ -97,9 +97,7 @@ function parseDelimitedNames(raw: string): string[] {
 }
 
 async function resolveMeetingLabel(meetingId: string): Promise<string> {
-  const meetings = await listMeetings();
-  const meeting = meetings.find((item) => item.id === meetingId);
-  return meeting?.title ?? "";
+  return getMeetingTitle(meetingId);
 }
 
 async function resolveParticipantRoleEntries(
