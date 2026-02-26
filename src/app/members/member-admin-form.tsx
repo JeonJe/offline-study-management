@@ -18,7 +18,8 @@ type MemberAdminFormProps = {
 type TeamDraft = {
   id: string;
   teamName: string;
-  angel: string;
+  angels: string[];
+  angelInput: string;
   members: string[];
   memberInput: string;
 };
@@ -76,7 +77,8 @@ export function MemberAdminForm({
     initialTeamGroups.map((team) => ({
       id: generateTeamId(),
       teamName: team.teamName,
-      angel: team.angel,
+      angels: uniq(team.angels ?? []),
+      angelInput: "",
       members: uniq(team.members),
       memberInput: "",
     }))
@@ -106,7 +108,7 @@ export function MemberAdminForm({
       fixedAngels: uniq(fixedAngels),
       teamGroups: teams.map((team) => ({
         teamName: team.teamName.trim(),
-        angel: team.angel.trim(),
+        angels: uniq(team.angels).slice(0, 2),
         members: uniq(team.members),
       })),
       specialRoles: Object.fromEntries(
@@ -119,7 +121,7 @@ export function MemberAdminForm({
   const canAutoSave = useMemo(() => {
     if (payload.fixedAngels.length === 0) return false;
     if (payload.teamGroups.length === 0) return false;
-    return payload.teamGroups.every((team) => team.teamName.length > 0 && team.angel.length > 0);
+    return payload.teamGroups.every((team) => team.teamName.length > 0 && team.angels.length > 0);
   }, [payload]);
 
   const saveNow = useCallback(async () => {
@@ -171,7 +173,8 @@ export function MemberAdminForm({
       {
         id: generateTeamId(),
         teamName: `${prev.length + 1}팀`,
-        angel: "",
+        angels: [],
+        angelInput: "",
         members: [],
         memberInput: "",
       },
@@ -192,6 +195,17 @@ export function MemberAdminForm({
       ...team,
       members: uniq([...team.members, ...names]),
       memberInput: "",
+    }));
+  }
+
+  function addTeamAngels(index: number, raw: string): void {
+    const names = parseNames(raw);
+    if (names.length === 0) return;
+
+    updateTeam(index, (team) => ({
+      ...team,
+      angels: uniq([...team.angels, ...names]).slice(0, 2),
+      angelInput: "",
     }));
   }
 
@@ -429,14 +443,12 @@ export function MemberAdminForm({
                         style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                         placeholder="팀명"
                       />
-                      <input
-                        value={team.angel}
-                        list="member-fixed-angels"
-                        onChange={(event) => updateTeam(index, (prev) => ({ ...prev, angel: event.target.value }))}
-                        className="h-9 w-28 rounded-lg border px-2 text-xs"
-                        style={{ borderColor: "#fbbf24", backgroundColor: "rgba(254, 243, 199, 0.3)", color: "#92400e" }}
-                        placeholder="팀 엔젤"
-                      />
+                      <span
+                        className="rounded-full border px-2 py-1 text-[11px] font-semibold"
+                        style={{ borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }}
+                      >
+                        엔젤 {team.angels.length}/2
+                      </span>
                     </div>
 
                     <button
@@ -450,6 +462,64 @@ export function MemberAdminForm({
                   </div>
 
                   <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold" style={{ color: "#92400e" }}>엔젤</span>
+                      <span className="text-xs" style={{ color: "var(--ink-muted)" }}>{team.angels.length}명</span>
+                    </div>
+
+                    <div
+                      className="mt-2 flex min-h-12 flex-wrap gap-2 rounded-lg border bg-white px-2 py-2"
+                      style={{ borderColor: "#fbbf24", backgroundColor: "rgba(254, 243, 199, 0.2)" }}
+                    >
+                      {team.angels.map((angel) => (
+                        <span
+                          key={`${team.teamName}-angel-${angel}`}
+                          className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs"
+                          style={{ borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }}
+                        >
+                          🪽 {angel}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateTeam(index, (prev) => ({
+                                ...prev,
+                                angels: prev.angels.filter((name) => name !== angel),
+                              }))
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      {team.angels.length === 0 ? (
+                        <span className="text-xs" style={{ color: "var(--ink-muted)" }}>등록된 엔젤 없음</span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        value={team.angelInput}
+                        list="member-fixed-angels"
+                        onChange={(event) => updateTeam(index, (prev) => ({ ...prev, angelInput: event.target.value }))}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          addTeamAngels(index, team.angelInput);
+                        }}
+                        className="h-9 w-full rounded-lg border px-2 text-xs sm:w-52"
+                        style={{ borderColor: "#fbbf24", backgroundColor: "rgba(254, 243, 199, 0.3)", color: "#92400e" }}
+                        placeholder="팀 엔젤(최대 2명)"
+                      />
+                      <button
+                        type="button"
+                        className="btn-press h-9 rounded-lg border px-2 text-xs font-semibold"
+                        style={{ borderColor: "#fbbf24", color: "#92400e" }}
+                        onClick={() => addTeamAngels(index, team.angelInput)}
+                      >
+                        추가
+                      </button>
+                    </div>
+
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>멤버</span>
                       <span className="text-xs" style={{ color: "var(--ink-muted)" }}>{team.members.length}명</span>

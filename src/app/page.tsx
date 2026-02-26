@@ -646,10 +646,12 @@ export default async function Home({ searchParams }: HomePageProps) {
     const knownMemberNames = new Set<string>();
     for (const group of memberPreset.teamGroups) {
       const teamLabel = toTeamLabel(group.teamName);
-      const normalizedAngelName = normalizeMemberName(group.angel);
-      knownMemberNames.add(normalizedAngelName);
-      if (teamLabel && !teamLabelByMemberName.has(normalizedAngelName)) {
-        teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+      for (const angel of group.angels) {
+        const normalizedAngelName = normalizeMemberName(angel);
+        knownMemberNames.add(normalizedAngelName);
+        if (teamLabel && !teamLabelByMemberName.has(normalizedAngelName)) {
+          teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+        }
       }
       for (const member of group.members) {
         const normalizedMemberName = normalizeMemberName(member);

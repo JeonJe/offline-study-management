@@ -370,9 +370,11 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     const memberPreset = await loadMemberPreset();
     for (const group of memberPreset.teamGroups) {
       const teamLabel = toTeamLabel(group.teamName);
-      const normalizedAngelName = normalizeMemberName(group.angel);
-      if (teamLabel && !teamLabelByMemberName.has(normalizedAngelName)) {
-        teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+      for (const angel of group.angels) {
+        const normalizedAngelName = normalizeMemberName(angel);
+        if (teamLabel && !teamLabelByMemberName.has(normalizedAngelName)) {
+          teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+        }
       }
 
       for (const memberName of group.members) {

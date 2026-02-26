@@ -253,9 +253,11 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
     const teamLabel = toTeamLabel(group.teamName);
     if (!teamLabel) continue;
 
-    const normalizedAngelName = normalizeMemberName(group.angel);
-    if (!teamLabelByMemberName.has(normalizedAngelName)) {
-      teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+    for (const angel of group.angels) {
+      const normalizedAngelName = normalizeMemberName(angel);
+      if (!teamLabelByMemberName.has(normalizedAngelName)) {
+        teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+      }
     }
 
     for (const member of group.members) {
@@ -306,7 +308,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   for (const role of operationRoleOrder) {
     const candidates =
       role === "angel"
-        ? [...memberPreset.teamGroups.map((group) => group.angel), ...memberPreset.fixedAngels]
+        ? [...memberPreset.teamGroups.flatMap((group) => group.angels), ...memberPreset.fixedAngels]
         : memberPreset.specialRoles[role] ?? [];
     for (const rawName of candidates) {
       const name = rawName.trim();

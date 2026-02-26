@@ -108,7 +108,9 @@ async function resolveParticipantRoleEntries(
   const memberPreset = await loadMemberPreset();
   const angelSet = new Set<string>([
     ...memberPreset.fixedAngels.map((name) => normalizeParticipantName(name)),
-    ...memberPreset.teamGroups.map((team) => normalizeParticipantName(team.angel)),
+    ...memberPreset.teamGroups.flatMap((team) =>
+      team.angels.map((angel) => normalizeParticipantName(angel))
+    ),
   ]);
   const roleMatchSet = buildRoleMatchSet(memberPreset.specialRoles);
 

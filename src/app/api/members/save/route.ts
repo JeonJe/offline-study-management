@@ -13,6 +13,22 @@ type BodyShape = {
   specialRoles?: unknown;
 };
 
+function uniq(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function parseNames(raw: string): string[] {
+  return uniq(raw.split(/[\n,;]+/));
+}
+
 function parseBody(
   input: BodyShape
 ): {
@@ -31,17 +47,29 @@ function parseBody(
     ? input.teamGroups
         .map((row) => {
           if (!row || typeof row !== "object") return null;
-          const obj = row as { teamName?: unknown; angel?: unknown; members?: unknown };
+          const obj = row as {
+            teamName?: unknown;
+            angel?: unknown;
+            angels?: unknown;
+            members?: unknown;
+          };
           const teamName = typeof obj.teamName === "string" ? obj.teamName.trim() : "";
-          const angel = typeof obj.angel === "string" ? obj.angel.trim() : "";
+          const angelsFromArray = Array.isArray(obj.angels)
+            ? obj.angels
+                .filter((item): item is string => typeof item === "string")
+                .map((v) => v.trim())
+                .filter(Boolean)
+            : [];
+          const angelsFromLegacy = typeof obj.angel === "string" ? parseNames(obj.angel) : [];
+          const angels = uniq([...(angelsFromArray.length > 0 ? angelsFromArray : angelsFromLegacy)]).slice(0, 2);
           const members = Array.isArray(obj.members)
             ? obj.members
                 .filter((item): item is string => typeof item === "string")
                 .map((v) => v.trim())
                 .filter(Boolean)
             : [];
-          if (!teamName || !angel) return null;
-          return { teamName, angel, members };
+          if (!teamName || angels.length === 0) return null;
+          return { teamName, angels, members };
         })
         .filter((row): row is TeamMemberGroup => row !== null)
     : [];

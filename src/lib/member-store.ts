@@ -3,7 +3,7 @@ import { query, withTransaction } from "@/lib/db";
 export type TeamMemberGroup = {
   teamName: string;
   members: string[];
-  angel: string;
+  angels: string[];
 };
 
 export type SpecialParticipantRole =
@@ -30,7 +30,7 @@ export type MemberPreset = {
 
 type DbTeamRow = {
   teamName: string;
-  angelName: string;
+  angelNames: string[] | null;
   memberName: string | null;
 };
 
@@ -60,8 +60,8 @@ function normalizeTeamGroups(groups: TeamMemberGroup[]): TeamMemberGroup[] {
 
   for (const group of groups) {
     const teamName = group.teamName.trim();
-    const angel = group.angel.trim();
-    if (!teamName || !angel || seenTeams.has(teamName)) continue;
+    const angels = normalizeAngels(group.angels ?? []).slice(0, 2);
+    if (!teamName || angels.length === 0 || seenTeams.has(teamName)) continue;
 
     seenTeams.add(teamName);
 
@@ -74,7 +74,7 @@ function normalizeTeamGroups(groups: TeamMemberGroup[]): TeamMemberGroup[] {
       members.push(member);
     }
 
-    normalized.push({ teamName, angel, members });
+    normalized.push({ teamName, angels, members });
   }
 
   return normalized;
@@ -122,10 +122,25 @@ async function ensureMemberSchema(): Promise<void> {
       `create table if not exists public.member_teams (
          team_name text primary key,
          angel_name text not null,
+         angel_names text[] not null default '{}'::text[],
          team_order integer not null default 0,
          created_at timestamptz not null default now(),
          updated_at timestamptz not null default now()
        )`
+    );
+
+    await query(
+      `alter table public.member_teams
+       add column if not exists angel_names text[] not null default '{}'::text[]`
+    );
+
+    await query(
+      `update public.member_teams
+       set angel_names = case
+         when cardinality(coalesce(angel_names, '{}'::text[])) > 0 then angel_names
+         when nullif(trim(angel_name), '') is not null then array[angel_name]
+         else '{}'::text[]
+       end`
     );
 
     await query(
@@ -207,12 +222,13 @@ async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
   }
 
   await query(
-    `insert into public.member_teams (team_name, angel_name, team_order)
-     select team_name, angel_name, team_order
+    `insert into public.member_teams (team_name, angel_name, angel_names, team_order)
+     select team_name, angel_name, array[angel_name], team_order
      from public.roster_teams
      on conflict (team_name)
      do update set
        angel_name = excluded.angel_name,
+       angel_names = excluded.angel_names,
        team_order = excluded.team_order,
        updated_at = now()`
   );
@@ -241,7 +257,11 @@ export async function loadMemberPreset(): Promise<MemberPreset> {
   const teamRows = await query<DbTeamRow>(
     `select
        t.team_name as "teamName",
-       t.angel_name as "angelName",
+       case
+         when cardinality(coalesce(t.angel_names, '{}'::text[])) > 0 then t.angel_names
+         when nullif(trim(t.angel_name), '') is not null then array[t.angel_name]
+         else '{}'::text[]
+       end as "angelNames",
        m.member_name as "memberName"
      from public.member_teams t
      left join public.member_team_members m on m.team_name = t.team_name
@@ -253,7 +273,11 @@ export async function loadMemberPreset(): Promise<MemberPreset> {
   for (const row of teamRows) {
     let group = groupMap.get(row.teamName);
     if (!group) {
-      group = { teamName: row.teamName, angel: row.angelName, members: [] };
+      group = {
+        teamName: row.teamName,
+        angels: normalizeAngels(row.angelNames ?? []).slice(0, 2),
+        members: [],
+      };
       groupMap.set(row.teamName, group);
       groups.push(group);
     }
@@ -321,14 +345,15 @@ export async function saveMemberPresetToDb(
   await withTransaction(async (tq) => {
     for (const [teamOrder, group] of normalizedGroups.entries()) {
       await tq(
-        `insert into public.member_teams (team_name, angel_name, team_order)
-         values ($1, $2, $3)
+        `insert into public.member_teams (team_name, angel_name, angel_names, team_order)
+         values ($1, $2, $3::text[], $4)
          on conflict (team_name)
          do update set
            angel_name = excluded.angel_name,
+           angel_names = excluded.angel_names,
            team_order = excluded.team_order,
            updated_at = now()`,
-        [group.teamName, group.angel, teamOrder]
+        [group.teamName, group.angels[0] ?? "", group.angels, teamOrder]
       );
 
       await tq(
