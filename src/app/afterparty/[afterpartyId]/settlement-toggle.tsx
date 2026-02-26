@@ -5,12 +5,14 @@ import { updateSettlementAction } from "@/app/actions";
 
 type SettlementToggleProps = {
   afterpartyId: string;
+  settlementId?: string;
   participantId: string;
   isSettled: boolean;
 };
 
 export function SettlementToggle({
   afterpartyId,
+  settlementId,
   participantId,
   isSettled,
 }: SettlementToggleProps) {
@@ -31,7 +33,12 @@ export function SettlementToggle({
           const nextChecked = event.currentTarget.checked;
           setChecked(nextChecked);
           startTransition(async () => {
-            const result = await updateSettlementAction(participantId, afterpartyId, nextChecked);
+            const result = await updateSettlementAction(
+              participantId,
+              afterpartyId,
+              settlementId,
+              nextChecked
+            );
             if (!result.ok) {
               setChecked(!nextChecked);
             }

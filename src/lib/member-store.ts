@@ -6,9 +6,25 @@ export type TeamMemberGroup = {
   angel: string;
 };
 
+export type SpecialParticipantRole =
+  | "supporter"
+  | "buddy"
+  | "mentor"
+  | "manager";
+
+export const SPECIAL_PARTICIPANT_ROLES: SpecialParticipantRole[] = [
+  "supporter",
+  "buddy",
+  "mentor",
+  "manager",
+];
+
+export type SpecialRoleDirectory = Record<SpecialParticipantRole, string[]>;
+
 export type MemberPreset = {
   teamGroups: TeamMemberGroup[];
   fixedAngels: string[];
+  specialRoles: SpecialRoleDirectory;
   source: "db";
 };
 
@@ -20,6 +36,11 @@ type DbTeamRow = {
 
 type DbAngelRow = {
   angelName: string;
+};
+
+type DbSpecialRoleRow = {
+  role: SpecialParticipantRole;
+  memberName: string;
 };
 
 type CountRow = {
@@ -71,6 +92,27 @@ function normalizeAngels(angels: string[]): string[] {
   return normalized;
 }
 
+function createEmptySpecialRoleDirectory(): SpecialRoleDirectory {
+  return {
+    supporter: [],
+    buddy: [],
+    mentor: [],
+    manager: [],
+  };
+}
+
+function normalizeSpecialRoles(
+  input?: Partial<Record<SpecialParticipantRole, string[]>>
+): SpecialRoleDirectory {
+  const normalized = createEmptySpecialRoleDirectory();
+  if (!input) return normalized;
+
+  for (const role of SPECIAL_PARTICIPANT_ROLES) {
+    normalized[role] = normalizeAngels(input[role] ?? []);
+  }
+  return normalized;
+}
+
 async function ensureMemberSchema(): Promise<void> {
   if (schemaReady) return;
   if (schemaPromise) return schemaPromise;
@@ -117,6 +159,21 @@ async function ensureMemberSchema(): Promise<void> {
     await query(
       `create index if not exists idx_member_angels_order
        on public.member_angels (angel_order asc, angel_name asc)`
+    );
+
+    await query(
+      `create table if not exists public.member_special_roles (
+         role text not null check (role in ('supporter', 'buddy', 'mentor', 'manager')),
+         member_name text not null,
+         member_order integer not null default 0,
+         created_at timestamptz not null default now(),
+         primary key (role, member_name)
+       )`
+    );
+
+    await query(
+      `create index if not exists idx_member_special_roles_order
+       on public.member_special_roles (role, member_order asc, member_name asc)`
     );
 
     schemaReady = true;
@@ -211,21 +268,49 @@ export async function loadMemberPreset(): Promise<MemberPreset> {
      order by angel_order asc, angel_name asc`
   );
 
+  const specialRoleRows = await query<DbSpecialRoleRow>(
+    `select
+       role,
+       member_name as "memberName"
+     from public.member_special_roles
+     order by
+       case role
+         when 'mentor' then 1
+         when 'manager' then 2
+         when 'supporter' then 3
+         when 'buddy' then 4
+         else 5
+       end asc,
+       member_order asc,
+       member_name asc`
+  );
+  const specialRoles = createEmptySpecialRoleDirectory();
+  for (const row of specialRoleRows) {
+    const list = specialRoles[row.role] ?? [];
+    list.push(row.memberName);
+    specialRoles[row.role] = list;
+  }
+
   return {
     teamGroups: groups,
     fixedAngels: angelRows.map((row) => row.angelName),
+    specialRoles,
     source: "db",
   };
 }
 
 export async function saveMemberPresetToDb(
   teamGroups: TeamMemberGroup[],
-  fixedAngels: string[]
+  fixedAngels: string[],
+  specialRolesInput?: Partial<Record<SpecialParticipantRole, string[]>>
 ): Promise<void> {
   await ensureMemberSchema();
 
   const normalizedGroups = normalizeTeamGroups(teamGroups);
   const normalizedAngels = normalizeAngels(fixedAngels);
+  const normalizedSpecialRoles = specialRolesInput
+    ? normalizeSpecialRoles(specialRolesInput)
+    : null;
 
   if (normalizedGroups.length === 0 || normalizedAngels.length === 0) {
     throw new Error("팀 그룹 또는 엔젤 목록이 비어 있어 저장할 수 없습니다.");
@@ -284,6 +369,28 @@ export async function saveMemberPresetToDb(
          do update set angel_order = excluded.angel_order`,
         [angelName, angelOrder]
       );
+    }
+
+    if (normalizedSpecialRoles) {
+      for (const role of SPECIAL_PARTICIPANT_ROLES) {
+        const members = normalizedSpecialRoles[role] ?? [];
+        await tq(
+          `delete from public.member_special_roles
+           where role = $1
+             and not (member_name = any($2::text[]))`,
+          [role, members]
+        );
+
+        for (const [memberOrder, memberName] of members.entries()) {
+          await tq(
+            `insert into public.member_special_roles (role, member_name, member_order)
+             values ($1, $2, $3)
+             on conflict (role, member_name)
+             do update set member_order = excluded.member_order`,
+            [role, memberName, memberOrder]
+          );
+        }
+      }
     }
   });
 }

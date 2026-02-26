@@ -3,13 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAuthenticated, login, logout } from "@/lib/auth";
+import { toKstIsoDate } from "@/lib/date-utils";
+import { withSettlementInPath } from "@/lib/navigation-utils";
 import {
   createAfterparty,
+  createAfterpartySettlement,
   createAfterpartyParticipantsBulk,
   deleteAfterparty,
   deleteAfterpartyParticipant,
+  deleteAfterpartySettlement,
+  deleteAfterpartySettlementParticipant,
   updateAfterpartyParticipantSettlement,
   updateAfterparty,
+  updateAfterpartySettlement,
 } from "@/lib/afterparty-store";
 import {
   createMeeting,
@@ -23,6 +29,12 @@ import {
   updateRsvp,
 } from "@/lib/meetup-store";
 import { loadMemberPreset } from "@/lib/member-store";
+import {
+  buildRoleMatchSet,
+  normalizeParticipantName,
+  PARTICIPANT_ROLE_ORDER,
+  resolveRoleByName,
+} from "@/lib/participant-role-utils";
 
 type DashboardState = {
   date?: string;
@@ -35,7 +47,14 @@ function textFrom(formData: FormData, key: string): string {
 }
 
 function isParticipantRole(value: string): value is ParticipantRole {
-  return value === "student" || value === "angel";
+  return (
+    value === "student" ||
+    value === "angel" ||
+    value === "supporter" ||
+    value === "buddy" ||
+    value === "mentor" ||
+    value === "manager"
+  );
 }
 
 function normalizeMemberName(raw: string): string {
@@ -47,30 +66,56 @@ function normalizeMemberName(raw: string): string {
 }
 
 function parseDelimitedNames(raw: string): string[] {
-  const stopWords = new Set(["이름", "엔젤", "학생", "멤버", "팀"]);
+  const stopWords = new Set([
+    "이름",
+    "엔젤",
+    "학생",
+    "멤버",
+    "팀",
+    "서포터",
+    "버디",
+    "멘토",
+    "매니저",
+    "supporter",
+    "buddy",
+    "mentor",
+    "manager",
+  ]);
 
   const fromDelimiter = raw
     .split(/[\n,;<>|/，]+/)
     .map((chunk) => normalizeMemberName(chunk))
     .filter(Boolean)
-    .filter((name) => !stopWords.has(name));
+    .filter((name) => !stopWords.has(name.toLowerCase()));
 
   const fromText = (raw.match(/[가-힣A-Za-z]{1,}(?:\s*\([^)]*\))?/g) ?? [])
     .map((chunk) => normalizeMemberName(chunk))
     .filter(Boolean)
-    .filter((name) => !stopWords.has(name));
+    .filter((name) => !stopWords.has(name.toLowerCase()));
 
   return Array.from(new Set([...fromDelimiter, ...fromText]));
-}
-
-function normalizeForMatch(raw: string): string {
-  return normalizeMemberName(raw).toLowerCase();
 }
 
 async function resolveMeetingLabel(meetingId: string): Promise<string> {
   const meetings = await listMeetings();
   const meeting = meetings.find((item) => item.id === meetingId);
   return meeting?.title ?? "";
+}
+
+async function resolveParticipantRoleEntries(
+  names: string[]
+): Promise<Array<{ name: string; role: ParticipantRole }>> {
+  const memberPreset = await loadMemberPreset();
+  const angelSet = new Set<string>([
+    ...memberPreset.fixedAngels.map((name) => normalizeParticipantName(name)),
+    ...memberPreset.teamGroups.map((team) => normalizeParticipantName(team.angel)),
+  ]);
+  const roleMatchSet = buildRoleMatchSet(memberPreset.specialRoles);
+
+  return names.map((name) => ({
+    name,
+    role: resolveRoleByName(name, angelSet, roleMatchSet),
+  }));
 }
 
 function dashboardPath(state: DashboardState = {}): string {
@@ -118,7 +163,7 @@ export async function loginAction(formData: FormData): Promise<void> {
     redirect("/?auth=invalid");
   }
 
-  redirect("/");
+  redirect(dashboardPath({ date: toKstIsoDate(new Date()) }));
 }
 
 export async function logoutAction(): Promise<void> {
@@ -222,19 +267,30 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
 
 export async function bulkCreateAfterpartyParticipantsAction(formData: FormData): Promise<void> {
   const afterpartyId = textFrom(formData, "afterpartyId").trim();
+  const settlementId = textFrom(formData, "settlementId").trim();
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
 
   await requireAuthOrRedirect();
 
   const namesRaw = textFrom(formData, "names");
+  const roleRaw = textFrom(formData, "role").trim();
   const names = parseDelimitedNames(namesRaw);
 
   if (!afterpartyId || names.length === 0) {
     redirect(afterpartyPath({ date }));
   }
 
-  await createAfterpartyParticipantsBulk(afterpartyId, names);
+  const participantInputs =
+    isParticipantRole(roleRaw)
+      ? names.map((name) => ({ name, role: roleRaw }))
+      : await resolveParticipantRoleEntries(names);
+
+  await createAfterpartyParticipantsBulk(
+    afterpartyId,
+    participantInputs,
+    settlementId || undefined
+  );
 
   revalidatePath("/afterparty");
   redirect(returnPath ?? afterpartyPath({ date }));
@@ -242,6 +298,7 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
 
 export async function deleteAfterpartyParticipantAction(formData: FormData): Promise<void> {
   const afterpartyId = textFrom(formData, "afterpartyId").trim();
+  const settlementId = textFrom(formData, "settlementId").trim();
   const participantId = textFrom(formData, "participantId").trim();
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
@@ -252,7 +309,11 @@ export async function deleteAfterpartyParticipantAction(formData: FormData): Pro
     redirect(afterpartyPath({ date }));
   }
 
-  await deleteAfterpartyParticipant(participantId, afterpartyId);
+  if (settlementId) {
+    await deleteAfterpartySettlementParticipant(participantId, settlementId, afterpartyId);
+  } else {
+    await deleteAfterpartyParticipant(participantId, afterpartyId);
+  }
 
   revalidatePath("/afterparty");
   redirect(returnPath ?? afterpartyPath({ date }));
@@ -261,6 +322,7 @@ export async function deleteAfterpartyParticipantAction(formData: FormData): Pro
 export async function updateSettlementAction(
   participantId: string,
   afterpartyId: string,
+  settlementId: string | undefined,
   isSettled: boolean
 ): Promise<{ ok: boolean }> {
   const authenticated = await isAuthenticated();
@@ -268,7 +330,12 @@ export async function updateSettlementAction(
     return { ok: false };
   }
   try {
-    await updateAfterpartyParticipantSettlement(participantId, afterpartyId, isSettled);
+    await updateAfterpartyParticipantSettlement(
+      participantId,
+      afterpartyId,
+      settlementId,
+      isSettled
+    );
     revalidatePath("/afterparty");
     return { ok: true };
   } catch {
@@ -278,6 +345,7 @@ export async function updateSettlementAction(
 
 export async function updateAfterpartyParticipantSettlementAction(formData: FormData): Promise<void> {
   const afterpartyId = textFrom(formData, "afterpartyId").trim();
+  const settlementId = textFrom(formData, "settlementId").trim();
   const participantId = textFrom(formData, "participantId").trim();
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
@@ -285,13 +353,14 @@ export async function updateAfterpartyParticipantSettlementAction(formData: Form
 
   await requireAuthOrRedirect();
 
-  if (!afterpartyId || !participantId) {
+  if (!afterpartyId || !settlementId || !participantId) {
     redirect(afterpartyPath({ date }));
   }
 
   await updateAfterpartyParticipantSettlement(
     participantId,
     afterpartyId,
+    settlementId,
     settledValue === "true"
   );
 
@@ -327,8 +396,6 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
   const startTime = textFrom(formData, "startTime").trim();
   const location = textFrom(formData, "location").trim();
   const description = textFrom(formData, "description").trim();
-  const settlementManager = textFrom(formData, "settlementManager").trim();
-  const settlementAccount = textFrom(formData, "settlementAccount").trim();
 
   if (!afterpartyId || !title || !eventDate || !startTime || !location) {
     redirect(afterpartyPath({ date }));
@@ -345,12 +412,84 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
     startTime,
     location,
     description,
+  });
+
+  revalidatePath("/afterparty");
+  redirect(returnPath ?? afterpartyPath({ date: eventDate }));
+}
+
+export async function createAfterpartySettlementAction(formData: FormData): Promise<void> {
+  const afterpartyId = textFrom(formData, "afterpartyId").trim();
+  const date = textFrom(formData, "returnDate").trim();
+  const returnPath = safeReturnPath(formData);
+  const title = textFrom(formData, "title").trim();
+  const settlementManager = textFrom(formData, "settlementManager").trim();
+  const settlementAccount = textFrom(formData, "settlementAccount").trim();
+
+  await requireAuthOrRedirect();
+
+  if (!afterpartyId || !title) {
+    redirect(returnPath ?? afterpartyPath({ date }));
+  }
+
+  const created = await createAfterpartySettlement({
+    afterpartyId,
+    title,
     settlementManager,
     settlementAccount,
   });
 
   revalidatePath("/afterparty");
-  redirect(returnPath ?? afterpartyPath({ date: eventDate }));
+  redirect(withSettlementInPath(returnPath, afterpartyId, created.id, date));
+}
+
+export async function updateAfterpartySettlementAction(formData: FormData): Promise<void> {
+  const afterpartyId = textFrom(formData, "afterpartyId").trim();
+  const settlementId = textFrom(formData, "settlementId").trim();
+  const date = textFrom(formData, "returnDate").trim();
+  const returnPath = safeReturnPath(formData);
+  const title = textFrom(formData, "title").trim();
+  const settlementManager = textFrom(formData, "settlementManager").trim();
+  const settlementAccount = textFrom(formData, "settlementAccount").trim();
+
+  await requireAuthOrRedirect();
+
+  if (!afterpartyId || !settlementId || !title) {
+    redirect(returnPath ?? afterpartyPath({ date }));
+  }
+
+  await updateAfterpartySettlement({
+    id: settlementId,
+    afterpartyId,
+    title,
+    settlementManager,
+    settlementAccount,
+  });
+
+  revalidatePath("/afterparty");
+  redirect(withSettlementInPath(returnPath, afterpartyId, settlementId, date));
+}
+
+export async function deleteAfterpartySettlementAction(formData: FormData): Promise<void> {
+  const afterpartyId = textFrom(formData, "afterpartyId").trim();
+  const settlementId = textFrom(formData, "settlementId").trim();
+  const date = textFrom(formData, "returnDate").trim();
+  const returnPath = safeReturnPath(formData);
+
+  await requireAuthOrRedirect();
+
+  if (!afterpartyId || !settlementId) {
+    redirect(returnPath ?? afterpartyPath({ date }));
+  }
+
+  try {
+    const remainingSettlementId = await deleteAfterpartySettlement(settlementId, afterpartyId);
+    revalidatePath("/afterparty");
+    redirect(withSettlementInPath(returnPath, afterpartyId, remainingSettlementId, date));
+  } catch {
+    revalidatePath("/afterparty");
+    redirect(returnPath ?? afterpartyPath({ date }));
+  }
 }
 
 export async function deleteRsvpAction(formData: FormData): Promise<void> {
@@ -397,27 +536,24 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
   if (isParticipantRole(roleRaw)) {
     await createRsvpsBulk(meetingId, roleRaw, names, meetingLabel);
   } else {
-    const memberPreset = await loadMemberPreset();
-    const angelSet = new Set<string>([
-      ...memberPreset.fixedAngels.map((name) => normalizeForMatch(name)),
-      ...memberPreset.teamGroups.map((team) => normalizeForMatch(team.angel)),
-    ]);
+    const roleEntries = await resolveParticipantRoleEntries(names);
 
-    const angelNames: string[] = [];
-    const memberNames: string[] = [];
-    for (const name of names) {
-      if (angelSet.has(normalizeForMatch(name))) {
-        angelNames.push(name);
-      } else {
-        memberNames.push(name);
+    const roleBuckets = new Map<ParticipantRole, string[]>();
+    for (const role of PARTICIPANT_ROLE_ORDER) {
+      roleBuckets.set(role, []);
+    }
+
+    for (const entry of roleEntries) {
+      const bucket = roleBuckets.get(entry.role) ?? [];
+      bucket.push(entry.name);
+      roleBuckets.set(entry.role, bucket);
+    }
+
+    for (const role of PARTICIPANT_ROLE_ORDER) {
+      const namesByRole = roleBuckets.get(role) ?? [];
+      if (namesByRole.length > 0) {
+        await createRsvpsBulk(meetingId, role, namesByRole, meetingLabel);
       }
-    }
-
-    if (memberNames.length > 0) {
-      await createRsvpsBulk(meetingId, "student", memberNames, meetingLabel);
-    }
-    if (angelNames.length > 0) {
-      await createRsvpsBulk(meetingId, "angel", angelNames, meetingLabel);
     }
   }
 

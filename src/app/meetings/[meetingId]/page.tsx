@@ -4,7 +4,6 @@ import {
   deleteMeetingAction,
   deleteRsvpAction,
   updateMeetingAction,
-  updateRsvpAction,
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
 import {
@@ -14,6 +13,7 @@ import {
 import {
   listMeetings,
   listRsvpsForMeetings,
+  type ParticipantRole,
   type RsvpRecord,
 } from "@/lib/meetup-store";
 import { loadMemberPreset } from "@/lib/member-store";
@@ -21,6 +21,16 @@ import { redirect } from "next/navigation";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
 import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-button";
 import type { CSSProperties } from "react";
+import { extractHttpUrl } from "@/lib/location-utils";
+import {
+  normalizeMemberName,
+  toTeamLabel,
+  withTeamLabel,
+} from "@/lib/member-label-utils";
+import {
+  PARTICIPANT_ROLE_META,
+  PARTICIPANT_ROLE_ORDER,
+} from "@/lib/participant-role-utils";
 
 type PageProps = {
   params: Promise<{ meetingId: string }>;
@@ -37,16 +47,19 @@ function QuickAssignButton({
   returnPath,
   name,
   role,
+  label,
   className,
   style,
 }: {
   meetingId: string;
   returnPath: string;
   name: string;
-  role: "student" | "angel";
+  role: ParticipantRole;
+  label?: string;
   className: string;
   style?: CSSProperties;
 }) {
+  const roleMeta = PARTICIPANT_ROLE_META[role];
   return (
     <form action={bulkCreateRsvpsAction} className="inline">
       <input type="hidden" name="meetingId" value={meetingId} />
@@ -54,19 +67,75 @@ function QuickAssignButton({
       <input type="hidden" name="role" value={role} />
       <input type="hidden" name="names" value={name} />
       <button type="submit" className={className} style={style}>
-        {name}
+        {roleMeta.emoji ? `${roleMeta.emoji} ` : ""}{label ?? name}
       </button>
     </form>
   );
 }
 
 function normalizeName(value: string): string {
-  return value
-    .replace(/\([^)]*\)/g, "")
-    .replace(/^\d+\s*/, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  return normalizeMemberName(value);
+}
+
+function teamOrderFromLabel(teamLabel: string): number {
+  const matched = teamLabel.match(/(\d+)\s*팀/);
+  if (!matched?.[1]) return Number.POSITIVE_INFINITY;
+  const parsed = Number.parseInt(matched[1], 10);
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+}
+
+function roleOrderIndex(role: ParticipantRole): number {
+  const index = PARTICIPANT_ROLE_ORDER.indexOf(role);
+  return index === -1 ? Number.POSITIVE_INFINITY : index;
+}
+
+function sortRsvpsForRole(
+  rows: RsvpRecord[],
+  role: ParticipantRole,
+  teamLabelByName: Map<string, string>
+): RsvpRecord[] {
+  const sorted = [...rows];
+  if (role === "student") {
+    sorted.sort((a, b) => {
+      const teamA = teamLabelByName.get(normalizeName(a.name)) ?? "";
+      const teamB = teamLabelByName.get(normalizeName(b.name)) ?? "";
+      const teamOrderA = teamOrderFromLabel(teamA);
+      const teamOrderB = teamOrderFromLabel(teamB);
+
+      if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
+      if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+
+      return normalizeName(a.name).localeCompare(normalizeName(b.name), "ko");
+    });
+    return sorted;
+  }
+
+  sorted.sort((a, b) =>
+    withTeamLabel(a.name, teamLabelByName).localeCompare(
+      withTeamLabel(b.name, teamLabelByName),
+      "ko"
+    )
+  );
+  return sorted;
+}
+
+function LocationValue({ location }: { location: string }) {
+  const placeLink = extractHttpUrl(location);
+  if (!placeLink) {
+    return <>{location}</>;
+  }
+
+  return (
+    <a
+      href={placeLink}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="underline decoration-1 underline-offset-2 transition hover:opacity-80"
+      style={{ color: "#0369a1" }}
+    >
+      {location}
+    </a>
+  );
 }
 
 function addAssignment(
@@ -86,24 +155,26 @@ function ParticipantChip({
   row,
   meetingId,
   returnPath,
+  displayName,
 }: {
   row: RsvpRecord;
   meetingId: string;
   returnPath: string;
+  displayName?: string;
 }) {
+  const roleMeta = PARTICIPANT_ROLE_META[row.role];
+  const displayText = `${roleMeta.emoji ? `${roleMeta.emoji} ` : ""}${displayName ?? row.name}`;
+
   return (
     <li
-      className="inline-flex items-center gap-1 rounded-full border px-2 py-1"
-      style={
-        row.role === "angel"
-          ? { borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }
-          : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
-      }
+      className="flex h-6 items-center rounded-full border px-2 leading-none"
+      style={{
+        borderColor: "var(--line)",
+        backgroundColor: "var(--surface)",
+        color: roleMeta.textColor,
+      }}
     >
-      <span className="text-xs font-medium">
-        {row.role === "angel" ? "🪽 " : ""}
-        {row.name}
-      </span>
+      <span className="block text-xs font-medium leading-none">{displayText}</span>
 
       <form action={deleteRsvpAction}>
         <input type="hidden" name="meetingId" value={meetingId} />
@@ -174,8 +245,77 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
   ]);
 
   const rsvps = rsvpsByMeeting[meetingId] ?? [];
-  const angels = rsvps.filter((row) => row.role === "angel");
-  const members = rsvps.filter((row) => row.role === "student");
+  const teamLabelByName = new Map<string, string>();
+  for (const group of memberPreset.teamGroups) {
+    const teamLabel = toTeamLabel(group.teamName);
+    if (!teamLabel) continue;
+
+    const normalizedAngelName = normalizeName(group.angel);
+    if (!teamLabelByName.has(normalizedAngelName)) {
+      teamLabelByName.set(normalizedAngelName, teamLabel);
+    }
+
+    for (const member of group.members) {
+      const normalizedMemberName = normalizeName(member);
+      if (!teamLabelByName.has(normalizedMemberName)) {
+        teamLabelByName.set(normalizedMemberName, teamLabel);
+      }
+    }
+  }
+  const operationRoleOrder = PARTICIPANT_ROLE_ORDER.filter(
+    (role): role is Exclude<ParticipantRole, "student"> => role !== "student"
+  );
+  const operationNamesByRole = new Map<Exclude<ParticipantRole, "student">, string[]>();
+  for (const role of operationRoleOrder) {
+    operationNamesByRole.set(role, []);
+  }
+  const roleByName = new Map<string, Exclude<ParticipantRole, "student">>();
+  const seenOperationNames = new Set<string>();
+  for (const role of operationRoleOrder) {
+    const candidates =
+      role === "angel"
+        ? [...memberPreset.teamGroups.map((group) => group.angel), ...memberPreset.fixedAngels]
+        : memberPreset.specialRoles[role] ?? [];
+    for (const rawName of candidates) {
+      const name = rawName.trim();
+      if (!name) continue;
+      const normalized = normalizeName(name);
+      if (!roleByName.has(normalized)) {
+        roleByName.set(normalized, role);
+      }
+      if (seenOperationNames.has(normalized)) continue;
+      seenOperationNames.add(normalized);
+      const bucket = operationNamesByRole.get(role) ?? [];
+      bucket.push(name);
+      operationNamesByRole.set(role, bucket);
+    }
+  }
+
+  const displayRsvps = rsvps.map((row) => {
+    const resolvedRole = roleByName.get(normalizeName(row.name));
+    if (row.role === "student" && resolvedRole) {
+      return { ...row, role: resolvedRole };
+    }
+    return row;
+  });
+  const groupedByRole = new Map<ParticipantRole, RsvpRecord[]>();
+  for (const role of PARTICIPANT_ROLE_ORDER) {
+    groupedByRole.set(role, []);
+  }
+  for (const row of displayRsvps) {
+    const existing = groupedByRole.get(row.role) ?? [];
+    existing.push(row);
+    groupedByRole.set(row.role, existing);
+  }
+  for (const role of PARTICIPANT_ROLE_ORDER) {
+    groupedByRole.set(
+      role,
+      sortRsvpsForRole(groupedByRole.get(role) ?? [], role, teamLabelByName)
+    );
+  }
+  const sortedParticipantRows = PARTICIPANT_ROLE_ORDER.flatMap(
+    (role) => groupedByRole.get(role) ?? []
+  );
 
   const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
   for (const meetingRow of sameDateMeetings) {
@@ -192,19 +332,59 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     }
   }
 
-  const visibleTeamGroups = teamFilter
-    ? memberPreset.teamGroups.filter((team) => team.teamName === teamFilter)
-    : memberPreset.teamGroups;
+  const operationEntries = operationRoleOrder.flatMap((role) =>
+    (operationNamesByRole.get(role) ?? []).map((name) => ({ name, role }))
+  ).sort((a, b) => {
+    const roleDiff = roleOrderIndex(a.role) - roleOrderIndex(b.role);
+    if (roleDiff !== 0) return roleDiff;
 
-  const totalMemberCount = visibleTeamGroups.reduce(
-    (sum, team) => sum + team.members.length + 1,
+    const teamA = teamLabelByName.get(normalizeName(a.name)) ?? "";
+    const teamB = teamLabelByName.get(normalizeName(b.name)) ?? "";
+    const teamOrderA = teamOrderFromLabel(teamA);
+    const teamOrderB = teamOrderFromLabel(teamB);
+    if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
+    if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+    return normalizeName(a.name).localeCompare(normalizeName(b.name), "ko");
+  });
+  const quickAddGroups = [
+    ...memberPreset.teamGroups.map((team) => ({
+      kind: "team" as const,
+      teamName: team.teamName,
+      entries: team.members
+        .map((name) => ({
+          name,
+          role: roleByName.get(normalizeName(name)) ?? ("student" as const),
+        }))
+        .sort((a, b) => {
+          const roleDiff = roleOrderIndex(a.role) - roleOrderIndex(b.role);
+          if (roleDiff !== 0) return roleDiff;
+
+          const teamA = teamLabelByName.get(normalizeName(a.name)) ?? "";
+          const teamB = teamLabelByName.get(normalizeName(b.name)) ?? "";
+          const teamOrderA = teamOrderFromLabel(teamA);
+          const teamOrderB = teamOrderFromLabel(teamB);
+          if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
+          if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+          return normalizeName(a.name).localeCompare(normalizeName(b.name), "ko");
+        }),
+    })),
+    ...(operationEntries.length > 0
+      ? [{ kind: "operation" as const, teamName: "운영진", entries: operationEntries }]
+      : []),
+  ];
+  const visibleQuickAddGroups = teamFilter
+    ? quickAddGroups.filter((group) => group.teamName === teamFilter)
+    : quickAddGroups;
+
+  const totalMemberCount = visibleQuickAddGroups.reduce(
+    (sum, group) => sum + group.entries.length,
     0
   );
-  const assignedCount = visibleTeamGroups.reduce((sum, team) => {
-    const memberAssigned = team.members.filter((name) => assignmentByName.has(normalizeName(name))).length;
-    const angelAssigned = assignmentByName.has(normalizeName(team.angel)) ? 1 : 0;
-    return sum + memberAssigned + angelAssigned;
-  }, 0);
+  const assignedCount = visibleQuickAddGroups.reduce(
+    (sum, group) =>
+      sum + group.entries.filter((entry) => assignmentByName.has(normalizeName(entry.name))).length,
+    0
+  );
 
   const returnParams = new URLSearchParams();
   if (date) returnParams.set("date", date);
@@ -244,9 +424,20 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                 >
                   {meeting.title}
                 </h1>
-                <p className="mt-1 text-sm" style={{ color: "var(--ink-soft)" }}>{meeting.location}</p>
+                <p className="mt-1 text-sm" style={{ color: "var(--ink-soft)" }}>
+                  <span className="font-semibold">장소:</span> <LocationValue location={meeting.location} />
+                </p>
+                <section
+                  className="mt-3 rounded-xl border p-3"
+                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
+                >
+                  <p className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>메모</p>
+                  <p className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
+                    {meeting.description || "등록된 메모가 없습니다."}
+                  </p>
+                </section>
                 <p className="mt-2 text-sm" style={{ color: "var(--ink-muted)" }}>
-                  총 {meeting.totalCount}명 · 멤버 {meeting.studentCount}명 · 엔젤 {meeting.angelCount}명
+                  총 {meeting.totalCount}명 · 멤버 {meeting.studentCount}명 · 운영진 {meeting.operationCount}명
                 </p>
               </div>
 
@@ -268,6 +459,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                       name="location" required defaultValue={meeting.location}
                       className="h-10 rounded-lg border bg-white px-3"
                       style={{ borderColor: "var(--line)" }}
+                      placeholder="장소명 + 링크 입력 시 메인 카드에서 장소 텍스트가 링크로 표시됩니다"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <input
@@ -299,55 +491,6 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
 
                 <section
                   className="mt-4 rounded-xl border p-4"
-                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
-                >
-                  <h3 className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>참여자 수정/삭제</h3>
-                  <div className="mt-2 grid gap-2">
-                    {rsvps.map((row) => (
-                      <details
-                        key={row.id}
-                        className="rounded-lg border bg-white p-2"
-                        style={{ borderColor: "var(--line)" }}
-                      >
-                        <summary className="cursor-pointer text-xs" style={{ color: "var(--ink-soft)" }}>
-                          {row.role === "angel" ? "🪽 " : ""}
-                          {row.name}
-                          {row.note ? ` (${row.note})` : ""}
-                        </summary>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
-                          <form action={updateRsvpAction} className="grid gap-2 text-xs sm:grid-cols-[1.1fr_120px_1fr_auto] sm:items-center">
-                            <input type="hidden" name="meetingId" value={meeting.id} />
-                            <input type="hidden" name="rsvpId" value={row.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <input name="name" required defaultValue={row.name} className="h-8 rounded-lg border bg-white px-2" style={{ borderColor: "var(--line)" }} />
-                            <select name="role" defaultValue={row.role} className="h-8 rounded-lg border bg-white px-2" style={{ borderColor: "var(--line)" }}>
-                              <option value="student">멤버</option>
-                              <option value="angel">엔젤</option>
-                            </select>
-                            <input name="note" defaultValue={row.note ?? ""} className="h-8 rounded-lg border bg-white px-2" style={{ borderColor: "var(--line)" }} placeholder="팀명" />
-                            <button type="submit" className="btn-press h-8 rounded-lg border px-2 font-medium" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>수정</button>
-                          </form>
-                          <form action={deleteRsvpAction}>
-                            <input type="hidden" name="meetingId" value={meeting.id} />
-                            <input type="hidden" name="rsvpId" value={row.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <button
-                              type="submit"
-                              className="btn-press h-8 rounded-lg border px-2 text-xs font-medium"
-                              style={{ borderColor: "#fecaca", color: "var(--danger)" }}
-                            >
-                              삭제
-                            </button>
-                          </form>
-                        </div>
-                      </details>
-                    ))}
-                    {rsvps.length === 0 ? <p className="text-sm" style={{ color: "var(--ink-muted)" }}>등록된 참여자가 없습니다.</p> : null}
-                  </div>
-                </section>
-
-                <section
-                  className="mt-4 rounded-xl border p-4"
                   style={{ borderColor: "#fecaca", backgroundColor: "var(--danger-bg)" }}
                 >
                   <h3 className="text-xs font-semibold" style={{ color: "var(--danger)" }}>모임 삭제</h3>
@@ -372,54 +515,38 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
 
           <section className="mt-4 card-static p-5">
             <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>참여자</h2>
-            <div className="mt-3 grid gap-4 md:grid-cols-2">
+            {sortedParticipantRows.length > 0 ? (
               <div
-                className="rounded-xl border p-3"
-                style={{ borderColor: "#fbbf24", backgroundColor: "rgba(254, 243, 199, 0.3)" }}
-              >
-                <p className="mb-2 text-xs font-semibold" style={{ color: "var(--angel)" }}>엔젤</p>
-                <ul className="flex flex-wrap gap-1">
-                  {angels.map((row) => (
-                    <ParticipantChip
-                      key={row.id}
-                      row={row}
-                      meetingId={meeting.id}
-                      returnPath={returnPath}
-                    />
-                  ))}
-                  {angels.length === 0 ? <li className="text-xs" style={{ color: "var(--ink-muted)" }}>없음</li> : null}
-                </ul>
-              </div>
-              <div
-                className="rounded-xl border p-3"
+                className="mt-3 rounded-xl border p-3"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
               >
-                <p className="mb-2 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>멤버</p>
                 <ul className="flex flex-wrap gap-1">
-                  {members.map((row) => (
+                  {sortedParticipantRows.map((row) => (
                     <ParticipantChip
                       key={row.id}
                       row={row}
                       meetingId={meeting.id}
                       returnPath={returnPath}
+                      displayName={withTeamLabel(row.name, teamLabelByName)}
                     />
                   ))}
-                  {members.length === 0 ? <li className="text-xs" style={{ color: "var(--ink-muted)" }}>없음</li> : null}
                 </ul>
               </div>
-            </div>
+            ) : (
+              <p className="mt-3 text-xs" style={{ color: "var(--ink-muted)" }}>없음</p>
+            )}
           </section>
 
         <section
           id="team-assignment"
           className="mt-4 card-static p-4 fade-in"
         >
-          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>팀 할당 현황</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>오프라인 스터디 참여자 관리</h2>
           <div
             className="mt-2 rounded-lg border border-dashed px-2.5 py-2 text-[11px] leading-relaxed"
             style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}
           >
-            이름을 클릭하면 현재 모임 참여자로 바로 추가됩니다. 오른쪽 배지는 해당 인원의 할당 상태입니다.
+            팀/운영진 필터를 선택한 뒤 이름을 클릭하면 현재 모임 참여자로 바로 추가됩니다. 오른쪽 배지는 해당 인원의 할당 상태입니다.
           </div>
           <ProgressBar assigned={assignedCount} total={totalMemberCount} />
 
@@ -435,83 +562,38 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             >
               전체
             </Link>
-            {memberPreset.teamGroups.map((team) => (
+            {quickAddGroups.map((group) => (
               <Link
-                key={`filter-${team.teamName}`}
-                href={teamFilterHref(team.teamName)}
+                key={`filter-${group.kind}-${group.teamName}`}
+                href={teamFilterHref(group.teamName)}
                 className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
                 style={
-                  teamFilter === team.teamName
+                  teamFilter === group.teamName
                     ? { borderColor: "var(--accent)", backgroundColor: "rgba(194, 65, 12, 0.1)", color: "var(--accent)" }
                     : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
                 }
               >
-                {team.teamName}
+                {group.teamName}
               </Link>
             ))}
           </div>
 
           <div className="mt-3 grid gap-3 stagger-children">
-            {visibleTeamGroups.map((team) => (
+            {visibleQuickAddGroups.map((group) => (
               <section
-                key={team.teamName}
+                key={`${group.kind}-${group.teamName}`}
                 className="rounded-xl border p-3"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
               >
-                <p className="mb-2 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>{team.teamName}</p>
+                <p className="mb-2 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>{group.teamName}</p>
                 <ul className="grid gap-1">
-                  {(() => {
-                    const angelAssignments = assignmentByName.get(normalizeName(team.angel)) ?? [];
+                  {group.entries.map((entry) => {
+                    const normalizedEntryName = normalizeName(entry.name);
+                    const assignedTitles = assignmentByName.get(normalizedEntryName) ?? [];
+                    const roleMeta = PARTICIPANT_ROLE_META[entry.role];
                     return (
                       <li
-                        className="rounded-md bg-white px-2 py-1 text-xs"
-                        style={{ backgroundColor: "var(--surface)" }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <QuickAssignButton
-                            meetingId={meeting.id}
-                            returnPath={assignmentReturnPath}
-                            name={team.angel}
-                            role="angel"
-                            className="font-medium underline-offset-2 hover:underline"
-                            style={{ color: "var(--angel)" }}
-                          />
-                          <div className="flex flex-wrap justify-end gap-1">
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={
-                                angelAssignments.length > 0
-                                  ? { backgroundColor: "var(--success-bg)", color: "var(--success)" }
-                                  : { backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }
-                              }
-                            >
-                              {angelAssignments.length > 0 ? "할당됨" : "미할당"}
-                            </span>
-                            {angelAssignments.map((entry) => (
-                              <span
-                                key={`${team.teamName}-${team.angel}-${entry.kind}-${entry.title}`}
-                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                style={
-                                  entry.kind === "afterparty"
-                                    ? { backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }
-                                    : { backgroundColor: "var(--angel-bg)", color: "var(--angel)" }
-                                }
-                              >
-                                {entry.kind === "study" ? `스터디 · ${entry.title}` : `뒷풀이 · ${entry.title}`}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })()}
-
-                  {team.members.map((member) => {
-                    const assignedTitles = assignmentByName.get(normalizeName(member)) ?? [];
-
-                    return (
-                      <li
-                        key={`${team.teamName}-${member}`}
+                        key={`${group.teamName}-${entry.role}-${entry.name}`}
                         className="rounded-md px-2 py-1 text-xs"
                         style={{ backgroundColor: "var(--surface)" }}
                       >
@@ -519,10 +601,11 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                           <QuickAssignButton
                             meetingId={meeting.id}
                             returnPath={assignmentReturnPath}
-                            name={member}
-                            role="student"
+                            name={entry.name}
+                            role={entry.role}
+                            label={withTeamLabel(entry.name, teamLabelByName)}
                             className="underline-offset-2 hover:underline"
-                            style={{ color: "var(--ink-soft)" }}
+                            style={{ color: roleMeta.textColor }}
                           />
                           <div className="flex flex-wrap justify-end gap-1">
                             <span
@@ -535,17 +618,17 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                             >
                               {assignedTitles.length > 0 ? "할당됨" : "미할당"}
                             </span>
-                            {assignedTitles.map((entry) => (
+                            {assignedTitles.map((assignedEntry) => (
                               <span
-                                key={`${team.teamName}-${member}-${entry.kind}-${entry.title}`}
+                                key={`${group.teamName}-${entry.role}-${entry.name}-${assignedEntry.kind}-${assignedEntry.title}`}
                                 className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                 style={
-                                  entry.kind === "afterparty"
+                                  assignedEntry.kind === "afterparty"
                                     ? { backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }
-                                    : { backgroundColor: "var(--angel-bg)", color: "var(--angel)" }
+                                    : { backgroundColor: roleMeta.backgroundColor, color: roleMeta.textColor }
                                 }
                               >
-                                {entry.kind === "study" ? `스터디 · ${entry.title}` : `뒷풀이 · ${entry.title}`}
+                                {assignedEntry.kind === "study" ? `스터디 · ${assignedEntry.title}` : `뒷풀이 · ${assignedEntry.title}`}
                               </span>
                             ))}
                           </div>

@@ -90,6 +90,11 @@ body {
   box-shadow: 0 4px 12px rgba(28, 25, 23, 0.1);
 }
 
+.study-card:hover,
+.study-card:focus-within {
+  border-color: var(--accent);
+}
+
 .card-static {
   background: var(--surface);
   border: 1px solid var(--line);

@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { query, withTransaction } from "@/lib/db";
 
-export type ParticipantRole = "student" | "angel";
+export type ParticipantRole =
+  | "student"
+  | "angel"
+  | "supporter"
+  | "buddy"
+  | "mentor"
+  | "manager";
 
 export type MeetingSummary = {
   id: string;
@@ -11,7 +17,7 @@ export type MeetingSummary = {
   location: string;
   description: string | null;
   studentCount: number;
-  angelCount: number;
+  operationCount: number;
   totalCount: number;
 };
 
@@ -79,10 +85,34 @@ export async function ensureSchema(): Promise<void> {
         id uuid primary key,
         meeting_id uuid not null references public.meetings(id) on delete cascade,
         name text not null,
-        role text not null check (role in ('student', 'angel')),
+        role text not null check (role in ('student', 'angel', 'supporter', 'buddy', 'mentor', 'manager')),
         note text,
         created_at timestamptz not null default now()
       )`
+    );
+
+    await query(
+      `do $$
+       declare
+         item record;
+       begin
+         for item in
+           select conname
+           from pg_constraint
+           where conrelid = 'public.rsvps'::regclass
+             and contype = 'c'
+             and pg_get_constraintdef(oid) ilike '%role%'
+         loop
+           execute format('alter table public.rsvps drop constraint if exists %I', item.conname);
+         end loop;
+       end
+       $$`
+    );
+
+    await query(
+      `alter table public.rsvps
+       add constraint chk_rsvps_role_allowed
+       check (role in ('student', 'angel', 'supporter', 'buddy', 'mentor', 'manager'))`
     );
 
     await query(
@@ -115,7 +145,7 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
        m.location,
        m.description,
        count(r.id) filter (where r.role = 'student')::int as "studentCount",
-       count(r.id) filter (where r.role = 'angel')::int as "angelCount",
+       count(r.id) filter (where r.role <> 'student')::int as "operationCount",
        count(r.id)::int as "totalCount"
      from public.meetings m
      left join public.rsvps r on r.meeting_id = m.id
@@ -138,7 +168,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
        location,
        description,
        0::int as "studentCount",
-       0::int as "angelCount",
+       0::int as "operationCount",
        0::int as "totalCount"`,
     [
       randomUUID(),

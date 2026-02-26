@@ -5,13 +5,25 @@ import {
 } from "@/app/actions";
 import { DatePicker } from "@/app/date-picker";
 import { DashboardHeader } from "@/app/dashboard-header";
+import { MeetingShareButton } from "@/app/meeting-share-button";
 import { isAuthenticated } from "@/lib/auth";
+import { toKstIsoDate } from "@/lib/date-utils";
+import { extractHttpUrl } from "@/lib/location-utils";
+import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
   listAfterparties,
   listParticipantsForAfterparties,
+  listSettlementsForAfterparties,
   type AfterpartyParticipant,
+  type AfterpartySettlement,
   type AfterpartySummary,
 } from "@/lib/afterparty-store";
+import type { ParticipantRole } from "@/lib/meetup-store";
+import { loadMemberPreset } from "@/lib/member-store";
+import {
+  PARTICIPANT_ROLE_META,
+  PARTICIPANT_ROLE_ORDER,
+} from "@/lib/participant-role-utils";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -33,13 +45,6 @@ function isIsoDate(value: string): boolean {
   return ISO_DATE_RE.test(value);
 }
 
-function toIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function formatStartTime(timeText: string): string {
   const [hourText, minuteText] = timeText.split(":");
   const hour = Number.parseInt(hourText ?? "", 10);
@@ -52,6 +57,49 @@ function formatStartTime(timeText: string): string {
   const period = hour >= 12 ? "오후" : "오전";
   const hour12 = hour % 12 || 12;
   return `${period} ${hour12}:${String(minute).padStart(2, "0")}`;
+}
+
+function LocationValue({ location }: { location: string }) {
+  const placeLink = extractHttpUrl(location);
+  if (!placeLink) {
+    return <>{location}</>;
+  }
+
+  return (
+    <a
+      href={placeLink}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="underline decoration-1 underline-offset-2 transition hover:opacity-80"
+      style={{ color: "#0369a1" }}
+    >
+      {location}
+    </a>
+  );
+}
+
+type DecoratedAfterpartyParticipant = AfterpartyParticipant & {
+  teamLabel: string;
+  teamOrder: number;
+  displayName: string;
+};
+
+function AfterpartyParticipantChip({ participant }: { participant: DecoratedAfterpartyParticipant }) {
+  const roleMeta = PARTICIPANT_ROLE_META[participant.role];
+  return (
+    <li
+      className="inline-flex h-6 items-center rounded-full border px-2 leading-none"
+      style={{
+        borderColor: roleMeta.borderColor,
+        backgroundColor: roleMeta.backgroundColor,
+        color: roleMeta.textColor,
+      }}
+    >
+      <span className="block text-xs font-medium leading-none">
+        {roleMeta.emoji ? `${roleMeta.emoji} ` : ""}{participant.displayName}
+      </span>
+    </li>
+  );
 }
 
 function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
@@ -146,56 +194,118 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
 
 function AfterpartyCard({
   afterparty,
+  settlements,
   participants,
   selectedDate,
+  teamLabelByMemberName,
 }: {
   afterparty: AfterpartySummary;
+  settlements: AfterpartySettlement[];
   participants: AfterpartyParticipant[];
   selectedDate: string;
+  teamLabelByMemberName: Map<string, string>;
 }) {
+  const detailPath = `/afterparty/${afterparty.id}?date=${selectedDate}`;
+  const sortedParticipants: DecoratedAfterpartyParticipant[] = [...participants]
+    .map((participant) => {
+      const normalizedName = normalizeMemberName(participant.name);
+      const teamLabel = teamLabelByMemberName.get(normalizedName) ?? "";
+      const teamNumberMatch = teamLabel.match(/(\d+)\s*팀/);
+      const teamOrder = teamNumberMatch?.[1] ? Number.parseInt(teamNumberMatch[1], 10) : Number.POSITIVE_INFINITY;
+      const displayName = withTeamLabel(participant.name, teamLabelByMemberName);
+
+      return {
+        ...participant,
+        teamLabel,
+        teamOrder,
+        displayName,
+      };
+    })
+    .sort((a, b) => {
+      const aRoleOrder = PARTICIPANT_ROLE_ORDER.indexOf(a.role);
+      const bRoleOrder = PARTICIPANT_ROLE_ORDER.indexOf(b.role);
+      if (aRoleOrder !== bRoleOrder) return aRoleOrder - bRoleOrder;
+
+      const aHasTeam = Boolean(a.teamLabel);
+      const bHasTeam = Boolean(b.teamLabel);
+      if (aHasTeam !== bHasTeam) return aHasTeam ? -1 : 1;
+
+      if (a.teamOrder !== b.teamOrder) return a.teamOrder - b.teamOrder;
+      if (a.teamLabel !== b.teamLabel) return a.teamLabel.localeCompare(b.teamLabel, "ko");
+      return a.displayName.localeCompare(b.displayName, "ko");
+    });
+  const participantsByRole = new Map<ParticipantRole, DecoratedAfterpartyParticipant[]>();
+  for (const role of PARTICIPANT_ROLE_ORDER) {
+    participantsByRole.set(role, []);
+  }
+  for (const participant of sortedParticipants) {
+    const existing = participantsByRole.get(participant.role) ?? [];
+    existing.push(participant);
+    participantsByRole.set(participant.role, existing);
+  }
+  const visibleRoleGroups = PARTICIPANT_ROLE_ORDER.map((role) => ({
+    role,
+    rows: participantsByRole.get(role) ?? [],
+  })).filter((group) => group.rows.length > 0);
   return (
-    <article id={`afterparty-${afterparty.id}`} className="card p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <article id={`afterparty-${afterparty.id}`} className="card study-card relative p-4 sm:p-5">
+      <Link
+        href={detailPath}
+        aria-label={`${afterparty.title} 상세 보기`}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2"
+        style={{ "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+      >
+        <span className="sr-only">{afterparty.title} 상세 보기</span>
+      </Link>
+
+      <div className="flex flex-wrap items-start gap-4 sm:flex-nowrap">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{afterparty.title}</p>
             <span
-              className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              className="inline-flex h-6 items-center rounded-full px-2 text-[11px] font-semibold leading-none"
               style={{ backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }}
             >
-              {formatStartTime(afterparty.startTime)}
+              <span className="inline-block leading-none">{formatStartTime(afterparty.startTime)}</span>
             </span>
           </div>
-          <p className="mt-1 text-xs" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-semibold">장소:</span> {afterparty.location}
+          <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-soft)" }}>
+            <span className="font-semibold">장소:</span> <LocationValue location={afterparty.location} />
           </p>
-          <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-muted)" }}>
             <span className="font-semibold">메모:</span> {afterparty.description || "없음"}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-            <span
-              className="rounded-full border px-2 py-1"
-              style={{ borderColor: "#86efac", backgroundColor: "#ecfdf3", color: "#166534" }}
-            >
-              정산자: {afterparty.settlementManager || "미등록"}
-            </span>
-            <span
-              className="rounded-full border px-2 py-1"
-              style={{ borderColor: "#7dd3fc", backgroundColor: "#f0f9ff", color: "#0c4a6e" }}
-            >
-              계좌: {afterparty.settlementAccount || "미등록"}
-            </span>
+          <div className="mt-2 grid gap-1 text-xs">
+            {settlements.length > 0 ? (
+              settlements.map((settlement, index) => (
+                <div
+                  key={settlement.id}
+                  className="inline-flex w-fit flex-wrap items-center gap-1 rounded-full border px-2 py-1"
+                  style={{ borderColor: "#fed7aa", backgroundColor: "#fff7ed", color: "#9a3412" }}
+                >
+                  <span className="font-semibold">{`정산${index + 1}`}</span>
+                  <span style={{ color: "var(--ink-soft)" }}>
+                    {`정산자: ${settlement.settlementManager || "미등록"}`}
+                  </span>
+                  <span style={{ color: "var(--ink-soft)" }}>
+                    {`계좌: ${settlement.settlementAccount || "미등록"}`}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <span style={{ color: "var(--ink-muted)" }}>정산 정보 없음</span>
+            )}
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            href={`/afterparty/${afterparty.id}?date=${selectedDate}`}
-            className="btn-press rounded-lg border px-2 py-1 text-[11px] font-semibold"
-            style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-          >
-            상세 관리
-          </Link>
+        <div className="relative z-20 flex min-w-[180px] shrink-0 flex-col items-end gap-2 sm:ml-auto">
+          <div className="flex flex-wrap justify-end gap-2">
+            <MeetingShareButton
+              path={detailPath}
+              className="btn-press inline-flex h-8 items-center rounded-lg border px-2.5 text-[11px] font-semibold transition hover:border-stone-400 disabled:cursor-not-allowed disabled:opacity-70"
+              style={{ borderColor: "var(--line)", color: "#0369a1", backgroundColor: "var(--surface)" }}
+            />
+          </div>
         </div>
       </div>
 
@@ -203,30 +313,36 @@ function AfterpartyCard({
         className="mt-4 rounded-xl border p-3"
         style={{ borderColor: "var(--line)", backgroundColor: "rgba(21, 128, 61, 0.04)" }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#166534" }}>
-            참여자
-          </p>
-          <span className="text-xs" style={{ color: "var(--ink-muted)" }}>{afterparty.participantCount}명</span>
-        </div>
-
-        <p className="mt-2 text-xs" style={{ color: "var(--ink-muted)" }}>
-          {afterparty.participantCount === 0 ? "없음" : `${afterparty.participantCount}명`}
+        <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#166534" }}>
+          참여자
         </p>
 
-        {participants.length > 0 ? (
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {participants.map((participant) => (
-              <li
-                key={participant.id}
-                className="inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium"
-                style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
-              >
-                {participant.name}
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {visibleRoleGroups.length > 0 ? (
+          <div className="mt-2 grid gap-1.5">
+            {visibleRoleGroups.map((group) => {
+              const roleMeta = PARTICIPANT_ROLE_META[group.role];
+              return (
+                <div
+                  key={`${afterparty.id}-participant-role-${group.role}`}
+                  className="flex flex-wrap items-start gap-2"
+                >
+                  <p className="pt-0.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: roleMeta.textColor }}>
+                    {roleMeta.label}
+                  </p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {group.rows.map((participant) => (
+                      <AfterpartyParticipantChip key={participant.id} participant={participant} />
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs" style={{ color: "var(--ink-muted)" }}>
+            등록된 참여자 없음
+          </p>
+        )}
       </section>
     </article>
   );
@@ -241,14 +357,31 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     redirect("/?auth=required");
   }
 
-  let selectedDate = isIsoDate(requestDate) ? requestDate : toIsoDate(new Date());
+  let selectedDate = isIsoDate(requestDate) ? requestDate : toKstIsoDate(new Date());
   let afterparties: AfterpartySummary[] = [];
   let afterpartiesOnDate: AfterpartySummary[] = [];
   let participantsByAfterparty: Record<string, AfterpartyParticipant[]> = {};
+  let settlementsByAfterparty: Record<string, AfterpartySettlement[]> = {};
+  const teamLabelByMemberName = new Map<string, string>();
   let loadError = "";
 
   try {
     afterparties = await listAfterparties();
+    const memberPreset = await loadMemberPreset();
+    for (const group of memberPreset.teamGroups) {
+      const teamLabel = toTeamLabel(group.teamName);
+      const normalizedAngelName = normalizeMemberName(group.angel);
+      if (teamLabel && !teamLabelByMemberName.has(normalizedAngelName)) {
+        teamLabelByMemberName.set(normalizedAngelName, teamLabel);
+      }
+
+      for (const memberName of group.members) {
+        const normalizedMemberName = normalizeMemberName(memberName);
+        if (teamLabel && !teamLabelByMemberName.has(normalizedMemberName)) {
+          teamLabelByMemberName.set(normalizedMemberName, teamLabel);
+        }
+      }
+    }
     if (!isIsoDate(requestDate)) {
       selectedDate = afterparties[0]?.eventDate ?? selectedDate;
     }
@@ -258,6 +391,9 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
       afterpartiesOnDate.map((item) => item.id),
       ""
     );
+    settlementsByAfterparty = await listSettlementsForAfterparties(
+      afterpartiesOnDate.map((item) => item.id)
+    );
   } catch (error) {
     loadError =
       error instanceof Error
@@ -265,21 +401,10 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
         : "데이터를 불러오지 못했습니다. DATABASE_URL 설정을 확인해 주세요.";
   }
 
-  const totalParticipantCount = afterpartiesOnDate.reduce(
-    (sum, item) => sum + item.participantCount,
+  const totalSettlementCount = afterpartiesOnDate.reduce(
+    (sum, item) => sum + item.settlementCount,
     0
   );
-  const settledParticipantCount = Object.values(participantsByAfterparty)
-    .flat()
-    .filter((row) => row.isSettled).length;
-  const unsettledParticipantCount = Math.max(
-    0,
-    totalParticipantCount - settledParticipantCount
-  );
-  const settlementRate =
-    totalParticipantCount > 0
-      ? `${Math.round((settledParticipantCount / totalParticipantCount) * 100)}%`
-      : "0%";
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
@@ -309,12 +434,10 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
             <p className="mt-2 break-words">{loadError}</p>
           </section>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-2 stagger-children">
             {[
               { label: "모임 수", value: `${afterpartiesOnDate.length}개`, accent: "#c2410c" },
-              { label: "총 참여", value: `${totalParticipantCount}명`, accent: "#0369a1" },
-              { label: "미정산 인원", value: `${unsettledParticipantCount}명`, accent: "#b45309" },
-              { label: "정산 완료율", value: settlementRate, accent: "#15803d" },
+              { label: "정산 수", value: `${totalSettlementCount}개`, accent: "#0369a1" },
             ].map((item) => (
               <div
                 key={item.label}
@@ -342,14 +465,16 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
 
       {!loadError && afterpartiesOnDate.length > 0 ? (
         <section className="card-static mb-5 p-5 sm:p-6 fade-in">
-          <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 카드</h3>
+          <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 참여 현황</h3>
           <div className="mt-4 grid gap-4 xl:grid-cols-2 stagger-children">
             {afterpartiesOnDate.map((afterparty) => (
               <AfterpartyCard
                 key={afterparty.id}
                 afterparty={afterparty}
+                settlements={settlementsByAfterparty[afterparty.id] ?? []}
                 participants={participantsByAfterparty[afterparty.id] ?? []}
                 selectedDate={selectedDate}
+                teamLabelByMemberName={teamLabelByMemberName}
               />
             ))}
           </div>
