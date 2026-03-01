@@ -168,14 +168,14 @@ function ParticipantChip({
 
   return (
     <li
-      className="flex h-6 items-center rounded-full border px-2 leading-none"
+      className="flex h-7 items-center rounded-full border px-2.5 leading-none"
       style={{
         borderColor: "var(--line)",
         backgroundColor: "var(--surface)",
         color: roleMeta.textColor,
       }}
     >
-      <span className="block text-xs font-medium leading-none">{displayText}</span>
+      <span className="block text-sm font-semibold leading-none">{displayText}</span>
 
       <form action={deleteRsvpAction}>
         <input type="hidden" name="meetingId" value={meetingId} />
@@ -183,7 +183,7 @@ function ParticipantChip({
         <input type="hidden" name="returnPath" value={returnPath} />
         <DeleteConfirmButton
           confirmMessage={`${row.name}을(를) 참여자 목록에서 제거합니다.`}
-          className="rounded-full px-1 text-[11px] font-semibold transition hover:text-rose-600"
+          className="rounded-full px-1 text-xs font-semibold transition hover:text-rose-600"
           style={{ color: "var(--ink-muted)" }}
           aria-label="참여자 제거"
           title="제거"
@@ -316,6 +316,44 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
   const sortedParticipantRows = PARTICIPANT_ROLE_ORDER.flatMap(
     (role) => groupedByRole.get(role) ?? []
   );
+  const operationSections = operationRoleOrder
+    .map((role) => {
+      const rows = groupedByRole.get(role) ?? [];
+      return {
+        role,
+        rows,
+      };
+    })
+    .filter((section) => section.rows.length > 0)
+    .map((section) => ({
+      key: `operation-${section.role}`,
+      label: PARTICIPANT_ROLE_META[section.role].label,
+      rows: section.rows,
+    }));
+  const studentRowsByTeam = new Map<string, RsvpRecord[]>();
+  for (const row of sortedParticipantRows) {
+    if (row.role !== "student") continue;
+    const teamLabel = teamLabelByName.get(normalizeName(row.name)) ?? "미분류";
+    const existing = studentRowsByTeam.get(teamLabel) ?? [];
+    existing.push(row);
+    studentRowsByTeam.set(teamLabel, existing);
+  }
+  const teamSections = Array.from(studentRowsByTeam.entries())
+    .sort(([teamA], [teamB]) => {
+      const orderA = teamOrderFromLabel(teamA);
+      const orderB = teamOrderFromLabel(teamB);
+      if (orderA !== orderB) return orderA - orderB;
+      return teamA.localeCompare(teamB, "ko");
+    })
+    .map(([label, rows]) => ({
+      key: `team-${label}`,
+      label,
+      rows,
+    }));
+  const participantSections = [
+    ...operationSections,
+    ...teamSections,
+  ];
 
   const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
   for (const meetingRow of sameDateMeetings) {
@@ -414,13 +452,14 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
         </Link>
       </div>
 
-      <div className="stagger-children">
-          <section className="card-static p-5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+        <div className="stagger-children mx-auto w-full max-w-[920px] lg:grid lg:h-[calc(100vh-3rem)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-3">
+          <section className="card-static w-full p-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h1
                   className="text-xl tracking-tight"
-                  style={{ fontFamily: "var(--font-instrument-serif), serif", color: "var(--ink)" }}
+                  style={{ fontFamily: "var(--font-heading), sans-serif", color: "var(--ink)" }}
                 >
                   {meeting.title}
                 </h1>
@@ -513,40 +552,51 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             </div>
           </section>
 
-          <section className="mt-4 card-static p-5">
+          <section className="mt-3 card-static w-full p-4 lg:mt-0 lg:min-h-0 lg:flex lg:flex-col">
             <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>참여자</h2>
             {sortedParticipantRows.length > 0 ? (
               <div
-                className="mt-3 rounded-xl border p-3"
+                className="mt-2 rounded-xl border p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
               >
-                <ul className="flex flex-wrap gap-1">
-                  {sortedParticipantRows.map((row) => (
-                    <ParticipantChip
-                      key={row.id}
-                      row={row}
-                      meetingId={meeting.id}
-                      returnPath={returnPath}
-                      displayName={withTeamLabel(row.name, teamLabelByName)}
-                    />
+                <div className="grid gap-3">
+                  {participantSections.map((section) => (
+                    <section key={section.key}>
+                      <p className="mb-1 text-[11px] font-semibold" style={{ color: "var(--ink-soft)" }}>
+                        {section.label}
+                      </p>
+                      <ul className="flex flex-wrap gap-1.5">
+                        {section.rows.map((row) => (
+                          <ParticipantChip
+                            key={row.id}
+                            row={row}
+                            meetingId={meeting.id}
+                            returnPath={returnPath}
+                            displayName={row.name}
+                          />
+                        ))}
+                      </ul>
+                    </section>
                   ))}
-                </ul>
+                </div>
               </div>
             ) : (
               <p className="mt-3 text-xs" style={{ color: "var(--ink-muted)" }}>없음</p>
             )}
           </section>
 
-        <section
+        </div>
+
+        <aside
           id="team-assignment"
-          className="mt-4 card-static p-4 fade-in"
+          className="card-static p-4 fade-in lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-hidden lg:flex lg:flex-col"
         >
-          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>오프라인 스터디 참여자 관리</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>참여자</h2>
           <div
             className="mt-2 rounded-lg border border-dashed px-2.5 py-2 text-[11px] leading-relaxed"
             style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}
           >
-            팀/운영진 필터를 선택한 뒤 이름을 클릭하면 현재 모임 참여자로 바로 추가됩니다. 오른쪽 배지는 해당 인원의 할당 상태입니다.
+            팀/운영진 필터를 고른 뒤 이름을 클릭하면 현재 모임 참여자로 바로 추가됩니다.
           </div>
           <ProgressBar assigned={assignedCount} total={totalMemberCount} />
 
@@ -554,9 +604,9 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             <Link
               href={teamFilterHref()}
               className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
-              style={
-                !teamFilter
-                  ? { borderColor: "var(--accent)", backgroundColor: "rgba(194, 65, 12, 0.1)", color: "var(--accent)" }
+                style={
+                  !teamFilter
+                  ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
                   : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
               }
             >
@@ -569,7 +619,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                 className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
                 style={
                   teamFilter === group.teamName
-                    ? { borderColor: "var(--accent)", backgroundColor: "rgba(194, 65, 12, 0.1)", color: "var(--accent)" }
+                    ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
                     : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
                 }
               >
@@ -578,7 +628,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             ))}
           </div>
 
-          <div className="mt-3 grid gap-3 stagger-children">
+          <div className="mt-3 grid gap-3 pr-1 stagger-children lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {visibleQuickAddGroups.map((group) => (
               <section
                 key={`${group.kind}-${group.teamName}`}
@@ -608,16 +658,14 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                             style={{ color: roleMeta.textColor }}
                           />
                           <div className="flex flex-wrap justify-end gap-1">
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={
-                                assignedTitles.length > 0
-                                  ? { backgroundColor: "var(--success-bg)", color: "var(--success)" }
-                                  : { backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }
-                              }
-                            >
-                              {assignedTitles.length > 0 ? "할당됨" : "미할당"}
-                            </span>
+                            {assignedTitles.length === 0 ? (
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}
+                              >
+                                미할당
+                              </span>
+                            ) : null}
                             {assignedTitles.map((assignedEntry) => (
                               <span
                                 key={`${group.teamName}-${entry.role}-${entry.name}-${assignedEntry.kind}-${assignedEntry.title}`}
@@ -625,7 +673,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                                 style={
                                   assignedEntry.kind === "afterparty"
                                     ? { backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }
-                                    : { backgroundColor: roleMeta.backgroundColor, color: roleMeta.textColor }
+                                    : { backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
                                 }
                               >
                                 {assignedEntry.kind === "study" ? `스터디 · ${assignedEntry.title}` : `뒷풀이 · ${assignedEntry.title}`}
@@ -640,7 +688,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
               </section>
             ))}
           </div>
-        </section>
+        </aside>
       </div>
     </main>
   );

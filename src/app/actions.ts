@@ -148,6 +148,30 @@ function safeReturnPath(formData: FormData): string | null {
   return raw;
 }
 
+function pathWithoutQueryAndHash(path: string | null): string | null {
+  if (!path) return null;
+  const hashRemoved = path.split("#")[0] ?? "";
+  const pathname = hashRemoved.split("?")[0] ?? "";
+  return pathname || null;
+}
+
+function revalidateMeetupViews(meetingId: string, returnPath: string | null): void {
+  revalidateTag("meetup-data", { expire: 300 });
+  revalidatePath("/");
+  if (meetingId) {
+    revalidatePath(`/meetings/${meetingId}`);
+  }
+
+  const returnPathname = pathWithoutQueryAndHash(returnPath);
+  if (
+    returnPathname &&
+    returnPathname !== "/" &&
+    returnPathname !== `/meetings/${meetingId}`
+  ) {
+    revalidatePath(returnPathname);
+  }
+}
+
 async function requireAuthOrRedirect(): Promise<void> {
   const authenticated = await isAuthenticated();
   if (!authenticated) {
@@ -225,8 +249,7 @@ export async function createRsvpAction(formData: FormData): Promise<void> {
     note: meetingLabel,
   });
 
-  revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
 
@@ -520,8 +543,7 @@ export async function deleteRsvpAction(formData: FormData): Promise<void> {
 
   await deleteRsvp(rsvpId, meetingId);
 
-  revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
 
@@ -571,8 +593,7 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
     }
   }
 
-  revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
 
@@ -603,8 +624,7 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
     description,
   });
 
-  revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date: meetingDate, keyword }));
 }
 
@@ -620,8 +640,7 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
 
   await deleteMeeting(meetingId);
 
-  revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  revalidateMeetupViews(meetingId, null);
   redirect(dashboardPath({ date }));
 }
 
@@ -650,7 +669,6 @@ export async function updateRsvpAction(formData: FormData): Promise<void> {
     note,
   });
 
-  revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }

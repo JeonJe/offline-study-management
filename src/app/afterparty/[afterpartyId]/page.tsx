@@ -451,10 +451,12 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
         </Link>
       </div>
 
-      <section className="card-static p-5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+        <div className="grid gap-3 lg:h-[calc(100vh-3rem)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
+          <section className="card-static w-full p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl tracking-tight" style={{ fontFamily: "var(--font-instrument-serif), serif", color: "var(--ink)" }}>
+            <h1 className="text-xl tracking-tight" style={{ fontFamily: "var(--font-heading), sans-serif", color: "var(--ink)" }}>
               {afterparty.title}
             </h1>
             <p className="mt-1 text-sm" style={{ color: "var(--ink-soft)" }}>
@@ -479,14 +481,14 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                 <span
                   key={`header-settlement-count-${settlement.id}`}
                   className="rounded-full border px-2 py-1"
-                  style={{ borderColor: "#fed7aa", backgroundColor: "#fffbeb", color: "#92400e" }}
+                  style={{ borderColor: "#bfdbfe", backgroundColor: "#eff6ff", color: "#1d4ed8" }}
                 >
                   {`정산${index + 1} 참여 ${settlement.participantCount}명`}
                 </span>
               ))}
               <span
                 className="rounded-full border px-2 py-1"
-                style={{ borderColor: "#fde68a", backgroundColor: "#fffbeb", color: "#92400e" }}
+                style={{ borderColor: "#bfdbfe", backgroundColor: "#eff6ff", color: "#1d4ed8" }}
               >
                 선택 정산: {selectedSettlement.title}
               </span>
@@ -685,9 +687,9 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
             </section>
           </EditManageModal>
         </div>
-      </section>
+          </section>
 
-      <section className="mt-4 card-static p-4">
+          <section className="card-static p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>정산 선택</h2>
           <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
@@ -701,19 +703,19 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
               key={settlement.id}
               href={settlementHref(settlement.id)}
               className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold"
-              style={
-                settlement.id === selectedSettlement.id
-                  ? { borderColor: "var(--accent)", backgroundColor: "rgba(194, 65, 12, 0.1)", color: "var(--accent)" }
-                  : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
-              }
+                style={
+                  settlement.id === selectedSettlement.id
+                    ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
+                    : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
+                }
             >
               {settlement.title} · {settlementProgressText(settlement)}
             </Link>
           ))}
         </div>
-      </section>
+          </section>
 
-      <section className="mt-4 card-static p-5">
+          <section className="card-static w-full p-5 lg:min-h-0 lg:flex lg:flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
             참여자 관리 · {selectedSettlement.title}
@@ -760,7 +762,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
 
         {sortedParticipantRows.length > 0 ? (
           <section
-            className="mt-3 rounded-xl border p-3"
+            className="mt-3 rounded-xl border p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
             style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
           >
             <ul className="grid gap-1.5">
@@ -780,12 +782,13 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
         ) : (
           <p className="mt-3 text-xs" style={{ color: "var(--ink-muted)" }}>등록된 참여자 없음</p>
         )}
-      </section>
+          </section>
+        </div>
 
-      <section className="mt-4 card-static p-4 fade-in">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 참여자 관리</h2>
+        <aside className="card-static p-4 fade-in lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-hidden lg:flex lg:flex-col">
+        <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>참여자</h2>
         <p className="mt-2 rounded-lg border border-dashed px-2.5 py-2 text-[11px]" style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}>
-          팀/운영진 필터를 선택한 뒤 이름을 클릭하면 선택된 정산에 즉시 추가됩니다. 오른쪽 뱃지로 현재 추가 여부를 확인하세요.
+          팀/운영진 필터를 고른 뒤 이름을 클릭하면 선택된 정산에 바로 추가됩니다.
         </p>
 
         <div className="mt-2">
@@ -802,7 +805,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
           <Link
             href={teamFilterHref()}
             className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
-            style={!teamFilter ? { borderColor: "var(--accent)", backgroundColor: "rgba(194, 65, 12, 0.1)", color: "var(--accent)" } : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+            style={!teamFilter ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" } : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
           >
             전체
           </Link>
@@ -811,21 +814,20 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
               key={`filter-${group.kind}-${group.teamName}`}
               href={teamFilterHref(group.teamName)}
               className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
-              style={teamFilter === group.teamName ? { borderColor: "var(--accent)", backgroundColor: "rgba(194, 65, 12, 0.1)", color: "var(--accent)" } : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+              style={teamFilter === group.teamName ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" } : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
             >
               {group.teamName}
             </Link>
           ))}
         </div>
 
-        <div className="mt-3 grid gap-3 stagger-children">
+        <div className="mt-3 grid gap-3 pr-1 stagger-children lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           {visibleQuickAddGroups.map((group) => (
             <section key={`${group.kind}-${group.teamName}`} className="rounded-xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
               <p className="mb-2 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>{group.teamName}</p>
               <ul className="grid gap-1">
                 {group.entries.map((entry) => {
                   const normalizedEntryName = normalizeName(entry.name);
-                  const roleMeta = PARTICIPANT_ROLE_META[entry.role];
                   return (
                     <li key={`${group.teamName}-${entry.role}-${entry.name}`} className="rounded-md px-2 py-1 text-xs" style={{ backgroundColor: "var(--surface)" }}>
                       <div className="flex items-start justify-between gap-2">
@@ -849,7 +851,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                               style={
                                 assignedEntry.kind === "afterparty"
                                   ? { backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }
-                                  : { backgroundColor: roleMeta.backgroundColor, color: roleMeta.textColor }
+                                  : { backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
                               }
                             >
                               {assignedEntry.kind === "study" ? `스터디 · ${assignedEntry.title}` : `뒷풀이 · ${assignedEntry.title}`}
@@ -864,7 +866,8 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
             </section>
           ))}
         </div>
-      </section>
+        </aside>
+      </div>
     </main>
   );
 }
