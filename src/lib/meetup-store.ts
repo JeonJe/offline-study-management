@@ -71,7 +71,7 @@ async function hasMeetupSchema(): Promise<boolean> {
 }
 
 export async function ensureSchema(): Promise<void> {
-  if (schemaReady) return;
+  if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {

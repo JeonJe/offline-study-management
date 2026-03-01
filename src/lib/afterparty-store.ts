@@ -105,7 +105,7 @@ async function hasAfterpartySchema(): Promise<boolean> {
 }
 
 export async function ensureAfterpartySchema(): Promise<void> {
-  if (schemaReady) return;
+  if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {

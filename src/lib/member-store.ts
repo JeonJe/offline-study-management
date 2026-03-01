@@ -140,7 +140,7 @@ async function hasMemberSchema(): Promise<boolean> {
 }
 
 async function ensureMemberSchema(): Promise<void> {
-  if (schemaReady) return;
+  if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {
