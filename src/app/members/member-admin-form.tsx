@@ -24,6 +24,8 @@ type TeamDraft = {
   memberInput: string;
 };
 
+type OperationRole = "angel" | SpecialParticipantRole;
+
 function generateTeamId(): string {
   return `team-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -44,26 +46,32 @@ function parseNames(raw: string): string[] {
   return uniq(raw.split(/[\n,;]+/));
 }
 
-const SPECIAL_ROLE_DISPLAY_ORDER: SpecialParticipantRole[] = [
-  "mentor",
-  "manager",
-  "supporter",
-  "buddy",
-];
 const SPECIAL_PARTICIPANT_ROLES: SpecialParticipantRole[] = [
   "supporter",
   "buddy",
   "mentor",
   "manager",
 ];
+const OPERATION_ROLE_ORDER: OperationRole[] = ["angel", "mentor", "manager", "supporter", "buddy"];
 
-function createEmptySpecialRoleInputs(): Record<SpecialParticipantRole, string> {
-  return {
-    supporter: "",
-    buddy: "",
-    mentor: "",
-    manager: "",
-  };
+function RemoveChipButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[11px] leading-none transition hover:bg-black/10"
+    >
+      ×
+    </button>
+  );
 }
 
 export function MemberAdminForm({
@@ -72,7 +80,6 @@ export function MemberAdminForm({
   initialSpecialRoles,
 }: MemberAdminFormProps) {
   const [fixedAngels, setFixedAngels] = useState<string[]>(uniq(initialFixedAngels));
-  const [angelInput, setAngelInput] = useState("");
   const [teams, setTeams] = useState<TeamDraft[]>(
     initialTeamGroups.map((team) => ({
       id: generateTeamId(),
@@ -89,13 +96,13 @@ export function MemberAdminForm({
     mentor: uniq(initialSpecialRoles.mentor ?? []),
     manager: uniq(initialSpecialRoles.manager ?? []),
   });
-  const [specialRoleInputs, setSpecialRoleInputs] = useState<Record<SpecialParticipantRole, string>>(
-    createEmptySpecialRoleInputs()
-  );
+  const [activeOperationRole, setActiveOperationRole] = useState<OperationRole>("angel");
+  const [operationInput, setOperationInput] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+  const [pendingAngelManageIndex, setPendingAngelManageIndex] = useState<number | null>(null);
   const initialRenderRef = useRef(true);
   const savingRef = useRef(false);
   const totalTeamMemberCount = useMemo(
@@ -214,7 +221,6 @@ export function MemberAdminForm({
     if (names.length === 0) return;
 
     setFixedAngels((prev) => uniq([...prev, ...names]));
-    setAngelInput("");
   }
 
   function addSpecialRoleMembers(role: SpecialParticipantRole, raw: string): void {
@@ -225,32 +231,68 @@ export function MemberAdminForm({
       ...prev,
       [role]: uniq([...(prev[role] ?? []), ...names]),
     }));
-    setSpecialRoleInputs((prev) => ({ ...prev, [role]: "" }));
+  }
+
+  function roleMeta(role: OperationRole): {
+    label: string;
+    emoji: string;
+    borderColor: string;
+    backgroundColor: string;
+    textColor: string;
+  } {
+    if (role === "angel") {
+      return {
+        label: "엔젤",
+        emoji: "🪽",
+        borderColor: "var(--angel-border)",
+        backgroundColor: "var(--angel-bg)",
+        textColor: "var(--angel-text)",
+      };
+    }
+    return PARTICIPANT_ROLE_META[role];
+  }
+
+  function operationMembers(role: OperationRole): string[] {
+    if (role === "angel") return fixedAngels;
+    return specialRoles[role] ?? [];
+  }
+
+  function addOperationMembers(role: OperationRole, raw: string): void {
+    if (role === "angel") {
+      addAngels(raw);
+      return;
+    }
+    addSpecialRoleMembers(role, raw);
+  }
+
+  function removeOperationMember(role: OperationRole, member: string): void {
+    if (role === "angel") {
+      setFixedAngels((prev) => prev.filter((name) => name !== member));
+      return;
+    }
+    setSpecialRoles((prev) => ({
+      ...prev,
+      [role]: prev[role].filter((name) => name !== member),
+    }));
   }
 
   return (
     <div className="mt-4 grid gap-4">
-      <section className="card-static p-4 sm:p-5">
+      <section className="card-static order-2 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>루퍼스 운영진</p>
-            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>엔젤 및 역할 디렉터리</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>운영진</p>
+            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>역할별로 빠르게 추가/삭제</p>
             <div className="mt-1 flex flex-wrap gap-1">
-              <span
-                className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                style={{ borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }}
-              >
-                엔젤 {fixedAngels.length}명
-              </span>
-              {SPECIAL_ROLE_DISPLAY_ORDER.map((role) => {
-                const roleMeta = PARTICIPANT_ROLE_META[role];
+              {OPERATION_ROLE_ORDER.map((role) => {
+                const meta = roleMeta(role);
                 return (
                   <span
-                    key={`operations-role-summary-${role}`}
+                    key={`operations-role-summary-tab-${role}`}
                     className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                    style={{ borderColor: roleMeta.borderColor, backgroundColor: roleMeta.backgroundColor, color: roleMeta.textColor }}
+                    style={{ borderColor: meta.borderColor, backgroundColor: meta.backgroundColor, color: meta.textColor }}
                   >
-                    {roleMeta.label} {(specialRoles[role] ?? []).length}명
+                    {meta.label} {operationMembers(role).length}명
                   </span>
                 );
               })}
@@ -264,125 +306,92 @@ export function MemberAdminForm({
           </span>
         </div>
 
-        <div className="mt-3 grid gap-3">
-          <section className="rounded-lg border p-2" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold" style={{ color: "#92400e" }}>엔젤</p>
-              <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>{fixedAngels.length}명</span>
-            </div>
-
-            <div className="mt-2 flex min-h-10 flex-wrap gap-1.5">
-              {fixedAngels.map((angel) => (
-                <span
-                  key={angel}
-                  className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium"
-                  style={{ borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }}
+        <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}>
+          <div className="flex flex-wrap gap-1.5">
+            {OPERATION_ROLE_ORDER.map((role) => {
+              const meta = roleMeta(role);
+              const active = activeOperationRole === role;
+              return (
+                <button
+                  key={`operation-role-tab-${role}`}
+                  type="button"
+                  onClick={() => setActiveOperationRole(role)}
+                  className="btn-press rounded-full border px-2 py-1 text-xs font-semibold"
+                  style={
+                    active
+                      ? { borderColor: meta.borderColor, backgroundColor: meta.backgroundColor, color: meta.textColor }
+                      : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }
+                  }
                 >
-                  🪽 {angel}
-                  <button type="button" onClick={() => setFixedAngels((prev) => prev.filter((name) => name !== angel))}>
-                    ×
-                  </button>
-                </span>
-              ))}
-              {fixedAngels.length === 0 ? (
-                <span className="text-xs" style={{ color: "var(--ink-muted)" }}>등록된 인원 없음</span>
-              ) : null}
-            </div>
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <input
-                value={angelInput}
-                onChange={(event) => setAngelInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  addAngels(angelInput);
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold" style={{ color: roleMeta(activeOperationRole).textColor }}>
+              {roleMeta(activeOperationRole).label}
+            </p>
+            <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+              {operationMembers(activeOperationRole).length}명
+            </span>
+          </div>
+
+          <div className="mt-2 flex max-h-36 min-h-10 flex-wrap gap-1.5 overflow-y-auto pr-1">
+            {operationMembers(activeOperationRole).map((member) => (
+              <span
+                key={`operation-member-${activeOperationRole}-${member}`}
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium"
+                style={{
+                  borderColor: roleMeta(activeOperationRole).borderColor,
+                  backgroundColor: roleMeta(activeOperationRole).backgroundColor,
+                  color: roleMeta(activeOperationRole).textColor,
                 }}
-                className="h-8 w-full rounded-lg border bg-white px-2 text-xs sm:w-44"
-                style={{ borderColor: "var(--line)" }}
-                placeholder="엔젤 이름"
-              />
-              <button
-                type="button"
-                className="btn-press h-8 rounded-lg border px-2 text-xs font-semibold"
-                style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-                onClick={() => addAngels(angelInput)}
               >
-                추가
-              </button>
-            </div>
-          </section>
+                {roleMeta(activeOperationRole).emoji ? `${roleMeta(activeOperationRole).emoji} ` : ""}
+                {member}
+                <RemoveChipButton
+                  label={`${member} ${roleMeta(activeOperationRole).label} 삭제`}
+                  onClick={() => removeOperationMember(activeOperationRole, member)}
+                />
+              </span>
+            ))}
+            {operationMembers(activeOperationRole).length === 0 ? (
+              <span className="text-xs" style={{ color: "var(--ink-muted)" }}>등록된 인원 없음</span>
+            ) : null}
+          </div>
 
-          {SPECIAL_ROLE_DISPLAY_ORDER.map((role) => {
-            const roleMeta = PARTICIPANT_ROLE_META[role];
-            const members = specialRoles[role] ?? [];
-            return (
-              <section key={`special-role-${role}`} className="rounded-lg border p-2" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold" style={{ color: roleMeta.textColor }}>{roleMeta.label}</p>
-                  <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>{members.length}명</span>
-                </div>
-
-                <div className="mt-2 flex min-h-10 flex-wrap gap-1.5">
-                  {members.map((member) => (
-                    <span
-                      key={`special-role-member-${role}-${member}`}
-                      className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium"
-                      style={{ borderColor: roleMeta.borderColor, backgroundColor: roleMeta.backgroundColor, color: roleMeta.textColor }}
-                    >
-                      {roleMeta.emoji ? `${roleMeta.emoji} ` : ""}{member}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSpecialRoles((prev) => ({
-                            ...prev,
-                            [role]: prev[role].filter((name) => name !== member),
-                          }))
-                        }
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  {members.length === 0 ? (
-                    <span className="text-xs" style={{ color: "var(--ink-muted)" }}>등록된 인원 없음</span>
-                  ) : null}
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <input
-                    value={specialRoleInputs[role]}
-                    onChange={(event) =>
-                      setSpecialRoleInputs((prev) => ({
-                        ...prev,
-                        [role]: event.target.value,
-                      }))
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter") return;
-                      event.preventDefault();
-                      addSpecialRoleMembers(role, specialRoleInputs[role]);
-                    }}
-                    className="h-8 w-full rounded-lg border bg-white px-2 text-xs sm:w-44"
-                    style={{ borderColor: "var(--line)" }}
-                    placeholder={`${roleMeta.label} 이름`}
-                  />
-                  <button
-                    type="button"
-                    className="btn-press h-8 rounded-lg border px-2 text-xs font-semibold"
-                    style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-                    onClick={() => addSpecialRoleMembers(role, specialRoleInputs[role])}
-                  >
-                    추가
-                  </button>
-                </div>
-              </section>
-            );
-          })}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              value={operationInput}
+              onChange={(event) => setOperationInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                addOperationMembers(activeOperationRole, operationInput);
+                setOperationInput("");
+              }}
+              className="h-8 w-full rounded-lg border bg-white px-2 text-xs sm:w-52"
+              style={{ borderColor: "var(--line)" }}
+              placeholder={`${roleMeta(activeOperationRole).label} 이름 (쉼표/Enter로 여러 명)`}
+            />
+            <button
+              type="button"
+              className="btn-press h-8 rounded-lg border px-2 text-xs font-semibold"
+              style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
+              onClick={() => {
+                addOperationMembers(activeOperationRole, operationInput);
+                setOperationInput("");
+              }}
+            >
+              추가
+            </button>
+          </div>
         </div>
       </section>
 
-      <section className="card-static p-4 sm:p-5">
+      <section className="card-static order-1 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>멤버</p>
@@ -425,17 +434,11 @@ export function MemberAdminForm({
               팀이 없습니다. 상단의 팀 추가 버튼으로 시작하세요.
             </p>
           ) : (
-            <div className="grid gap-3 stagger-children">
+            <div className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1 stagger-children">
               {teams.map((team, index) => (
                 <article key={team.id} className="card-static p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded-full border px-2 py-1 text-[11px] font-semibold"
-                        style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
-                      >
-                        팀 {index + 1}
-                      </span>
                       <input
                         value={team.teamName}
                         onChange={(event) => updateTeam(index, (prev) => ({ ...prev, teamName: event.target.value }))}
@@ -445,10 +448,18 @@ export function MemberAdminForm({
                       />
                       <span
                         className="rounded-full border px-2 py-1 text-[11px] font-semibold"
-                        style={{ borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }}
+                        style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)", color: "var(--ink-soft)" }}
                       >
-                        엔젤 {team.angels.length}/2
+                        엔젤 {team.angels.length}/2{team.angels.length > 0 ? ` · ${team.angels.join(", ")}` : ""}
                       </span>
+                      <button
+                        type="button"
+                        className="btn-press h-9 rounded-lg border bg-white px-2 text-[11px] font-semibold"
+                        style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
+                        onClick={() => setPendingAngelManageIndex(index)}
+                      >
+                        엔젤 추가
+                      </button>
                     </div>
 
                     <button
@@ -462,64 +473,6 @@ export function MemberAdminForm({
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold" style={{ color: "#92400e" }}>엔젤</span>
-                      <span className="text-xs" style={{ color: "var(--ink-muted)" }}>{team.angels.length}명</span>
-                    </div>
-
-                    <div
-                      className="mt-2 flex min-h-12 flex-wrap gap-2 rounded-lg border bg-white px-2 py-2"
-                      style={{ borderColor: "#fbbf24", backgroundColor: "rgba(254, 243, 199, 0.2)" }}
-                    >
-                      {team.angels.map((angel) => (
-                        <span
-                          key={`${team.teamName}-angel-${angel}`}
-                          className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs"
-                          style={{ borderColor: "#fbbf24", backgroundColor: "var(--angel-bg)", color: "#92400e" }}
-                        >
-                          🪽 {angel}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateTeam(index, (prev) => ({
-                                ...prev,
-                                angels: prev.angels.filter((name) => name !== angel),
-                              }))
-                            }
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                      {team.angels.length === 0 ? (
-                        <span className="text-xs" style={{ color: "var(--ink-muted)" }}>등록된 엔젤 없음</span>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <input
-                        value={team.angelInput}
-                        list="member-fixed-angels"
-                        onChange={(event) => updateTeam(index, (prev) => ({ ...prev, angelInput: event.target.value }))}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter") return;
-                          event.preventDefault();
-                          addTeamAngels(index, team.angelInput);
-                        }}
-                        className="h-9 w-full rounded-lg border px-2 text-xs sm:w-52"
-                        style={{ borderColor: "#fbbf24", backgroundColor: "rgba(254, 243, 199, 0.3)", color: "#92400e" }}
-                        placeholder="팀 엔젤(최대 2명)"
-                      />
-                      <button
-                        type="button"
-                        className="btn-press h-9 rounded-lg border px-2 text-xs font-semibold"
-                        style={{ borderColor: "#fbbf24", color: "#92400e" }}
-                        onClick={() => addTeamAngels(index, team.angelInput)}
-                      >
-                        추가
-                      </button>
-                    </div>
-
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>멤버</span>
                       <span className="text-xs" style={{ color: "var(--ink-muted)" }}>{team.members.length}명</span>
@@ -536,17 +489,15 @@ export function MemberAdminForm({
                           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)", color: "var(--ink-soft)" }}
                         >
                           {member}
-                          <button
-                            type="button"
+                          <RemoveChipButton
+                            label={`${member} 멤버 삭제`}
                             onClick={() =>
                               updateTeam(index, (prev) => ({
                                 ...prev,
                                 members: prev.members.filter((name) => name !== member),
                               }))
                             }
-                          >
-                            ×
-                          </button>
+                          />
                         </span>
                       ))}
                     </div>
@@ -562,7 +513,7 @@ export function MemberAdminForm({
                         }}
                         className="h-9 w-full rounded-lg border bg-white px-2 text-xs sm:w-52"
                         style={{ borderColor: "var(--line)" }}
-                        placeholder="멤버 이름"
+                        placeholder="멤버 이름 (쉼표/Enter로 여러 명)"
                       />
                       <button
                         type="button"
@@ -586,6 +537,87 @@ export function MemberAdminForm({
           <option key={`angel-option-${angel}`} value={angel} />
         ))}
       </datalist>
+
+      {pendingAngelManageIndex !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-2xl border bg-white p-5 shadow-2xl" style={{ borderColor: "var(--line)" }}>
+            <h4 className="text-base font-semibold" style={{ color: "var(--ink)" }}>
+              {teams[pendingAngelManageIndex]?.teamName || "팀"} 엔젤 관리
+            </h4>
+            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+              최대 2명까지 등록할 수 있습니다.
+            </p>
+
+            <div
+              className="mt-3 flex min-h-12 flex-wrap gap-2 rounded-lg border bg-white px-2 py-2"
+              style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
+            >
+              {(teams[pendingAngelManageIndex]?.angels ?? []).map((angel) => (
+                <span
+                  key={`angel-manage-${angel}`}
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs"
+                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+                >
+                  🪽 {angel}
+                  <RemoveChipButton
+                    label={`${angel} 엔젤 삭제`}
+                    onClick={() =>
+                      updateTeam(pendingAngelManageIndex, (prev) => ({
+                        ...prev,
+                        angels: prev.angels.filter((name) => name !== angel),
+                      }))
+                    }
+                  />
+                </span>
+              ))}
+              {(teams[pendingAngelManageIndex]?.angels ?? []).length === 0 ? (
+                <span className="text-xs" style={{ color: "var(--ink-muted)" }}>등록된 엔젤 없음</span>
+              ) : null}
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                value={teams[pendingAngelManageIndex]?.angelInput ?? ""}
+                list="member-fixed-angels"
+                onChange={(event) =>
+                  updateTeam(pendingAngelManageIndex, (prev) => ({ ...prev, angelInput: event.target.value }))
+                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  const currentInput = teams[pendingAngelManageIndex]?.angelInput ?? "";
+                  addTeamAngels(pendingAngelManageIndex, currentInput);
+                }}
+                className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-xs"
+                style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+                placeholder="팀 엔젤 (쉼표/Enter로 여러 명)"
+              />
+              <button
+                type="button"
+                className="btn-press h-9 rounded-lg border px-3 text-xs font-semibold"
+                style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
+                onClick={() => {
+                  const currentInput = teams[pendingAngelManageIndex]?.angelInput ?? "";
+                  addTeamAngels(pendingAngelManageIndex, currentInput);
+                }}
+              >
+                추가
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                className="btn-press rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
+                onClick={() => setPendingAngelManageIndex(null)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {pendingDeleteIndex !== null ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">

@@ -15,7 +15,7 @@ export default async function MembersPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
       <DashboardHeader
-        title="멤버 관리"
+        title="멤버"
         activeTab="members"
       />
 

@@ -7,7 +7,7 @@ type OfflineStudyCaptureButtonProps = {
 };
 
 type CaptureState = "idle" | "capturing" | "downloaded";
-const DEFAULT_CAPTURE_BUTTON_LABEL = "공유 이미지 다운로드";
+const DEFAULT_CAPTURE_BUTTON_LABEL = "이미지 다운로드";
 
 type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
 type HtmlToImageNamespace = {
@@ -285,7 +285,7 @@ function openCapturePreviewWindow(target: HTMLElement): boolean {
 <head>
   <meta charset="utf-8" />
   <base href="${window.location.origin}${window.location.pathname}" />
-  <title>오프라인 스터디 카드 캡처</title>
+  <title>스터디 카드 캡처</title>
   ${styleMarkup}
   <style>
     html, body { margin: 0; padding: 0; background: #ffffff !important; }
@@ -350,7 +350,7 @@ export function OfflineStudyCaptureButton({ targetId }: OfflineStudyCaptureButto
       const opened = openCapturePreviewWindow(target);
       if (opened) {
         window.alert(
-          `PNG 자동 다운로드가 실패했습니다.\n원인: ${reason}\n캡처 전용 새 창을 열었습니다. 새 창에서 브라우저 기본 캡처로 공유해 주세요.`
+          `PNG 자동 다운로드가 실패했습니다.\n원인: ${reason}\n캡처 전용 새 창을 열었습니다. 새 창에서 브라우저 기본 캡처를 사용해 주세요.`
         );
       } else {
         window.alert(`PNG 자동 다운로드가 실패했습니다.\n원인: ${reason}\n팝업 차단을 해제한 뒤 다시 시도해 주세요.`);

@@ -34,9 +34,9 @@ export const PARTICIPANT_ROLE_META: Record<ParticipantRole, RoleMeta> = {
   angel: {
     label: "엔젤",
     emoji: "🪽",
-    borderColor: "#fbbf24",
+    borderColor: "var(--angel-border)",
     backgroundColor: "var(--angel-bg)",
-    textColor: "#92400e",
+    textColor: "var(--angel-text)",
   },
   supporter: {
     label: "서포터",

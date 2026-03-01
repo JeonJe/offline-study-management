@@ -35,7 +35,7 @@ export function OfflineStudyCopyTextButton({ textToCopy }: OfflineStudyCopyTextB
 
   async function handleCopy(): Promise<void> {
     if (!textToCopy.trim()) {
-      window.alert("복사할 공유 텍스트가 없습니다.");
+      window.alert("복사할 텍스트가 없습니다.");
       return;
     }
 
@@ -58,7 +58,7 @@ export function OfflineStudyCopyTextButton({ textToCopy }: OfflineStudyCopyTextB
         ? "복사 완료"
         : copyState === "failed"
           ? "복사 실패"
-          : "공유 텍스트 복사";
+          : "텍스트 복사";
 
   return (
     <button
