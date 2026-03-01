@@ -5,7 +5,6 @@ import {
 } from "@/app/actions";
 import { DatePicker } from "@/app/date-picker";
 import { DashboardHeader } from "@/app/dashboard-header";
-import { MeetingShareButton } from "@/app/meeting-share-button";
 import { isAuthenticated } from "@/lib/auth";
 import { toKstIsoDate } from "@/lib/date-utils";
 import { extractHttpUrl } from "@/lib/location-utils";
@@ -284,7 +283,7 @@ function AfterpartyCard({
                 <div
                   key={settlement.id}
                   className="inline-flex w-fit flex-wrap items-center gap-1 rounded-full border px-2 py-1"
-                  style={{ borderColor: "#fed7aa", backgroundColor: "#fff7ed", color: "#9a3412" }}
+                  style={{ borderColor: "#bfdbfe", backgroundColor: "#eff6ff", color: "#1d4ed8" }}
                 >
                   <span className="font-semibold">{`정산${index + 1}`}</span>
                   <span style={{ color: "var(--ink-soft)" }}>
@@ -301,15 +300,6 @@ function AfterpartyCard({
           </div>
         </div>
 
-        <div className="relative z-20 flex min-w-[180px] shrink-0 flex-col items-end gap-2 sm:ml-auto">
-          <div className="flex flex-wrap justify-end gap-2">
-            <MeetingShareButton
-              path={detailPath}
-              className="btn-press inline-flex h-8 items-center rounded-lg border px-2.5 text-[11px] font-semibold transition hover:border-stone-400 disabled:cursor-not-allowed disabled:opacity-70"
-              style={{ borderColor: "var(--line)", color: "#0369a1", backgroundColor: "var(--surface)" }}
-            />
-          </div>
-        </div>
       </div>
 
       <section
@@ -411,23 +401,35 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     (sum, item) => sum + item.settlementCount,
     0
   );
+  const totalParticipantCount = afterpartiesOnDate.reduce(
+    (sum, item) => sum + item.participantCount,
+    0
+  );
+  const settledParticipantCount = Object.values(participantsByAfterparty).reduce(
+    (sum, rows) => sum + rows.filter((row) => row.isSettled).length,
+    0
+  );
+  const settlementRate =
+    totalParticipantCount > 0
+      ? Math.round((settledParticipantCount / totalParticipantCount) * 100)
+      : 0;
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <DashboardHeader title="뒷풀이 관리" activeTab="afterparty" currentDate={selectedDate} />
+      <DashboardHeader title="뒷풀이" activeTab="afterparty" currentDate={selectedDate} />
 
-      <section className="card-static mb-5 p-5 sm:p-6 fade-in">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <label className="grid gap-2 text-sm sm:min-w-64" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">조회 날짜</span>
-            <DatePicker selectedDate={selectedDate} basePath="/afterparty" />
-          </label>
-
-          <div className="text-left sm:text-right">
-            <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 요약</h2>
-            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+      <section className="card-static mb-5 p-4 sm:p-5 fade-in">
+        <div className="rounded-xl border px-3 py-3 sm:px-4" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">날짜</span>
+              <div className="min-w-44">
+                <DatePicker selectedDate={selectedDate} basePath="/afterparty" />
+              </div>
+            </label>
+            <span className="text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
               {afterpartiesOnDate.length > 0 ? `${afterpartiesOnDate.length}개 모임` : "모임 없음"}
-            </p>
+            </span>
           </div>
         </div>
 
@@ -440,39 +442,66 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
             <p className="mt-2 break-words">{loadError}</p>
           </section>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-2 stagger-children">
-            {[
-              { label: "모임 수", value: `${afterpartiesOnDate.length}개`, accent: "#c2410c" },
-              { label: "정산 수", value: `${totalSettlementCount}개`, accent: "#0369a1" },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="flex items-stretch overflow-hidden rounded-xl border"
-                style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+          <>
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>요약</h2>
+              <span
+                className="rounded-full border px-2 py-1 text-xs font-semibold"
+                style={{ borderColor: "var(--line)", color: "var(--accent)", backgroundColor: "var(--accent-weak)" }}
               >
-                <div className="w-1.5 shrink-0" style={{ backgroundColor: item.accent }} />
-                <div className="px-3 py-3">
-                  <p className="text-xs" style={{ color: "var(--ink-soft)" }}>{item.label}</p>
-                  <p className="text-lg font-semibold" style={{ color: "var(--ink)" }}>{item.value}</p>
-                </div>
+                정산 완료율 {settlementRate}%
+              </span>
+            </div>
+
+            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
+              <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
+                참여자 {totalParticipantCount}명 중 {settledParticipantCount}명이 정산 완료되었습니다.
+              </p>
+              <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: "var(--surface)" }}>
+                <div
+                  className="h-full rounded-full transition-[width] duration-500"
+                  style={{
+                    width: `${Math.max(0, Math.min(settlementRate, 100))}%`,
+                    backgroundColor: "var(--accent)",
+                  }}
+                />
               </div>
-            ))}
-          </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 stagger-children">
+              {[
+                { label: "뒷풀이", value: `${afterpartiesOnDate.length}개`, accent: "var(--accent)" },
+                { label: "참여자", value: `${totalParticipantCount}명`, accent: "#15803d" },
+                { label: "정산", value: `${totalSettlementCount}개`, accent: "#0369a1" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border p-3"
+                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+                >
+                  <p className="text-xs" style={{ color: "var(--ink-soft)" }}>{item.label}</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: "var(--ink)" }}>
+                    <span style={{ color: item.accent }}>{item.value}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
       {!loadError && afterpartiesOnDate.length === 0 ? (
         <section className="card-static mb-5 p-6 text-center fade-in">
           <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-            선택한 날짜에는 생성된 뒷풀이가 없습니다. 우하단 + 버튼으로 모임을 만들어보세요.
+            선택한 날짜의 데이터가 없습니다. 우하단 + 버튼으로 추가하세요.
           </p>
         </section>
       ) : null}
 
       {!loadError && afterpartiesOnDate.length > 0 ? (
-        <section className="card-static mb-5 p-5 sm:p-6 fade-in">
-          <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 참여 현황</h3>
-          <div className="mt-4 grid gap-4 xl:grid-cols-2 stagger-children">
+        <section className="card-static mb-5 p-4 sm:p-5 fade-in">
+          <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>참여 현황</h3>
+          <div className="mt-4 grid gap-3 xl:grid-cols-2 stagger-children">
             {afterpartiesOnDate.map((afterparty) => (
               <AfterpartyCard
                 key={afterparty.id}

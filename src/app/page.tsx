@@ -5,7 +5,6 @@ import {
 } from "@/app/actions";
 import { DatePicker } from "@/app/date-picker";
 import { DashboardHeader } from "@/app/dashboard-header";
-import { MeetingShareButton } from "@/app/meeting-share-button";
 import { OfflineStudyCaptureButton } from "@/app/offline-study-capture-button";
 import { OfflineStudyCopyTextButton } from "@/app/offline-study-copy-text-button";
 import { isAuthenticated } from "@/lib/auth";
@@ -133,7 +132,7 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
 
         {/* 타이틀 */}
         <h1 className="li li-d1" style={{
-          fontFamily: "var(--font-instrument-serif), serif",
+          fontFamily: "var(--font-heading), sans-serif",
           fontSize: "2.25rem",
           lineHeight: 1.1,
           letterSpacing: "-0.025em",
@@ -254,7 +253,7 @@ function CreateMeetingModal({ selectedDate }: { selectedDate: string }) {
               maxLength={240}
               className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
               style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-              placeholder="예: 팀별 진행 후 15:00 전체 공유"
+              placeholder="예: 팀별 진행 후 15:00 전체 정리"
             />
           </label>
 
@@ -488,20 +487,12 @@ function MeetingCard({
           </p>
         </div>
 
-        <div className="relative z-20 flex min-w-[180px] shrink-0 flex-col items-end gap-2 sm:ml-auto">
-          <div className="flex flex-wrap justify-end gap-2">
-            <MeetingShareButton
-              path={detailPath}
-              className="btn-press inline-flex h-8 items-center rounded-lg border px-2.5 text-[11px] font-semibold transition hover:border-stone-400 disabled:cursor-not-allowed disabled:opacity-70"
-              style={{ borderColor: "var(--line)", color: "#0369a1", backgroundColor: "var(--surface)" }}
-            />
-          </div>
-
+        <div className="relative z-20 flex min-w-[140px] shrink-0 flex-col items-end gap-2 sm:ml-auto">
           <div className="flex flex-wrap justify-end gap-1.5">
             {[
               { label: "총참여", value: meeting.totalCount, color: "var(--ink)" },
               { label: "멤버", value: meeting.studentCount, color: "#15803d" },
-              { label: "운영진", value: meeting.operationCount, color: "#b45309" },
+              { label: "운영진", value: meeting.operationCount, color: "#1d4ed8" },
             ].map((item) => (
               <span
                 key={`${meeting.id}-${item.label}`}
@@ -577,7 +568,7 @@ function buildOfflineStudyShareText({
   teamLabelByMemberName: Map<string, string>;
 }): string {
   const lines: string[] = [];
-  lines.push(`오프라인 스터디 공유 (${selectedDate})`);
+  lines.push(`스터디 정리 (${selectedDate})`);
   lines.push(`모임 ${meetingsOnDate.length}개`);
   lines.push("");
 
@@ -606,10 +597,10 @@ function buildOfflineStudyShareText({
 }
 
 const STAT_CONFIG = [
-  { label: "모임 수", suffix: "개", accent: "#c2410c" },
+  { label: "모임 수", suffix: "개", accent: "var(--accent)" },
   { label: "총 참여", suffix: "명", accent: "#0369a1" },
   { label: "멤버", suffix: "명", accent: "#15803d" },
-  { label: "운영진", suffix: "명", accent: "#b45309" },
+  { label: "운영진", suffix: "명", accent: "#1d4ed8" },
 ] as const;
 
 export default async function Home({ searchParams }: HomePageProps) {
@@ -712,20 +703,20 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <DashboardHeader title="오프라인 스터디 대시보드" activeTab="study" currentDate={selectedDate} />
+      <DashboardHeader title="스터디" activeTab="study" currentDate={selectedDate} />
 
-      <section className="card-static mb-5 p-5 sm:p-6 fade-in">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <label className="grid gap-2 text-sm sm:min-w-64" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">조회 날짜</span>
-            <DatePicker selectedDate={selectedDate} />
-          </label>
-
-          <div className="text-left sm:text-right">
-            <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>오프라인 스터디 요약</h2>
-            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+      <section className="card-static mb-5 p-4 sm:p-5 fade-in">
+        <div className="rounded-xl border px-3 py-3 sm:px-4" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">날짜</span>
+              <div className="min-w-44">
+                <DatePicker selectedDate={selectedDate} />
+              </div>
+            </label>
+            <span className="text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
               {meetingsOnDate.length > 0 ? `${meetingsOnDate.length}개 모임` : "모임 없음"}
-            </p>
+            </span>
           </div>
         </div>
 
@@ -739,38 +730,21 @@ export default async function Home({ searchParams }: HomePageProps) {
           </section>
         ) : (
           <>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
-              {STAT_CONFIG.map((stat, index) => (
-                <div
-                  key={stat.label}
-                  className="flex items-stretch overflow-hidden rounded-xl border"
-                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
-                >
-                  <div className="w-1.5 shrink-0" style={{ backgroundColor: stat.accent }} />
-                  <div className="px-3 py-3">
-                    <p className="text-xs" style={{ color: "var(--ink-soft)" }}>{stat.label}</p>
-                    <p className="text-lg font-semibold" style={{ color: "var(--ink)" }}>
-                      {statValues[index]}{stat.suffix}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>요약</h2>
+              <span
+                className="rounded-full border px-2 py-1 text-xs font-semibold"
+                style={{ borderColor: "var(--line)", color: "var(--accent)", backgroundColor: "var(--accent-weak)" }}
+              >
+                참여 커버리지 {memberCoverageRate}%
+              </span>
             </div>
 
-            <div
-              className="mt-4 rounded-xl border p-3"
-              style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-                참여 커버리지
+            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
+              <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
+                등록 멤버 {knownMemberCount}명 중 {assignedKnownMemberCount}명이 참여했습니다.
               </p>
-              <p className="mt-1 text-sm" style={{ color: "var(--ink-soft)" }}>
-                등록 멤버 {knownMemberCount}명 중 {assignedKnownMemberCount}명이 오프라인 스터디에 참여했습니다.
-              </p>
-              <div
-                className="mt-3 h-2 overflow-hidden rounded-full"
-                style={{ backgroundColor: "var(--surface-alt)" }}
-              >
+              <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: "var(--surface)" }}>
                 <div
                   className="h-full rounded-full transition-[width] duration-500"
                   style={{
@@ -779,9 +753,21 @@ export default async function Home({ searchParams }: HomePageProps) {
                   }}
                 />
               </div>
-              <p className="mt-1 text-right text-xs font-semibold" style={{ color: "var(--accent)" }}>
-                {memberCoverageRate}%
-              </p>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 stagger-children">
+              {STAT_CONFIG.map((stat, index) => (
+                <div
+                  key={stat.label}
+                  className="rounded-xl border p-3"
+                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+                >
+                  <p className="text-xs" style={{ color: "var(--ink-soft)" }}>{stat.label}</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: "var(--ink)" }}>
+                    <span style={{ color: stat.accent }}>{statValues[index]}</span>{stat.suffix}
+                  </p>
+                </div>
+              ))}
             </div>
 
             {meetingsOnDate.length === 0 ? (
@@ -791,57 +777,22 @@ export default async function Home({ searchParams }: HomePageProps) {
               >
                 선택한 날짜에는 생성된 모임이 없습니다.
               </p>
-            ) : (
-              <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-                  오프라인 스터디 목록
-                </p>
-                <ol className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {meetingsOnDate.map((meeting, index) => (
-                    <li
-                      key={`timeline-${meeting.id}`}
-                      className="rounded-xl border px-3 py-2"
-                      style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
-                    >
-                      <div className="flex items-start gap-2">
-                        <span
-                          className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[10px] font-bold"
-                          style={{ backgroundColor: "rgba(194, 65, 12, 0.15)", color: "var(--accent)" }}
-                        >
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold" style={{ color: "var(--ink)" }}>
-                            {meeting.title}
-                          </p>
-                          <p className="truncate text-xs" style={{ color: "var(--ink-soft)" }}>
-                            장소: <LocationValue location={meeting.location} />
-                          </p>
-                        </div>
-                      </div>
-                      <p className="mt-1 text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                        {formatStartTime(meeting.startTime)} · 총 {meeting.totalCount}명
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
+            ) : null}
           </>
         )}
       </section>
 
       {!loadError && meetingsOnDate.length > 0 ? (
-        <section id="offline-study-cards-capture" className="card-static mb-5 p-5 sm:p-6 fade-in">
+        <section id="offline-study-cards-capture" className="card-static mb-5 p-4 sm:p-5 fade-in">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>오프라인 스터디 참여 현황</h3>
+            <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>참여 현황</h3>
             <div className="flex flex-wrap items-center gap-2">
               <OfflineStudyCopyTextButton textToCopy={shareText} />
               <OfflineStudyCaptureButton targetId="offline-study-cards-capture" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="grid gap-4 xl:grid-cols-2 stagger-children">
+            <div className="grid gap-3 xl:grid-cols-2 stagger-children">
               {meetingsOnDate.map((meeting) => (
                 <MeetingCard
                   key={meeting.id}
