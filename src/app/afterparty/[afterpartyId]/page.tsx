@@ -33,6 +33,7 @@ import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
+import { PendingSubmitButton } from "@/app/pending-submit-button";
 
 type PageProps = {
   params: Promise<{ afterpartyId: string }>;
@@ -88,13 +89,12 @@ function QuickAddButton({
       <input type="hidden" name="returnPath" value={returnPath} />
       <input type="hidden" name="names" value={name} />
       <input type="hidden" name="role" value={role} />
-      <button
-        type="submit"
+      <PendingSubmitButton
+        idleLabel={`${roleMeta.emoji ? `${roleMeta.emoji} ` : ""}${label ?? name}`}
+        pendingLabel="추가중..."
         className="underline-offset-2 hover:underline"
         style={{ color: roleMeta.textColor }}
-      >
-        {roleMeta.emoji ? `${roleMeta.emoji} ` : ""}{label ?? name}
-      </button>
+      />
     </form>
   );
 }
