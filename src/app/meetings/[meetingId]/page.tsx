@@ -12,11 +12,8 @@ import {
 } from "@/lib/meetup-store";
 import {
   cachedGetMeetingById,
-  cachedListMeetingsByDate,
   cachedListRsvpsForMeetings,
   cachedLoadMemberPreset,
-  cachedListAfterpartiesByDate,
-  cachedListParticipantsForAfterparties,
 } from "@/lib/cached-queries";
 import { redirect } from "next/navigation";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
@@ -139,19 +136,6 @@ function LocationValue({ location }: { location: string }) {
   );
 }
 
-function addAssignment(
-  map: Map<string, { title: string; kind: "study" | "afterparty" }[]>,
-  normalizedName: string,
-  title: string,
-  kind: "study" | "afterparty"
-): void {
-  const existing = map.get(normalizedName) ?? [];
-  if (!existing.some((item) => item.title === title && item.kind === kind)) {
-    existing.push({ title, kind });
-  }
-  map.set(normalizedName, existing);
-}
-
 function ParticipantChip({
   row,
   meetingId,
@@ -232,16 +216,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     redirect(date ? `/?date=${date}` : "/");
   }
 
-  const [sameDateMeetings, sameDateAfterparties] = await Promise.all([
-    cachedListMeetingsByDate(meeting.meetingDate),
-    cachedListAfterpartiesByDate(meeting.meetingDate),
-  ]);
-
-  const [rsvpsByMeeting, participantsByAfterparty] = await Promise.all([
-    cachedListRsvpsForMeetings(sameDateMeetings.map((item) => item.id), ""),
-    cachedListParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
-  ]);
-
+  const rsvpsByMeeting = await cachedListRsvpsForMeetings([meetingId], "");
   const rsvps = rsvpsByMeeting[meetingId] ?? [];
   const teamLabelByName = new Map<string, string>();
   for (const group of memberPreset.teamGroups) {
@@ -355,20 +330,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     ...teamSections,
   ];
 
-  const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
-  for (const meetingRow of sameDateMeetings) {
-    const rows = rsvpsByMeeting[meetingRow.id] ?? [];
-    for (const row of rows) {
-      addAssignment(assignmentByName, normalizeName(row.name), meetingRow.title, "study");
-    }
-  }
-
-  for (const afterparty of sameDateAfterparties) {
-    const participants = participantsByAfterparty[afterparty.id] ?? [];
-    for (const participant of participants) {
-      addAssignment(assignmentByName, normalizeName(participant.name), afterparty.title, "afterparty");
-    }
-  }
+  const assignedNameSet = new Set(displayRsvps.map((row) => normalizeName(row.name)));
 
   const operationEntries = operationRoleOrder.flatMap((role) =>
     (operationNamesByRole.get(role) ?? []).map((name) => ({ name, role }))
@@ -420,7 +382,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
   );
   const assignedCount = visibleQuickAddGroups.reduce(
     (sum, group) =>
-      sum + group.entries.filter((entry) => assignmentByName.has(normalizeName(entry.name))).length,
+      sum + group.entries.filter((entry) => assignedNameSet.has(normalizeName(entry.name))).length,
     0
   );
 
@@ -639,7 +601,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                 <ul className="grid gap-1">
                   {group.entries.map((entry) => {
                     const normalizedEntryName = normalizeName(entry.name);
-                    const assignedTitles = assignmentByName.get(normalizedEntryName) ?? [];
+                    const isAssigned = assignedNameSet.has(normalizedEntryName);
                     const roleMeta = PARTICIPANT_ROLE_META[entry.role];
                     return (
                       <li
@@ -658,27 +620,21 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                             style={{ color: roleMeta.textColor }}
                           />
                           <div className="flex flex-wrap justify-end gap-1">
-                            {assignedTitles.length === 0 ? (
+                            {isAssigned ? (
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                style={{ backgroundColor: "var(--success-bg)", color: "var(--success)" }}
+                              >
+                                추가됨
+                              </span>
+                            ) : (
                               <span
                                 className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                                 style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}
                               >
                                 미할당
                               </span>
-                            ) : null}
-                            {assignedTitles.map((assignedEntry) => (
-                              <span
-                                key={`${group.teamName}-${entry.role}-${entry.name}-${assignedEntry.kind}-${assignedEntry.title}`}
-                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                style={
-                                  assignedEntry.kind === "afterparty"
-                                    ? { backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }
-                                    : { backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
-                                }
-                              >
-                                {assignedEntry.kind === "study" ? `스터디 · ${assignedEntry.title}` : `뒷풀이 · ${assignedEntry.title}`}
-                              </span>
-                            ))}
+                            )}
                           </div>
                         </div>
                       </li>
