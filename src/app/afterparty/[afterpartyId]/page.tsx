@@ -23,11 +23,7 @@ import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
 import type { ParticipantRole } from "@/lib/meetup-store";
 import {
   cachedGetAfterpartyById,
-  cachedListAfterpartiesByDate,
-  cachedListMeetingsByDate,
-  cachedListParticipantsForAfterparties,
   cachedListParticipantsForSettlement,
-  cachedListRsvpsForMeetings,
   cachedListSettlementsForAfterparty,
   cachedLoadMemberPreset,
 } from "@/lib/cached-queries";
@@ -64,19 +60,6 @@ function formatStartTime(timeText: string): string {
   const period = hour >= 12 ? "오후" : "오전";
   const hour12 = hour % 12 || 12;
   return `${period} ${hour12}:${String(minute).padStart(2, "0")}`;
-}
-
-function addAssignment(
-  map: Map<string, { title: string; kind: "study" | "afterparty" }[]>,
-  normalizedName: string,
-  title: string,
-  kind: "study" | "afterparty"
-): void {
-  const existing = map.get(normalizedName) ?? [];
-  if (!existing.some((item) => item.title === title && item.kind === kind)) {
-    existing.push({ title, kind });
-  }
-  map.set(normalizedName, existing);
 }
 
 function QuickAddButton({
@@ -264,32 +247,6 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
       if (!teamLabelByMemberName.has(normalizedMemberName)) {
         teamLabelByMemberName.set(normalizedMemberName, teamLabel);
       }
-    }
-  }
-
-  const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
-
-  const [sameDateAfterparties, allMeetings] = await Promise.all([
-    cachedListAfterpartiesByDate(afterparty.eventDate),
-    cachedListMeetingsByDate(afterparty.eventDate),
-  ]);
-
-  const [participantsByAllAfterparty, rsvpsByMeeting] = await Promise.all([
-    cachedListParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
-    cachedListRsvpsForMeetings(allMeetings.map((item) => item.id), ""),
-  ]);
-
-  for (const row of sameDateAfterparties) {
-    const names = participantsByAllAfterparty[row.id] ?? [];
-    for (const participant of names) {
-      addAssignment(assignmentByName, normalizeName(participant.name), row.title, "afterparty");
-    }
-  }
-
-  for (const meeting of allMeetings) {
-    const rows = rsvpsByMeeting[meeting.id] ?? [];
-    for (const row of rows) {
-      addAssignment(assignmentByName, normalizeName(row.name), meeting.title, "study");
     }
   }
 
@@ -841,22 +798,21 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                           label={withTeamLabel(entry.name, teamLabelByMemberName)}
                         />
                         <div className="flex flex-wrap justify-end gap-1">
-                          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={currentSettlementNames.has(normalizedEntryName) ? { backgroundColor: "var(--success-bg)", color: "var(--success)" } : { backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}>
-                            {currentSettlementNames.has(normalizedEntryName) ? "추가됨" : "미추가"}
-                          </span>
-                          {(assignmentByName.get(normalizedEntryName) ?? []).map((assignedEntry) => (
+                          {currentSettlementNames.has(normalizedEntryName) ? (
                             <span
-                              key={`${group.teamName}-${entry.role}-${entry.name}-${assignedEntry.kind}-${assignedEntry.title}`}
                               className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={
-                                assignedEntry.kind === "afterparty"
-                                  ? { backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }
-                                  : { backgroundColor: "var(--accent-weak)", color: "var(--accent)" }
-                              }
+                              style={{ backgroundColor: "var(--success-bg)", color: "var(--success)" }}
                             >
-                              {assignedEntry.kind === "study" ? `스터디 · ${assignedEntry.title}` : `뒷풀이 · ${assignedEntry.title}`}
+                              추가됨
                             </span>
-                          ))}
+                          ) : (
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                              style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}
+                            >
+                              미할당
+                            </span>
+                          )}
                         </div>
                       </div>
                     </li>
