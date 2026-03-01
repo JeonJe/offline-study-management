@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAuthenticated, login, logout } from "@/lib/auth";
 import { toKstIsoDate } from "@/lib/date-utils";
@@ -197,6 +197,7 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
     description,
   });
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(dashboardPath({ date: created.meetingDate }));
 }
@@ -224,6 +225,7 @@ export async function createRsvpAction(formData: FormData): Promise<void> {
     note: meetingLabel,
   });
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
@@ -261,6 +263,7 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
     settlementAccount,
   });
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(afterpartyPath({ date: created.eventDate }));
 }
@@ -292,6 +295,7 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
     settlementId || undefined
   );
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(returnPath ?? afterpartyPath({ date }));
 }
@@ -315,6 +319,7 @@ export async function deleteAfterpartyParticipantAction(formData: FormData): Pro
     await deleteAfterpartyParticipant(participantId, afterpartyId);
   }
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(returnPath ?? afterpartyPath({ date }));
 }
@@ -336,6 +341,7 @@ export async function updateSettlementAction(
       settlementId,
       isSettled
     );
+    revalidateTag("afterparty-data", { expire: 300 });
     revalidatePath("/afterparty");
     return { ok: true };
   } catch {
@@ -364,6 +370,7 @@ export async function updateAfterpartyParticipantSettlementAction(formData: Form
     settledValue === "true"
   );
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(returnPath ?? afterpartyPath({ date }));
 }
@@ -380,6 +387,7 @@ export async function deleteAfterpartyAction(formData: FormData): Promise<void> 
 
   await deleteAfterparty(afterpartyId);
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(afterpartyPath({ date }));
 }
@@ -414,6 +422,7 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
     description,
   });
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(returnPath ?? afterpartyPath({ date: eventDate }));
 }
@@ -439,6 +448,7 @@ export async function createAfterpartySettlementAction(formData: FormData): Prom
     settlementAccount,
   });
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(withSettlementInPath(returnPath, afterpartyId, created.id, date));
 }
@@ -466,6 +476,7 @@ export async function updateAfterpartySettlementAction(formData: FormData): Prom
     settlementAccount,
   });
 
+  revalidateTag("afterparty-data", { expire: 300 });
   revalidatePath("/afterparty");
   redirect(withSettlementInPath(returnPath, afterpartyId, settlementId, date));
 }
@@ -484,9 +495,11 @@ export async function deleteAfterpartySettlementAction(formData: FormData): Prom
 
   try {
     const remainingSettlementId = await deleteAfterpartySettlement(settlementId, afterpartyId);
+    revalidateTag("afterparty-data", { expire: 300 });
     revalidatePath("/afterparty");
     redirect(withSettlementInPath(returnPath, afterpartyId, remainingSettlementId, date));
   } catch {
+    revalidateTag("afterparty-data", { expire: 300 });
     revalidatePath("/afterparty");
     redirect(returnPath ?? afterpartyPath({ date }));
   }
@@ -507,6 +520,7 @@ export async function deleteRsvpAction(formData: FormData): Promise<void> {
 
   await deleteRsvp(rsvpId, meetingId);
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
@@ -557,6 +571,7 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
     }
   }
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
@@ -588,6 +603,7 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
     description,
   });
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(returnPath ?? dashboardPath({ date: meetingDate, keyword }));
 }
@@ -604,6 +620,7 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
 
   await deleteMeeting(meetingId);
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(dashboardPath({ date }));
 }
@@ -633,6 +650,7 @@ export async function updateRsvpAction(formData: FormData): Promise<void> {
     note,
   });
 
+  revalidateTag("meetup-data", { expire: 300 });
   revalidatePath("/");
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }

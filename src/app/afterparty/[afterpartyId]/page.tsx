@@ -10,27 +10,27 @@ import {
   updateAfterpartySettlementAction,
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
-import { loadMemberPreset } from "@/lib/member-store";
 import {
   normalizeMemberName,
   toTeamLabel,
   withTeamLabel,
 } from "@/lib/member-label-utils";
 import {
-  getAfterpartyById,
-  listAfterpartiesByDate,
-  listParticipantsForAfterparties,
-  listParticipantsForSettlement,
-  listSettlementsForAfterparty,
   type AfterpartyParticipant,
   type AfterpartySettlement,
 } from "@/lib/afterparty-store";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
+import type { ParticipantRole } from "@/lib/meetup-store";
 import {
-  listMeetingsByDate,
-  listRsvpsForMeetings,
-  type ParticipantRole,
-} from "@/lib/meetup-store";
+  cachedGetAfterpartyById,
+  cachedListAfterpartiesByDate,
+  cachedListMeetingsByDate,
+  cachedListParticipantsForAfterparties,
+  cachedListParticipantsForSettlement,
+  cachedListRsvpsForMeetings,
+  cachedListSettlementsForAfterparty,
+  cachedLoadMemberPreset,
+} from "@/lib/cached-queries";
 import { SettlementToggle } from "@/app/afterparty/[afterpartyId]/settlement-toggle";
 import {
   normalizeParticipantName,
@@ -228,9 +228,9 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   }
 
   const [afterparty, settlements, memberPreset] = await Promise.all([
-    getAfterpartyById(afterpartyId),
-    listSettlementsForAfterparty(afterpartyId),
-    loadMemberPreset(),
+    cachedGetAfterpartyById(afterpartyId),
+    cachedListSettlementsForAfterparty(afterpartyId),
+    cachedLoadMemberPreset(),
   ]);
 
   if (!afterparty) {
@@ -244,7 +244,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
     redirect(date ? `/afterparty?date=${date}` : "/afterparty");
   }
 
-  const participants = await listParticipantsForSettlement(selectedSettlement.id, "");
+  const participants = await cachedListParticipantsForSettlement(selectedSettlement.id, "");
   const settledCount = participants.filter((row) => row.isSettled).length;
   const unsettledCount = Math.max(participants.length - settledCount, 0);
   const teamLabelByMemberName = new Map<string, string>();
@@ -270,13 +270,13 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   const assignmentByName = new Map<string, { title: string; kind: "study" | "afterparty" }[]>();
 
   const [sameDateAfterparties, allMeetings] = await Promise.all([
-    listAfterpartiesByDate(afterparty.eventDate),
-    listMeetingsByDate(afterparty.eventDate),
+    cachedListAfterpartiesByDate(afterparty.eventDate),
+    cachedListMeetingsByDate(afterparty.eventDate),
   ]);
 
   const [participantsByAllAfterparty, rsvpsByMeeting] = await Promise.all([
-    listParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
-    listRsvpsForMeetings(allMeetings.map((item) => item.id), ""),
+    cachedListParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
+    cachedListRsvpsForMeetings(allMeetings.map((item) => item.id), ""),
   ]);
 
   for (const row of sameDateAfterparties) {

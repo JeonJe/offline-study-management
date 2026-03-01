@@ -7,17 +7,17 @@ import {
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
 import {
-  listAfterpartiesByDate,
-  listParticipantsForAfterparties,
-} from "@/lib/afterparty-store";
-import {
-  getMeetingById,
-  listMeetingsByDate,
-  listRsvpsForMeetings,
   type ParticipantRole,
   type RsvpRecord,
 } from "@/lib/meetup-store";
-import { loadMemberPreset } from "@/lib/member-store";
+import {
+  cachedGetMeetingById,
+  cachedListMeetingsByDate,
+  cachedListRsvpsForMeetings,
+  cachedLoadMemberPreset,
+  cachedListAfterpartiesByDate,
+  cachedListParticipantsForAfterparties,
+} from "@/lib/cached-queries";
 import { redirect } from "next/navigation";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
 import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-button";
@@ -225,21 +225,21 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
   }
 
   const [meeting, memberPreset] = await Promise.all([
-    getMeetingById(meetingId),
-    loadMemberPreset(),
+    cachedGetMeetingById(meetingId),
+    cachedLoadMemberPreset(),
   ]);
   if (!meeting) {
     redirect(date ? `/?date=${date}` : "/");
   }
 
   const [sameDateMeetings, sameDateAfterparties] = await Promise.all([
-    listMeetingsByDate(meeting.meetingDate),
-    listAfterpartiesByDate(meeting.meetingDate),
+    cachedListMeetingsByDate(meeting.meetingDate),
+    cachedListAfterpartiesByDate(meeting.meetingDate),
   ]);
 
   const [rsvpsByMeeting, participantsByAfterparty] = await Promise.all([
-    listRsvpsForMeetings(sameDateMeetings.map((item) => item.id), ""),
-    listParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
+    cachedListRsvpsForMeetings(sameDateMeetings.map((item) => item.id), ""),
+    cachedListParticipantsForAfterparties(sameDateAfterparties.map((item) => item.id), ""),
   ]);
 
   const rsvps = rsvpsByMeeting[meetingId] ?? [];

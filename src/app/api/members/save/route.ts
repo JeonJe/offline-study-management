@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import {
   saveMemberPresetToDb,
@@ -118,5 +119,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "save failed" }, { status: 500 });
   }
 
+  revalidateTag("member-data", { expire: 300 });
   return NextResponse.json({ ok: true });
 }

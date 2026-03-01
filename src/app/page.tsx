@@ -13,13 +13,15 @@ import { toKstIsoDate } from "@/lib/date-utils";
 import { extractHttpUrl } from "@/lib/location-utils";
 import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
-  listMeetings,
-  listRsvpsForMeetings,
   type MeetingSummary,
   type ParticipantRole,
   type RsvpRecord,
 } from "@/lib/meetup-store";
-import { loadMemberPreset } from "@/lib/member-store";
+import {
+  cachedListMeetings,
+  cachedListRsvpsForMeetings,
+  cachedLoadMemberPreset,
+} from "@/lib/cached-queries";
 import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
@@ -632,8 +634,8 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   try {
     const [fetchedMeetings, memberPreset] = await Promise.all([
-      listMeetings(),
-      loadMemberPreset(),
+      cachedListMeetings(),
+      cachedLoadMemberPreset(),
     ]);
     meetings = fetchedMeetings;
     if (!isIsoDate(requestDate)) {
@@ -641,7 +643,7 @@ export default async function Home({ searchParams }: HomePageProps) {
     }
 
     meetingsOnDate = meetings.filter((meeting) => meeting.meetingDate === selectedDate);
-    rsvpsByMeeting = await listRsvpsForMeetings(meetingsOnDate.map((meeting) => meeting.id), "");
+    rsvpsByMeeting = await cachedListRsvpsForMeetings(meetingsOnDate.map((meeting) => meeting.id), "");
 
     const knownMemberNames = new Set<string>();
     for (const group of memberPreset.teamGroups) {

@@ -11,16 +11,18 @@ import { toKstIsoDate } from "@/lib/date-utils";
 import { extractHttpUrl } from "@/lib/location-utils";
 import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
-  listAfterparties,
-  listAfterpartiesByDate,
-  listParticipantsForAfterparties,
-  listSettlementsForAfterparties,
   type AfterpartyParticipant,
   type AfterpartySettlement,
   type AfterpartySummary,
 } from "@/lib/afterparty-store";
 import type { ParticipantRole } from "@/lib/meetup-store";
-import { loadMemberPreset } from "@/lib/member-store";
+import {
+  cachedListAfterparties,
+  cachedListAfterpartiesByDate,
+  cachedListParticipantsForAfterparties,
+  cachedListSettlementsForAfterparties,
+  cachedLoadMemberPreset,
+} from "@/lib/cached-queries";
 import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
@@ -366,7 +368,7 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
   let loadError = "";
 
   try {
-    const memberPreset = await loadMemberPreset();
+    const memberPreset = await cachedLoadMemberPreset();
     for (const group of memberPreset.teamGroups) {
       const teamLabel = toTeamLabel(group.teamName);
       for (const angel of group.angels) {
@@ -385,17 +387,17 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     }
     if (isIsoDate(requestDate)) {
       selectedDate = requestDate;
-      afterpartiesOnDate = await listAfterpartiesByDate(selectedDate);
+      afterpartiesOnDate = await cachedListAfterpartiesByDate(selectedDate);
     } else {
-      const allAfterparties = await listAfterparties();
+      const allAfterparties = await cachedListAfterparties();
       selectedDate = allAfterparties[0]?.eventDate ?? selectedDate;
-      afterpartiesOnDate = await listAfterpartiesByDate(selectedDate);
+      afterpartiesOnDate = await cachedListAfterpartiesByDate(selectedDate);
     }
-    participantsByAfterparty = await listParticipantsForAfterparties(
+    participantsByAfterparty = await cachedListParticipantsForAfterparties(
       afterpartiesOnDate.map((item) => item.id),
       ""
     );
-    settlementsByAfterparty = await listSettlementsForAfterparties(
+    settlementsByAfterparty = await cachedListSettlementsForAfterparties(
       afterpartiesOnDate.map((item) => item.id)
     );
   } catch (error) {

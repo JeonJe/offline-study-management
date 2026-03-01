@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
-import { loadMemberPreset } from "@/lib/member-store";
+import { cachedLoadMemberPreset } from "@/lib/cached-queries";
 import { MemberAdminForm } from "@/app/members/member-admin-form";
 import { DashboardHeader } from "@/app/dashboard-header";
 
@@ -10,7 +10,7 @@ export default async function MembersPage() {
     redirect("/?auth=required");
   }
 
-  const preset = await loadMemberPreset();
+  const preset = await cachedLoadMemberPreset();
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
