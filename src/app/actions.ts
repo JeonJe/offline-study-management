@@ -155,9 +155,15 @@ function pathWithoutQueryAndHash(path: string | null): string | null {
   return pathname || null;
 }
 
-function revalidateMeetupViews(meetingId: string, returnPath: string | null): void {
+function revalidateMeetupViews(
+  meetingId: string,
+  returnPath: string | null,
+  options?: { skipDashboardPath?: boolean }
+): void {
   revalidateTag("meetup-data", { expire: 300 });
-  revalidatePath("/");
+  if (!options?.skipDashboardPath) {
+    revalidatePath("/");
+  }
   if (meetingId) {
     revalidatePath(`/meetings/${meetingId}`);
   }
@@ -167,6 +173,29 @@ function revalidateMeetupViews(meetingId: string, returnPath: string | null): vo
     returnPathname &&
     returnPathname !== "/" &&
     returnPathname !== `/meetings/${meetingId}`
+  ) {
+    revalidatePath(returnPathname);
+  }
+}
+
+function revalidateAfterpartyViews(
+  afterpartyId: string,
+  returnPath: string | null,
+  options?: { skipDashboardPath?: boolean }
+): void {
+  revalidateTag("afterparty-data", { expire: 300 });
+  if (!options?.skipDashboardPath) {
+    revalidatePath("/afterparty");
+  }
+  if (afterpartyId) {
+    revalidatePath(`/afterparty/${afterpartyId}`);
+  }
+
+  const returnPathname = pathWithoutQueryAndHash(returnPath);
+  if (
+    returnPathname &&
+    returnPathname !== "/afterparty" &&
+    returnPathname !== `/afterparty/${afterpartyId}`
   ) {
     revalidatePath(returnPathname);
   }
@@ -296,6 +325,7 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
   const settlementId = textFrom(formData, "settlementId").trim();
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
+  const mutationSource = textFrom(formData, "mutationSource").trim();
 
   await requireAuthOrRedirect();
 
@@ -318,8 +348,9 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
     settlementId || undefined
   );
 
-  revalidateTag("afterparty-data", { expire: 300 });
-  revalidatePath("/afterparty");
+  revalidateAfterpartyViews(afterpartyId, returnPath, {
+    skipDashboardPath: mutationSource === "quick-add",
+  });
   redirect(returnPath ?? afterpartyPath({ date }));
 }
 
@@ -552,13 +583,14 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
   const date = textFrom(formData, "returnDate").trim();
   const keyword = textFrom(formData, "returnKeyword").trim();
   const returnPath = safeReturnPath(formData);
+  const mutationSource = textFrom(formData, "mutationSource").trim();
 
   await requireAuthOrRedirect();
 
   const namesRaw = textFrom(formData, "names");
   const roleRaw = textFrom(formData, "role").trim();
   const note = textFrom(formData, "note").trim();
-  const meetingLabel = (await resolveMeetingLabel(meetingId)) || note;
+  const meetingLabel = note || (await resolveMeetingLabel(meetingId));
 
   if (!meetingId) {
     redirect(dashboardPath({ date, keyword }));
@@ -593,7 +625,9 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
     }
   }
 
-  revalidateMeetupViews(meetingId, returnPath);
+  revalidateMeetupViews(meetingId, returnPath, {
+    skipDashboardPath: mutationSource === "quick-assign",
+  });
   redirect(returnPath ?? dashboardPath({ date, keyword }));
 }
 
