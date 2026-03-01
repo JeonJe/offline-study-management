@@ -89,6 +89,7 @@ function QuickAddButton({
       <input type="hidden" name="returnPath" value={returnPath} />
       <input type="hidden" name="names" value={name} />
       <input type="hidden" name="role" value={role} />
+      <input type="hidden" name="mutationSource" value="quick-add" />
       <PendingSubmitButton
         idleLabel={`${roleMeta.emoji ? `${roleMeta.emoji} ` : ""}${label ?? name}`}
         pendingLabel="추가중..."
