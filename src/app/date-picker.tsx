@@ -19,7 +19,7 @@ export function DatePicker({ selectedDate, basePath = "/" }: DatePickerProps) {
         const nextDate = event.currentTarget.value;
         router.push(nextDate ? `${basePath}?date=${encodeURIComponent(nextDate)}` : basePath);
       }}
-      className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+      className="h-10 w-full rounded-xl border bg-white px-3 text-sm font-medium outline-none transition focus:ring-2"
       style={{
         borderColor: "var(--line)",
         "--tw-ring-color": "var(--accent)",

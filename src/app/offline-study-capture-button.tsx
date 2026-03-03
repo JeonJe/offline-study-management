@@ -372,7 +372,7 @@ export function OfflineStudyCaptureButton({ targetId }: OfflineStudyCaptureButto
       onClick={handleCapture}
       disabled={captureState === "capturing"}
       data-capture-button="true"
-      className="btn-press inline-flex h-9 items-center rounded-lg border px-3 text-xs font-semibold transition hover:border-stone-400 disabled:cursor-not-allowed disabled:opacity-70"
+      className="btn-press inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
       style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}
     >
       {buttonLabel}

@@ -74,7 +74,7 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "2rem",
+      padding: "1.5rem",
     }}>
       <style>{`
         @keyframes li {
@@ -87,45 +87,57 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
         .login-field {
           width: 100%;
           box-sizing: border-box;
-          background: transparent;
-          border: none;
-          border-bottom: 1.5px solid var(--line);
-          padding: 0.6rem 0;
+          background: var(--surface);
+          border: 1px solid var(--line);
+          border-radius: 0.9rem;
+          padding: 0.72rem 0.8rem;
           font-size: 15px;
           font-family: inherit;
           color: var(--ink);
           outline: none;
-          transition: border-color 0.2s;
+          transition: border-color 0.2s, box-shadow 0.2s;
         }
         .login-field::placeholder { color: var(--ink-muted); }
-        .login-field:focus { border-bottom-color: var(--accent); }
+        .login-field:focus {
+          border-color: rgba(13, 127, 242, 0.4);
+          box-shadow: 0 0 0 3px rgba(13, 127, 242, 0.14);
+        }
         .login-submit {
           width: 100%;
-          height: 46px;
-          background: var(--ink);
+          height: 48px;
+          background: var(--accent);
           color: var(--surface);
           border: none;
-          border-radius: 8px;
+          border-radius: 999px;
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 700;
           letter-spacing: 0.02em;
           font-family: inherit;
           cursor: pointer;
-          transition: opacity 0.15s;
+          transition: opacity 0.15s, transform 0.15s;
+          box-shadow: 0 10px 20px rgba(13, 127, 242, 0.28);
         }
-        .login-submit:hover { opacity: 0.82; }
+        .login-submit:hover { opacity: 0.9; }
         .login-submit:active { transform: scale(0.98); }
       `}</style>
 
-      <div style={{ width: "100%", maxWidth: "340px" }}>
+      <div
+        className="card-static li"
+        style={{
+          width: "100%",
+          maxWidth: "380px",
+          padding: "1.6rem 1.4rem",
+          borderRadius: "1.5rem",
+        }}
+      >
         {/* 브랜드 */}
         <p className="li" style={{
           fontSize: "11px",
-          fontWeight: 700,
-          letterSpacing: "0.2em",
+          fontWeight: 800,
+          letterSpacing: "0.16em",
           textTransform: "uppercase",
-          color: "var(--accent)",
-          margin: "0 0 1.5rem",
+          color: "var(--accent-strong)",
+          margin: "0 0 1.25rem",
         }}>
           Saturday Meetup
         </p>
@@ -133,14 +145,17 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
         {/* 타이틀 */}
         <h1 className="li li-d1" style={{
           fontFamily: "var(--font-heading), sans-serif",
-          fontSize: "2.25rem",
+          fontSize: "2.05rem",
           lineHeight: 1.1,
           letterSpacing: "-0.025em",
           color: "var(--ink)",
-          margin: "0 0 2.5rem",
+          margin: "0 0 0.5rem",
         }}>
           모임 대시보드
         </h1>
+        <p className="li li-d1" style={{ margin: "0 0 1.8rem", color: "var(--ink-muted)", fontSize: "13px" }}>
+          스터디와 뒷풀이를 한 화면에서 관리하세요.
+        </p>
 
         {/* 폼 */}
         <form action={loginAction} className="li li-d2" style={{ display: "grid", gap: "1.25rem" }}>
@@ -162,7 +177,7 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
               autoComplete="current-password"
               placeholder="공용 비밀번호"
               className="login-field"
-              style={authMessage ? { borderBottomColor: "var(--danger)" } : undefined}
+              style={authMessage ? { borderColor: "var(--danger)" } : undefined}
             />
             {authMessage ? (
               <p style={{ fontSize: "12px", color: "var(--danger)", margin: 0 }}>
@@ -185,14 +200,14 @@ function CreateMeetingModal({ selectedDate }: { selectedDate: string }) {
     <details className="fixed bottom-6 right-6 z-40">
       <summary
         className="fab-pulse flex h-14 w-14 cursor-pointer list-none items-center justify-center rounded-full text-2xl font-semibold text-white shadow-lg transition hover:scale-105"
-        style={{ backgroundColor: "var(--accent)" }}
+        style={{ backgroundColor: "var(--accent)", boxShadow: "0 16px 30px rgba(13, 127, 242, 0.35)" }}
       >
         +
       </summary>
 
       <div
-        className="absolute bottom-18 right-0 w-[min(92vw,760px)] rounded-2xl border p-4 shadow-2xl backdrop-blur-md fade-in"
-        style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 253, 249, 0.92)" }}
+        className="absolute bottom-18 right-0 w-[min(92vw,760px)] rounded-[1.75rem] border p-4 shadow-2xl backdrop-blur-md fade-in"
+        style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.95)" }}
       >
         <p className="mb-3 text-sm font-semibold" style={{ color: "var(--ink)" }}>모임 만들기</p>
         <form action={createMeetingAction} className="grid gap-3 md:grid-cols-12">
@@ -259,8 +274,8 @@ function CreateMeetingModal({ selectedDate }: { selectedDate: string }) {
 
           <button
             type="submit"
-            className="btn-press h-10 rounded-xl px-4 text-sm font-semibold text-white transition hover:opacity-90 md:col-span-3 md:self-end"
-            style={{ backgroundColor: "var(--success)" }}
+            className="btn-press h-10 rounded-full px-4 text-sm font-semibold text-white transition hover:opacity-90 md:col-span-3 md:self-end"
+            style={{ backgroundColor: "var(--accent)", boxShadow: "0 10px 20px rgba(13, 127, 242, 0.25)" }}
           >
             생성
           </button>
@@ -281,8 +296,8 @@ function UsageGuideModal() {
       </summary>
 
       <div
-        className="absolute bottom-12 right-0 w-[min(92vw,420px)] rounded-2xl border p-4 shadow-2xl backdrop-blur-md fade-in"
-        style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 253, 249, 0.95)" }}
+        className="absolute bottom-12 right-0 w-[min(92vw,420px)] rounded-[1.5rem] border p-4 shadow-2xl backdrop-blur-md fade-in"
+        style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.95)" }}
       >
         <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>사용 가이드</p>
         <ol className="mt-2 grid gap-1 text-xs" style={{ color: "var(--ink-soft)" }}>
@@ -702,7 +717,7 @@ export default async function Home({ searchParams }: HomePageProps) {
       : "";
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <DashboardHeader title="스터디" activeTab="study" currentDate={selectedDate} />
 
       <section className="card-static mb-5 p-4 sm:p-5 fade-in">

@@ -402,7 +402,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   }
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <div className="mb-4">
         <Link href={backPath} className="text-sm font-semibold hover:underline" style={{ color: "var(--accent)" }}>
           ← 뒷풀이 보드로 돌아가기

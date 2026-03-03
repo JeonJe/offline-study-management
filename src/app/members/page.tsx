@@ -13,13 +13,13 @@ export default async function MembersPage() {
   const preset = await cachedLoadMemberPreset();
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <DashboardHeader
         title="멤버"
         activeTab="members"
       />
 
-      <section className="card-static p-5 sm:p-6 fade-in">
+      <section className="card-static p-5 sm:p-7 fade-in">
         <MemberAdminForm
           initialFixedAngels={preset.fixedAngels}
           initialTeamGroups={preset.teamGroups}

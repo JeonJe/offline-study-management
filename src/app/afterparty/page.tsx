@@ -109,14 +109,14 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
     <details className="fixed bottom-6 right-6 z-40">
       <summary
         className="fab-pulse flex h-14 w-14 cursor-pointer list-none items-center justify-center rounded-full text-2xl font-semibold text-white shadow-lg transition hover:scale-105"
-        style={{ backgroundColor: "var(--accent)" }}
+        style={{ backgroundColor: "var(--accent)", boxShadow: "0 16px 30px rgba(13, 127, 242, 0.35)" }}
       >
         +
       </summary>
 
       <div
-        className="absolute bottom-18 right-0 w-[min(92vw,760px)] rounded-2xl border p-4 shadow-2xl backdrop-blur-md fade-in"
-        style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 253, 249, 0.92)" }}
+        className="absolute bottom-18 right-0 w-[min(92vw,760px)] rounded-[1.75rem] border p-4 shadow-2xl backdrop-blur-md fade-in"
+        style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.95)" }}
       >
         <p className="mb-3 text-sm font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 만들기</p>
         <form action={createAfterpartyAction} className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
@@ -183,8 +183,8 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
 
           <button
             type="submit"
-            className="btn-press h-10 self-end rounded-xl px-4 text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ backgroundColor: "var(--success)" }}
+            className="btn-press h-10 self-end rounded-full px-4 text-sm font-semibold text-white transition hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)", boxShadow: "0 10px 20px rgba(13, 127, 242, 0.25)" }}
           >
             생성
           </button>
@@ -415,7 +415,7 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
       : 0;
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <DashboardHeader title="뒷풀이" activeTab="afterparty" currentDate={selectedDate} />
 
       <section className="card-static mb-5 p-4 sm:p-5 fade-in">

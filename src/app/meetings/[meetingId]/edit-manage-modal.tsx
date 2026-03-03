@@ -57,7 +57,7 @@ export function EditManageModal({ children }: EditManageModalProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn-press inline-flex h-10 items-center rounded-xl border bg-white px-4 text-sm font-semibold shadow-sm transition hover:border-stone-400"
+        className="btn-press inline-flex h-10 items-center rounded-full border bg-white px-4 text-sm font-semibold shadow-sm transition"
         style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
       >
         수정 관리
@@ -67,25 +67,25 @@ export function EditManageModal({ children }: EditManageModalProps) {
         ? createPortal(
             <div
               className="fixed inset-0 z-50 overflow-y-auto p-4 fade-in sm:p-6"
-              style={{ backgroundColor: "rgba(28, 25, 23, 0.4)", backdropFilter: "blur(6px)" }}
+              style={{ backgroundColor: "rgba(15, 23, 42, 0.42)", backdropFilter: "blur(8px)" }}
               role="dialog"
               aria-modal="true"
               onClick={onBackdropClick}
               onKeyDown={onContainerKeyDown}
             >
               <div
-                className="mx-auto my-4 w-full max-w-4xl overflow-hidden rounded-2xl border shadow-2xl"
+                className="mx-auto my-4 w-full max-w-4xl overflow-hidden rounded-[1.75rem] border shadow-2xl"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
               >
                 <div
                   className="sticky top-0 z-10 mb-0 flex items-center justify-between gap-2 border-b px-4 py-3 sm:px-5"
-                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+                  style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.94)", backdropFilter: "blur(10px)" }}
                 >
                   <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>수정 관리</h2>
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="btn-press flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition hover:border-stone-400"
+                    className="btn-press flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition"
                     style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                   >
                     ×

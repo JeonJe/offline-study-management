@@ -47,8 +47,8 @@ export function SettlementToggle({
         className="peer sr-only"
       />
       <span
-        className="relative h-5 w-9 rounded-full transition-colors peer-checked:bg-emerald-600"
-        style={{ backgroundColor: checked ? "#059669" : "#d6d3d1", opacity: isPending ? 0.7 : 1 }}
+        className="relative h-5 w-9 rounded-full transition-colors"
+        style={{ backgroundColor: checked ? "var(--accent)" : "#cbd5e1", opacity: isPending ? 0.7 : 1 }}
       >
         <span
           className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"

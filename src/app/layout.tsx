@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Anton, Noto_Sans_KR } from "next/font/google";
+import { Noto_Sans_KR, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -8,10 +8,10 @@ const notoSansKr = Noto_Sans_KR({
   variable: "--font-noto-korean",
 });
 
-const anton = Anton({
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-anton",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-plus-jakarta",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={`${notoSansKr.variable} ${anton.variable} antialiased`}>
+      <body className={`${plusJakartaSans.variable} ${notoSansKr.variable} antialiased`}>
         {children}
       </body>
     </html>

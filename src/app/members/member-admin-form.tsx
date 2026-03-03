@@ -277,8 +277,8 @@ export function MemberAdminForm({
   }
 
   return (
-    <div className="mt-4 grid gap-4">
-      <section className="card-static order-2 p-4 sm:p-5">
+    <div className="mt-4 grid gap-5">
+      <section className="card-static order-2 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>운영진</p>
@@ -372,13 +372,13 @@ export function MemberAdminForm({
                 addOperationMembers(activeOperationRole, operationInput);
                 setOperationInput("");
               }}
-              className="h-8 w-full rounded-lg border bg-white px-2 text-xs sm:w-52"
+              className="h-8 w-full rounded-xl border bg-white px-2 text-xs sm:w-52"
               style={{ borderColor: "var(--line)" }}
               placeholder={`${roleMeta(activeOperationRole).label} 이름 (쉼표/Enter로 여러 명)`}
             />
             <button
               type="button"
-              className="btn-press h-8 rounded-lg border px-2 text-xs font-semibold"
+              className="btn-press h-8 rounded-xl border px-2 text-xs font-semibold"
               style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
               onClick={() => {
                 addOperationMembers(activeOperationRole, operationInput);
@@ -391,7 +391,7 @@ export function MemberAdminForm({
         </div>
       </section>
 
-      <section className="card-static order-1 p-4 sm:p-5">
+      <section className="card-static order-1 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>멤버</p>
@@ -442,7 +442,7 @@ export function MemberAdminForm({
                       <input
                         value={team.teamName}
                         onChange={(event) => updateTeam(index, (prev) => ({ ...prev, teamName: event.target.value }))}
-                        className="h-9 w-24 rounded-lg border bg-white px-2 text-xs"
+                        className="h-9 w-24 rounded-xl border bg-white px-2 text-xs"
                         style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                         placeholder="팀명"
                       />
@@ -454,7 +454,7 @@ export function MemberAdminForm({
                       </span>
                       <button
                         type="button"
-                        className="btn-press h-9 rounded-lg border bg-white px-2 text-[11px] font-semibold"
+                        className="btn-press h-9 rounded-xl border bg-white px-2 text-[11px] font-semibold"
                         style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                         onClick={() => setPendingAngelManageIndex(index)}
                       >
@@ -464,7 +464,7 @@ export function MemberAdminForm({
 
                     <button
                       type="button"
-                      className="btn-press h-9 rounded-lg border bg-white px-2 text-[11px] font-semibold"
+                      className="btn-press h-9 rounded-xl border bg-white px-2 text-[11px] font-semibold"
                       style={{ borderColor: "#fecaca", color: "var(--danger)" }}
                       onClick={() => setPendingDeleteIndex(index)}
                     >
@@ -479,7 +479,7 @@ export function MemberAdminForm({
                     </div>
 
                     <div
-                      className="mt-2 flex min-h-12 flex-wrap gap-2 rounded-lg border bg-white px-2 py-2"
+                      className="mt-2 flex min-h-12 flex-wrap gap-2 rounded-xl border bg-white px-2 py-2"
                       style={{ borderColor: "var(--line)" }}
                     >
                       {team.members.map((member) => (
@@ -511,13 +511,13 @@ export function MemberAdminForm({
                           event.preventDefault();
                           addMembers(index, team.memberInput);
                         }}
-                        className="h-9 w-full rounded-lg border bg-white px-2 text-xs sm:w-52"
+                        className="h-9 w-full rounded-xl border bg-white px-2 text-xs sm:w-52"
                         style={{ borderColor: "var(--line)" }}
                         placeholder="멤버 이름 (쉼표/Enter로 여러 명)"
                       />
                       <button
                         type="button"
-                        className="btn-press h-9 rounded-lg border px-2 text-xs font-semibold"
+                        className="btn-press h-9 rounded-xl border px-2 text-xs font-semibold"
                         style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                         onClick={() => addMembers(index, team.memberInput)}
                       >
@@ -549,7 +549,7 @@ export function MemberAdminForm({
             </p>
 
             <div
-              className="mt-3 flex min-h-12 flex-wrap gap-2 rounded-lg border bg-white px-2 py-2"
+              className="mt-3 flex min-h-12 flex-wrap gap-2 rounded-xl border bg-white px-2 py-2"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
             >
               {(teams[pendingAngelManageIndex]?.angels ?? []).map((angel) => (
@@ -588,13 +588,13 @@ export function MemberAdminForm({
                   const currentInput = teams[pendingAngelManageIndex]?.angelInput ?? "";
                   addTeamAngels(pendingAngelManageIndex, currentInput);
                 }}
-                className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-xs"
+                className="h-9 min-w-0 flex-1 rounded-xl border px-2 text-xs"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
                 placeholder="팀 엔젤 (쉼표/Enter로 여러 명)"
               />
               <button
                 type="button"
-                className="btn-press h-9 rounded-lg border px-3 text-xs font-semibold"
+                className="btn-press h-9 rounded-xl border px-3 text-xs font-semibold"
                 style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                 onClick={() => {
                   const currentInput = teams[pendingAngelManageIndex]?.angelInput ?? "";
@@ -608,7 +608,7 @@ export function MemberAdminForm({
             <div className="mt-4 flex justify-end">
               <button
                 type="button"
-                className="btn-press rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                className="btn-press rounded-xl border bg-white px-3 py-2 text-xs font-semibold"
                 style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                 onClick={() => setPendingAngelManageIndex(null)}
               >
@@ -629,7 +629,7 @@ export function MemberAdminForm({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="btn-press rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                className="btn-press rounded-xl border bg-white px-3 py-2 text-xs font-semibold"
                 style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                 onClick={() => setPendingDeleteIndex(null)}
               >
@@ -637,7 +637,7 @@ export function MemberAdminForm({
               </button>
               <button
                 type="button"
-                className="btn-press rounded-lg px-3 py-2 text-xs font-semibold text-white"
+                className="btn-press rounded-xl px-3 py-2 text-xs font-semibold text-white"
                 style={{ backgroundColor: "var(--danger)" }}
                 onClick={() => {
                   setTeams((prev) => prev.filter((_, i) => i !== pendingDeleteIndex));
