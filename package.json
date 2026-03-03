@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "db:ping": "node scripts/db-ping.mjs"
+    "db:ping": "node scripts/db-ping.mjs",
+    "docs:screenshots": "node scripts/capture-readme-screenshots.mjs"
   },
   "dependencies": {
     "next": "16.1.6",

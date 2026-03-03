@@ -45,6 +45,8 @@
 
 ![멤버 관리 샘플](docs/screenshots/members-sample.png)
 
+스크린샷 운영 가이드: [`docs/readme-screenshot-guide.md`](docs/readme-screenshot-guide.md)
+
 ## 핵심 기능
 
 ### 1) 오프라인 스터디 관리
