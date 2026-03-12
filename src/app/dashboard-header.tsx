@@ -105,7 +105,7 @@ export function DashboardHeader({
       </div>
       {currentDate ? (
         <p className="mt-3 text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
-          기준일 {currentDate}
+          모임일 {currentDate}
         </p>
       ) : null}
     </header>
