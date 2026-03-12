@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query, withTransaction } from "@/lib/db";
 import type { ParticipantRole } from "@/lib/meetup-store";
 
@@ -11,6 +11,7 @@ export type AfterpartySummary = {
   description: string | null;
   settlementManager: string | null;
   settlementAccount: string | null;
+  hasPassword: boolean;
   participantCount: number;
   settlementCount: number;
 };
@@ -44,6 +45,7 @@ type CreateAfterpartyInput = {
   description?: string;
   settlementManager?: string;
   settlementAccount?: string;
+  password?: string;
 };
 
 type UpdateAfterpartyInput = {
@@ -53,6 +55,9 @@ type UpdateAfterpartyInput = {
   startTime: string;
   location: string;
   description?: string;
+  accessPassword?: string;
+  nextPassword?: string;
+  clearPassword?: boolean;
 };
 
 type CreateAfterpartySettlementInput = {
@@ -60,6 +65,7 @@ type CreateAfterpartySettlementInput = {
   title: string;
   settlementManager?: string;
   settlementAccount?: string;
+  accessPassword?: string;
 };
 
 type UpdateAfterpartySettlementInput = {
@@ -68,6 +74,7 @@ type UpdateAfterpartySettlementInput = {
   title: string;
   settlementManager?: string;
   settlementAccount?: string;
+  accessPassword?: string;
 };
 
 type TxQuery = <R>(text: string, params?: unknown[]) => Promise<R[]>;
@@ -81,6 +88,40 @@ let schemaPromise: Promise<void> | null = null;
 const runtimeMigrationsEnabled =
   process.env.DB_RUNTIME_MIGRATIONS === "1" ||
   process.env.DB_RUNTIME_MIGRATIONS === "true";
+
+export class AfterpartyPasswordError extends Error {
+  constructor(public readonly code: "password-required" | "password-invalid") {
+    super(
+      code === "password-required"
+        ? "Afterparty password is required."
+        : "Afterparty password is invalid."
+    );
+    this.name = "AfterpartyPasswordError";
+  }
+}
+
+export function isAfterpartyPasswordError(error: unknown): error is AfterpartyPasswordError {
+  return error instanceof AfterpartyPasswordError;
+}
+
+function normalizeAfterpartyPassword(password?: string): string | null {
+  const normalized = password?.trim() ?? "";
+  return normalized ? normalized : null;
+}
+
+function hashAfterpartyPassword(password: string): string {
+  return createHash("sha256")
+    .update(`saturday-meetup:afterparty:${password}`)
+    .digest("hex");
+}
+
+function safeEquals(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
 
 async function hasAfterpartySchema(): Promise<boolean> {
   const [row] = await query<{
@@ -104,15 +145,43 @@ async function hasAfterpartySchema(): Promise<boolean> {
   );
 }
 
+async function hasAfterpartyColumn(columnName: string): Promise<boolean> {
+  const [row] = await query<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'afterparties'
+         and column_name = $1
+     ) as exists`,
+    [columnName]
+  );
+
+  return Boolean(row?.exists);
+}
+
+async function ensureAfterpartyPasswordHashColumn(): Promise<void> {
+  const hasColumn = await hasAfterpartyColumn("password_hash");
+  if (hasColumn) return;
+
+  await query(
+    `alter table public.afterparties
+     add column if not exists password_hash text`
+  );
+}
+
 export async function ensureAfterpartySchema(): Promise<void> {
   if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {
     const schemaExists = await hasAfterpartySchema();
-    if (schemaExists && !runtimeMigrationsEnabled) {
-      schemaReady = true;
-      return;
+    if (schemaExists) {
+      await ensureAfterpartyPasswordHashColumn();
+      if (!runtimeMigrationsEnabled) {
+        schemaReady = true;
+        return;
+      }
     }
 
     await query(`create extension if not exists pgcrypto`);
@@ -127,6 +196,7 @@ export async function ensureAfterpartySchema(): Promise<void> {
         description text,
         settlement_manager text,
         settlement_account text,
+        password_hash text,
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       )`
@@ -140,6 +210,11 @@ export async function ensureAfterpartySchema(): Promise<void> {
     await query(
       `alter table public.afterparties
        add column if not exists settlement_account text`
+    );
+
+    await query(
+      `alter table public.afterparties
+       add column if not exists password_hash text`
     );
 
     await query(
@@ -486,6 +561,7 @@ export async function listAfterparties(): Promise<AfterpartySummary[]> {
        a.description,
        coalesce(primary_settlement.settlement_manager, a.settlement_manager) as "settlementManager",
        coalesce(primary_settlement.settlement_account, a.settlement_account) as "settlementAccount",
+       (a.password_hash is not null) as "hasPassword",
        coalesce(participant_stats.participant_count, 0)::int as "participantCount",
        coalesce(settlement_stats.settlement_count, 0)::int as "settlementCount"
      from public.afterparties a
@@ -527,6 +603,7 @@ export async function listAfterpartiesByDate(
        a.description,
        coalesce(primary_settlement.settlement_manager, a.settlement_manager) as "settlementManager",
        coalesce(primary_settlement.settlement_account, a.settlement_account) as "settlementAccount",
+       (a.password_hash is not null) as "hasPassword",
        coalesce(participant_stats.participant_count, 0)::int as "participantCount",
        coalesce(settlement_stats.settlement_count, 0)::int as "settlementCount"
      from public.afterparties a
@@ -568,6 +645,7 @@ export async function getAfterpartyById(afterpartyId: string): Promise<Afterpart
        a.description,
        coalesce(primary_settlement.settlement_manager, a.settlement_manager) as "settlementManager",
        coalesce(primary_settlement.settlement_account, a.settlement_account) as "settlementAccount",
+       (a.password_hash is not null) as "hasPassword",
        coalesce(participant_stats.participant_count, 0)::int as "participantCount",
        coalesce(settlement_stats.settlement_count, 0)::int as "settlementCount"
      from public.afterparties a
@@ -726,6 +804,8 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
     const afterpartyId = randomUUID();
     const settlementManager = input.settlementManager?.trim() ?? "";
     const settlementAccount = input.settlementAccount?.trim() ?? "";
+    const password = normalizeAfterpartyPassword(input.password);
+    const passwordHash = password ? hashAfterpartyPassword(password) : null;
 
     const [created] = await tq<AfterpartySummary>(
       `insert into public.afterparties (
@@ -736,9 +816,10 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
          location,
          description,
          settlement_manager,
-         settlement_account
+         settlement_account,
+         password_hash
        )
-       values ($1, $2, $3, $4, $5, nullif($6, ''), nullif($7, ''), nullif($8, ''))
+       values ($1, $2, $3, $4, $5, nullif($6, ''), nullif($7, ''), nullif($8, ''), $9)
        returning
          id,
          title,
@@ -748,6 +829,7 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
          description,
          settlement_manager as "settlementManager",
          settlement_account as "settlementAccount",
+         (password_hash is not null) as "hasPassword",
          0::int as "participantCount",
          1::int as "settlementCount"`,
       [
@@ -759,6 +841,7 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
         input.description?.trim() ?? "",
         settlementManager,
         settlementAccount,
+        passwordHash,
       ]
     );
 
@@ -785,6 +868,14 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
 
 export async function updateAfterparty(input: UpdateAfterpartyInput): Promise<void> {
   await ensureAfterpartySchema();
+  const currentPasswordHash = await getAfterpartyPasswordHash(input.id);
+  assertAfterpartyPasswordAccess(currentPasswordHash, input.accessPassword);
+  const nextPassword = normalizeAfterpartyPassword(input.nextPassword);
+  const nextPasswordHash = input.clearPassword
+    ? null
+    : nextPassword
+      ? hashAfterpartyPassword(nextPassword)
+      : currentPasswordHash;
 
   await query(
     `update public.afterparties
@@ -793,6 +884,7 @@ export async function updateAfterparty(input: UpdateAfterpartyInput): Promise<vo
          start_time = $4,
          location = $5,
          description = nullif($6, ''),
+         password_hash = $7,
          updated_at = now()
      where id = $1`,
     [
@@ -802,6 +894,7 @@ export async function updateAfterparty(input: UpdateAfterpartyInput): Promise<vo
       input.startTime,
       input.location.trim(),
       input.description?.trim() ?? "",
+      nextPasswordHash,
     ]
   );
 }
@@ -810,6 +903,8 @@ export async function createAfterpartySettlement(
   input: CreateAfterpartySettlementInput
 ): Promise<AfterpartySettlement> {
   await ensureAfterpartySchema();
+  const currentPasswordHash = await getAfterpartyPasswordHash(input.afterpartyId);
+  assertAfterpartyPasswordAccess(currentPasswordHash, input.accessPassword);
 
   return withTransaction(async (tq) => {
     const [orderRow] = await tq<{ nextOrder: number }>(
@@ -875,6 +970,8 @@ export async function updateAfterpartySettlement(
   input: UpdateAfterpartySettlementInput
 ): Promise<void> {
   await ensureAfterpartySchema();
+  const currentPasswordHash = await getAfterpartyPasswordHash(input.afterpartyId);
+  assertAfterpartyPasswordAccess(currentPasswordHash, input.accessPassword);
 
   await withTransaction(async (tq) => {
     const manager = input.settlementManager?.trim() ?? "";
@@ -914,9 +1011,12 @@ export async function updateAfterpartySettlement(
 
 export async function deleteAfterpartySettlement(
   settlementId: string,
-  afterpartyId: string
+  afterpartyId: string,
+  accessPassword?: string
 ): Promise<string> {
   await ensureAfterpartySchema();
+  const currentPasswordHash = await getAfterpartyPasswordHash(afterpartyId);
+  assertAfterpartyPasswordAccess(currentPasswordHash, accessPassword);
 
   return withTransaction(async (tq) => {
     const [countRow] = await tq<{ count: number }>(
@@ -1192,8 +1292,42 @@ export async function updateAfterpartyParticipantSettlement(
   );
 }
 
-export async function deleteAfterparty(afterpartyId: string): Promise<void> {
+async function getAfterpartyPasswordHash(afterpartyId: string): Promise<string | null> {
+  const [row] = await query<{ passwordHash: string | null }>(
+    `select password_hash as "passwordHash"
+     from public.afterparties
+     where id = $1
+     limit 1`,
+    [afterpartyId]
+  );
+
+  return row?.passwordHash ?? null;
+}
+
+function assertAfterpartyPasswordAccess(
+  passwordHash: string | null,
+  accessPassword?: string
+): void {
+  if (!passwordHash) return;
+
+  const normalizedAccessPassword = normalizeAfterpartyPassword(accessPassword);
+  if (!normalizedAccessPassword) {
+    throw new AfterpartyPasswordError("password-required");
+  }
+
+  const inputHash = hashAfterpartyPassword(normalizedAccessPassword);
+  if (!safeEquals(inputHash, passwordHash)) {
+    throw new AfterpartyPasswordError("password-invalid");
+  }
+}
+
+export async function deleteAfterparty(
+  afterpartyId: string,
+  accessPassword?: string
+): Promise<void> {
   await ensureAfterpartySchema();
+  const currentPasswordHash = await getAfterpartyPasswordHash(afterpartyId);
+  assertAfterpartyPasswordAccess(currentPasswordHash, accessPassword);
 
   await query(
     `delete from public.afterparties

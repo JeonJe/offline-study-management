@@ -31,6 +31,7 @@ import {
 import { PendingSubmitButton } from "@/app/pending-submit-button";
 import { QuerySelectFilter } from "@/app/query-select-filter";
 import { LeaderChipInput } from "@/app/leader-chip-input";
+import { SharedFormPasswordField } from "@/app/shared-form-password-field";
 
 type PageProps = {
   params: Promise<{ meetingId: string }>;
@@ -356,6 +357,12 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
       : manageStatus === "password-invalid"
         ? "방 비밀번호가 일치하지 않습니다."
         : "";
+  const managePasswordFieldMessage =
+    manageStatus === "password-required"
+      ? "현재 방 비밀번호를 입력해 주세요."
+      : manageStatus === "password-invalid"
+        ? "현재 방 비밀번호가 일치하지 않습니다."
+        : "";
   const participantFeedback = resolveParticipantFeedback(participantStatus, participantSource);
   const manualParticipantFeedback =
     participantFeedback && participantSource === "manual" ? participantFeedback : null;
@@ -619,20 +626,8 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
               </div>
 
               <EditManageModal defaultOpen={Boolean(manageErrorMessage)}>
-                {manageErrorMessage ? (
-                  <section
-                    className="mb-4 rounded-xl border px-3 py-2.5"
-                    style={{ borderColor: "#fecaca", backgroundColor: "#fff1f2", color: "var(--danger)" }}
-                  >
-                    <p className="text-sm font-semibold">비밀번호 확인 필요</p>
-                    <p className="mt-1 text-xs" style={{ color: "var(--ink-soft)" }}>
-                      {manageErrorMessage}
-                    </p>
-                  </section>
-                ) : null}
-
                 <section
-                  className="mb-4 rounded-xl border px-3 py-2.5"
+                  className="mb-4 rounded-xl border p-4"
                   style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
                 >
                   <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
@@ -643,6 +638,19 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                       ? "메모, 일정, 장소, 삭제 같은 주요 메타데이터를 바꾸려면 현재 방 비밀번호가 필요합니다."
                       : "원하면 여기서 비밀번호를 추가해 이후 주요 메타데이터 수정과 삭제를 제한할 수 있습니다."}
                   </p>
+                  {meeting.hasPassword ? (
+                    <SharedFormPasswordField
+                      label="현재 방 비밀번호"
+                      placeholder="한 번 입력하면 저장과 삭제에 같이 사용돼요"
+                      helperText="이 비밀번호는 이 모달의 저장/삭제 작업에 함께 사용됩니다."
+                      errorText={managePasswordFieldMessage}
+                      className="mt-3"
+                      targets={[
+                        { formId: "meeting-update-form", name: "meetingPassword" },
+                        { formId: "meeting-delete-form", name: "meetingPassword" },
+                      ]}
+                    />
+                  ) : null}
                 </section>
 
                 <section
@@ -650,20 +658,13 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                   style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
                 >
                   <h3 className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>모임 정보 수정</h3>
-                  <form action={updateMeetingAction} className="mt-3 grid gap-2 text-sm">
+                  <form
+                    id="meeting-update-form"
+                    action={updateMeetingAction}
+                    className="mt-3 grid gap-2 text-sm"
+                  >
                     <input type="hidden" name="meetingId" value={meeting.id} />
                     <input type="hidden" name="returnPath" value={returnPath} />
-                    {meeting.hasPassword ? (
-                      <input
-                        name="meetingPassword"
-                        type="password"
-                        required
-                        className="h-10 rounded-lg border bg-white px-3"
-                        style={{ borderColor: manageErrorMessage ? "#fda4af" : "var(--line)" }}
-                        placeholder="현재 방 비밀번호"
-                        autoComplete="current-password"
-                      />
-                    ) : null}
                     <input
                       name="title" required defaultValue={meeting.title}
                       className="h-10 rounded-lg border bg-white px-3"
@@ -730,21 +731,10 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                   <p className="mt-1 text-xs" style={{ color: "var(--ink-soft)" }}>
                     이 모임과 참여자 데이터가 함께 삭제됩니다.
                   </p>
-                  <form action={deleteMeetingAction} className="mt-3">
+                  <form id="meeting-delete-form" action={deleteMeetingAction} className="mt-3">
                     <input type="hidden" name="meetingId" value={meeting.id} />
                     <input type="hidden" name="returnDate" value={meeting.meetingDate} />
                     <input type="hidden" name="returnPath" value={returnPath} />
-                    {meeting.hasPassword ? (
-                      <input
-                        name="meetingPassword"
-                        type="password"
-                        required
-                        className="mb-3 h-10 w-full rounded-lg border bg-white px-3 text-sm"
-                        style={{ borderColor: manageErrorMessage ? "#fda4af" : "var(--line)" }}
-                        placeholder="삭제하려면 방 비밀번호 입력"
-                        autoComplete="current-password"
-                      />
-                    ) : null}
                     <DeleteConfirmButton
                       confirmMessage={`"${meeting.title}" 모임과 모든 참여자 데이터가 삭제됩니다. 계속하시겠습니까?`}
                       className="btn-press h-9 rounded-lg px-3 text-xs font-semibold text-white"

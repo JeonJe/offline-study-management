@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { queryMock, withTransactionMock } = vi.hoisted(() => ({
@@ -11,11 +12,20 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import {
+  createAfterparty,
   createAfterpartyParticipantsBulk,
+  deleteAfterparty,
   deleteAfterpartySettlement,
   ensureAfterpartySchema,
+  updateAfterparty,
   updateAfterpartyParticipantSettlement,
 } from "@/lib/afterparty-store";
+
+function hashAfterpartyPassword(password: string): string {
+  return createHash("sha256")
+    .update(`saturday-meetup:afterparty:${password}`)
+    .digest("hex");
+}
 
 describe("afterparty-store settlement flows", () => {
   beforeAll(async () => {
@@ -26,6 +36,7 @@ describe("afterparty-store settlement flows", () => {
 
   beforeEach(() => {
     queryMock.mockClear();
+    queryMock.mockResolvedValue([]);
     withTransactionMock.mockReset();
   });
 
@@ -152,5 +163,112 @@ describe("afterparty-store settlement flows", () => {
     const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("s.afterparty_id = $2");
     expect(params).toEqual(["participant-1", "afterparty-1", false]);
+  });
+
+  it("stores a hashed password when creating a protected afterparty", async () => {
+    const txCalls: Array<{ text: string; params?: unknown[] }> = [];
+
+    withTransactionMock.mockImplementation(async (callback: (tq: (text: string, params?: unknown[]) => Promise<unknown[]>) => Promise<unknown>) => {
+      const tq = async (text: string, params?: unknown[]): Promise<unknown[]> => {
+        txCalls.push({ text, params });
+
+        if (text.includes("insert into public.afterparties")) {
+          return [{
+            id: "after-1",
+            title: "홍대 뒷풀이",
+            eventDate: "2026-03-12",
+            startTime: "19:00",
+            location: "홍대입구",
+            description: "2차 가능",
+            settlementManager: "제니",
+            settlementAccount: "3333-12-1234567",
+            hasPassword: true,
+            participantCount: 0,
+            settlementCount: 1,
+          }];
+        }
+
+        return [];
+      };
+
+      return callback(tq);
+    });
+
+    const created = await createAfterparty({
+      title: "홍대 뒷풀이",
+      eventDate: "2026-03-12",
+      startTime: "19:00",
+      location: "홍대입구",
+      description: "2차 가능",
+      settlementManager: "제니",
+      settlementAccount: "3333-12-1234567",
+      password: "late-secret",
+    });
+
+    expect(created.hasPassword).toBe(true);
+    const afterpartyInsertCall = txCalls.find((call) =>
+      call.text.includes("insert into public.afterparties")
+    );
+    expect(afterpartyInsertCall?.params?.[8]).toBe(hashAfterpartyPassword("late-secret"));
+  });
+
+  it("rejects afterparty updates when a protected password is missing", async () => {
+    queryMock.mockResolvedValueOnce([
+      { passwordHash: hashAfterpartyPassword("late-secret") },
+    ]);
+
+    await expect(
+      updateAfterparty({
+        id: "after-1",
+        title: "홍대 뒷풀이",
+        eventDate: "2026-03-12",
+        startTime: "19:00",
+        location: "홍대입구",
+        description: "메모",
+      })
+    ).rejects.toMatchObject({ code: "password-required" });
+  });
+
+  it("allows clearing afterparty protection when the current password matches", async () => {
+    queryMock
+      .mockResolvedValueOnce([{ passwordHash: hashAfterpartyPassword("late-secret") }])
+      .mockResolvedValueOnce([]);
+
+    await updateAfterparty({
+      id: "after-1",
+      title: "홍대 뒷풀이",
+      eventDate: "2026-03-12",
+      startTime: "19:00",
+      location: "홍대입구",
+      description: "메모",
+      accessPassword: "late-secret",
+      clearPassword: true,
+    });
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    const [sql, params] = queryMock.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain("password_hash = $7");
+    expect(params[6]).toBeNull();
+  });
+
+  it("rejects settlement deletion when a protected password is missing", async () => {
+    queryMock.mockResolvedValueOnce([
+      { passwordHash: hashAfterpartyPassword("late-secret") },
+    ]);
+
+    await expect(
+      deleteAfterpartySettlement("settle-1", "after-1")
+    ).rejects.toMatchObject({ code: "password-required" });
+    expect(withTransactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects afterparty deletion when the password does not match", async () => {
+    queryMock.mockResolvedValueOnce([
+      { passwordHash: hashAfterpartyPassword("late-secret") },
+    ]);
+
+    await expect(
+      deleteAfterparty("after-1", "wrong-secret")
+    ).rejects.toMatchObject({ code: "password-invalid" });
   });
 });

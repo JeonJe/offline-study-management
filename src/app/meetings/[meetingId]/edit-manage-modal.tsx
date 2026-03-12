@@ -18,8 +18,13 @@ export function EditManageModal({
   children,
   defaultOpen = false,
 }: EditManageModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(defaultOpen);
-  const portalTarget = typeof window === "undefined" ? null : document.body;
+  const portalTarget = mounted ? document.body : null;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setOpen(defaultOpen);
@@ -71,7 +76,7 @@ export function EditManageModal({
         수정 관리
       </button>
 
-      {open && portalTarget
+      {mounted && open && portalTarget
         ? createPortal(
             <div
               className="fixed inset-0 z-50 overflow-y-auto p-4 fade-in sm:p-6"

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { isAuthenticated, login, logout } from "@/lib/auth";
 import { withSettlementInPath } from "@/lib/navigation-utils";
 import {
+  isAfterpartyPasswordError,
   createAfterparty,
   createAfterpartySettlement,
   createAfterpartyParticipantsBulk,
@@ -202,6 +203,16 @@ function meetingManagePath(meetingId: string, returnPath: string | null, status:
   });
 }
 
+function afterpartyManagePath(
+  afterpartyId: string,
+  returnPath: string | null,
+  status: string
+): string {
+  return withUpdatedSearchParams(returnPath ?? `/afterparty/${afterpartyId}`, {
+    manage: status,
+  });
+}
+
 function participantFeedbackSourceFromMutation(
   mutationSource: string
 ): ParticipantAddFeedbackSource {
@@ -377,6 +388,7 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
   const description = textFrom(formData, "description").trim();
   const settlementManager = textFrom(formData, "settlementManager").trim();
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
+  const password = textFrom(formData, "afterpartyPassword").trim();
 
   if (!title || !eventDate || !location) {
     redirect(afterpartyPath(state));
@@ -394,6 +406,7 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
     description,
     settlementManager,
     settlementAccount,
+    password,
   });
 
   revalidateTag("afterparty-data", { expire: 300 });
@@ -527,6 +540,8 @@ export async function updateAfterpartyParticipantSettlementAction(formData: Form
 export async function deleteAfterpartyAction(formData: FormData): Promise<void> {
   const afterpartyId = textFrom(formData, "afterpartyId").trim();
   const date = textFrom(formData, "returnDate").trim();
+  const returnPath = safeReturnPath(formData);
+  const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
   await requireAuthOrRedirect();
 
@@ -534,10 +549,16 @@ export async function deleteAfterpartyAction(formData: FormData): Promise<void> 
     redirect(afterpartyPath({ date }));
   }
 
-  await deleteAfterparty(afterpartyId);
+  try {
+    await deleteAfterparty(afterpartyId, accessPassword);
+  } catch (error) {
+    if (isAfterpartyPasswordError(error)) {
+      redirect(afterpartyManagePath(afterpartyId, returnPath, error.code));
+    }
+    throw error;
+  }
 
-  revalidateTag("afterparty-data", { expire: 300 });
-  revalidatePath("/afterparty");
+  revalidateAfterpartyViews(afterpartyId, null);
   redirect(afterpartyPath({ date }));
 }
 
@@ -553,6 +574,9 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
   const startTime = textFrom(formData, "startTime").trim();
   const location = textFrom(formData, "location").trim();
   const description = textFrom(formData, "description").trim();
+  const accessPassword = textFrom(formData, "afterpartyPassword").trim();
+  const nextPassword = textFrom(formData, "nextAfterpartyPassword").trim();
+  const clearPassword = textFrom(formData, "clearAfterpartyPassword") === "true";
 
   if (!afterpartyId || !title || !eventDate || !startTime || !location) {
     redirect(afterpartyPath({ date }));
@@ -562,17 +586,26 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
     redirect(afterpartyPath({ date }));
   }
 
-  await updateAfterparty({
-    id: afterpartyId,
-    title,
-    eventDate,
-    startTime,
-    location,
-    description,
-  });
+  try {
+    await updateAfterparty({
+      id: afterpartyId,
+      title,
+      eventDate,
+      startTime,
+      location,
+      description,
+      accessPassword,
+      nextPassword,
+      clearPassword,
+    });
+  } catch (error) {
+    if (isAfterpartyPasswordError(error)) {
+      redirect(afterpartyManagePath(afterpartyId, returnPath, error.code));
+    }
+    throw error;
+  }
 
-  revalidateTag("afterparty-data", { expire: 300 });
-  revalidatePath("/afterparty");
+  revalidateAfterpartyViews(afterpartyId, returnPath);
   redirect(returnPath ?? afterpartyPath({ date: eventDate }));
 }
 
@@ -583,6 +616,7 @@ export async function createAfterpartySettlementAction(formData: FormData): Prom
   const title = textFrom(formData, "title").trim();
   const settlementManager = textFrom(formData, "settlementManager").trim();
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
+  const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
   await requireAuthOrRedirect();
 
@@ -590,15 +624,23 @@ export async function createAfterpartySettlementAction(formData: FormData): Prom
     redirect(returnPath ?? afterpartyPath({ date }));
   }
 
-  const created = await createAfterpartySettlement({
-    afterpartyId,
-    title,
-    settlementManager,
-    settlementAccount,
-  });
+  let created: Awaited<ReturnType<typeof createAfterpartySettlement>>;
+  try {
+    created = await createAfterpartySettlement({
+      afterpartyId,
+      title,
+      settlementManager,
+      settlementAccount,
+      accessPassword,
+    });
+  } catch (error) {
+    if (isAfterpartyPasswordError(error)) {
+      redirect(afterpartyManagePath(afterpartyId, returnPath, error.code));
+    }
+    throw error;
+  }
 
-  revalidateTag("afterparty-data", { expire: 300 });
-  revalidatePath("/afterparty");
+  revalidateAfterpartyViews(afterpartyId, returnPath);
   redirect(withSettlementInPath(returnPath, afterpartyId, created.id, date));
 }
 
@@ -610,6 +652,7 @@ export async function updateAfterpartySettlementAction(formData: FormData): Prom
   const title = textFrom(formData, "title").trim();
   const settlementManager = textFrom(formData, "settlementManager").trim();
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
+  const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
   await requireAuthOrRedirect();
 
@@ -617,16 +660,23 @@ export async function updateAfterpartySettlementAction(formData: FormData): Prom
     redirect(returnPath ?? afterpartyPath({ date }));
   }
 
-  await updateAfterpartySettlement({
-    id: settlementId,
-    afterpartyId,
-    title,
-    settlementManager,
-    settlementAccount,
-  });
+  try {
+    await updateAfterpartySettlement({
+      id: settlementId,
+      afterpartyId,
+      title,
+      settlementManager,
+      settlementAccount,
+      accessPassword,
+    });
+  } catch (error) {
+    if (isAfterpartyPasswordError(error)) {
+      redirect(afterpartyManagePath(afterpartyId, returnPath, error.code));
+    }
+    throw error;
+  }
 
-  revalidateTag("afterparty-data", { expire: 300 });
-  revalidatePath("/afterparty");
+  revalidateAfterpartyViews(afterpartyId, returnPath);
   redirect(withSettlementInPath(returnPath, afterpartyId, settlementId, date));
 }
 
@@ -635,6 +685,7 @@ export async function deleteAfterpartySettlementAction(formData: FormData): Prom
   const settlementId = textFrom(formData, "settlementId").trim();
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
+  const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
   await requireAuthOrRedirect();
 
@@ -643,13 +694,18 @@ export async function deleteAfterpartySettlementAction(formData: FormData): Prom
   }
 
   try {
-    const remainingSettlementId = await deleteAfterpartySettlement(settlementId, afterpartyId);
-    revalidateTag("afterparty-data", { expire: 300 });
-    revalidatePath("/afterparty");
+    const remainingSettlementId = await deleteAfterpartySettlement(
+      settlementId,
+      afterpartyId,
+      accessPassword
+    );
+    revalidateAfterpartyViews(afterpartyId, returnPath);
     redirect(withSettlementInPath(returnPath, afterpartyId, remainingSettlementId, date));
-  } catch {
-    revalidateTag("afterparty-data", { expire: 300 });
-    revalidatePath("/afterparty");
+  } catch (error) {
+    if (isAfterpartyPasswordError(error)) {
+      redirect(afterpartyManagePath(afterpartyId, returnPath, error.code));
+    }
+    revalidateAfterpartyViews(afterpartyId, returnPath);
     redirect(returnPath ?? afterpartyPath({ date }));
   }
 }

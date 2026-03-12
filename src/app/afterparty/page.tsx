@@ -139,6 +139,19 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
             </label>
 
             <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">관리 비밀번호 (선택)</span>
+              <input
+                name="afterpartyPassword"
+                type="password"
+                maxLength={80}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="비워두면 누구나 수정할 수 있어요"
+                autoComplete="new-password"
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm md:col-span-4" style={{ color: "var(--ink-soft)" }}>
               <span className="font-medium">정산자 (선택)</span>
               <input
                 name="settlementManager"
@@ -149,7 +162,7 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
               />
             </label>
 
-            <label className="grid gap-1 text-sm md:col-span-4" style={{ color: "var(--ink-soft)" }}>
+            <label className="grid gap-1 text-sm md:col-span-12" style={{ color: "var(--ink-soft)" }}>
               <span className="font-medium">정산 계좌 (선택)</span>
               <input
                 name="settlementAccount"
@@ -302,6 +315,14 @@ function AfterpartyCard({
             >
               <span className="inline-block leading-none">{formatStartTime(afterparty.startTime)}</span>
             </span>
+            {afterparty.hasPassword ? (
+              <span
+                className="inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+                style={{ borderColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#b45309" }}
+              >
+                비밀번호 설정
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-soft)" }}>
             <span className="font-semibold">장소:</span> <LocationValue location={afterparty.location} />

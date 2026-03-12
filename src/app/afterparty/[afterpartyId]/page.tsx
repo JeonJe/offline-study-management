@@ -20,6 +20,7 @@ import {
   type AfterpartySettlement,
 } from "@/lib/afterparty-store";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
+import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-button";
 import type { ParticipantRole } from "@/lib/meetup-store";
 import {
   cachedGetAfterpartyById,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/participant-role-utils";
 import { PendingSubmitButton } from "@/app/pending-submit-button";
 import { QuerySelectFilter } from "@/app/query-select-filter";
+import { SharedFormPasswordField } from "@/app/shared-form-password-field";
 
 type PageProps = {
   params: Promise<{ afterpartyId: string }>;
@@ -294,6 +296,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   const teamFilter = singleParam(query.team);
   const participantSearch = singleParam(query.participantSearch).trim();
   const requestedSettlementId = singleParam(query.settlement);
+  const manageStatus = singleParam(query.manage);
   const participantStatus = singleParam(query.participantStatus);
   const participantSource = singleParam(query.participantSource);
   const participantDraft = singleParam(query.participantDraft);
@@ -312,6 +315,19 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   if (!afterparty) {
     redirect(date ? `/afterparty?date=${date}` : "/afterparty");
   }
+
+  const manageErrorMessage =
+    manageStatus === "password-required"
+      ? "이 뒷풀이는 비밀번호가 설정되어 있어 저장 또는 삭제 전에 비밀번호를 입력해야 합니다."
+      : manageStatus === "password-invalid"
+        ? "뒷풀이 비밀번호가 일치하지 않습니다."
+        : "";
+  const managePasswordFieldMessage =
+    manageStatus === "password-required"
+      ? "현재 뒷풀이 비밀번호를 입력해 주세요."
+      : manageStatus === "password-invalid"
+        ? "현재 뒷풀이 비밀번호가 일치하지 않습니다."
+        : "";
 
   const selectedSettlement =
     settlements.find((item) => item.id === requestedSettlementId) ?? settlements[0] ?? null;
@@ -498,6 +514,23 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   const manualReturnPath = `${returnPath}#participant-manual-add`;
   const quickAddReturnPath = `${returnPath}#participant-quick-add`;
   const backPath = date ? `/afterparty?date=${date}` : "/afterparty";
+  const managePasswordTargets = afterparty.hasPassword
+    ? [
+        { formId: "afterparty-update-form", name: "afterpartyPassword" },
+        { formId: "afterparty-create-settlement-form", name: "afterpartyPassword" },
+        { formId: "afterparty-delete-form", name: "afterpartyPassword" },
+        ...settlements.flatMap((settlement) => [
+          {
+            formId: `afterparty-settlement-update-${settlement.id}`,
+            name: "afterpartyPassword",
+          },
+          {
+            formId: `afterparty-settlement-delete-${settlement.id}`,
+            name: "afterpartyPassword",
+          },
+        ]),
+      ]
+    : [];
 
   function settlementHref(settlementId: string): string {
     const params = new URLSearchParams();
@@ -521,10 +554,20 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
         <div className="grid gap-3 lg:h-[calc(100vh-3rem)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
           <section className="card-static w-full p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl tracking-tight" style={{ fontFamily: "var(--font-heading), sans-serif", color: "var(--ink)" }}>
-              {afterparty.title}
-            </h1>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl tracking-tight" style={{ fontFamily: "var(--font-heading), sans-serif", color: "var(--ink)" }}>
+                {afterparty.title}
+              </h1>
+              {afterparty.hasPassword ? (
+                <span
+                  className="inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+                  style={{ borderColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#b45309" }}
+                >
+                  비밀번호 설정
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm" style={{ color: "var(--ink-soft)" }}>
               {afterparty.location} · {formatStartTime(afterparty.startTime)}
             </p>
@@ -580,22 +623,102 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
             </div>
           </div>
 
-          <EditManageModal>
+          <EditManageModal defaultOpen={Boolean(manageErrorMessage)}>
+            <section
+              className="mb-4 rounded-xl border p-4"
+              style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
+            >
+              <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                {afterparty.hasPassword ? "이 뒷풀이는 비밀번호 보호 중입니다." : "현재 뒷풀이 비밀번호가 없습니다."}
+              </p>
+              <p className="mt-1 text-xs" style={{ color: "var(--ink-soft)" }}>
+                {afterparty.hasPassword
+                  ? "메모, 일정, 장소, 정산 정보, 삭제 같은 주요 메타데이터를 바꾸려면 현재 비밀번호가 필요합니다."
+                  : "원하면 여기서 비밀번호를 추가해 이후 주요 메타데이터 수정과 삭제를 제한할 수 있습니다."}
+              </p>
+              {afterparty.hasPassword ? (
+                <SharedFormPasswordField
+                  label="현재 뒷풀이 비밀번호"
+                  placeholder="한 번 입력하면 저장, 삭제, 정산 관리에 같이 사용돼요"
+                  helperText="이 비밀번호는 이 모달의 저장/삭제/정산 작업에 함께 사용됩니다."
+                  errorText={managePasswordFieldMessage}
+                  className="mt-3"
+                  targets={managePasswordTargets}
+                />
+              ) : null}
+            </section>
+
             <section
               className="rounded-xl border p-4"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
             >
               <h3 className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>뒷풀이 정보 수정</h3>
-              <form action={updateAfterpartyAction} className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+              <form
+                id="afterparty-update-form"
+                action={updateAfterpartyAction}
+                className="mt-3 grid gap-2 text-sm"
+              >
                 <input type="hidden" name="afterpartyId" value={afterparty.id} />
                 <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
                 <input type="hidden" name="returnPath" value={returnPath} />
-                <input name="title" required defaultValue={afterparty.title} className="h-10 rounded-lg border bg-white px-3" style={{ borderColor: "var(--line)" }} />
-                <input name="location" required defaultValue={afterparty.location} className="h-10 rounded-lg border bg-white px-3" style={{ borderColor: "var(--line)" }} />
-                <input name="eventDate" type="date" required defaultValue={afterparty.eventDate} className="h-10 rounded-lg border bg-white px-3" style={{ borderColor: "var(--line)" }} />
-                <input name="startTime" type="time" required defaultValue={afterparty.startTime} className="h-10 rounded-lg border bg-white px-3" style={{ borderColor: "var(--line)" }} />
-                <input name="description" defaultValue={afterparty.description ?? ""} className="h-10 rounded-lg border bg-white px-3 md:col-span-2" style={{ borderColor: "var(--line)" }} placeholder="메모" />
-                <button type="submit" className="btn-press h-10 rounded-lg text-sm font-semibold text-white md:w-28" style={{ backgroundColor: "var(--ink)" }}>
+                <input
+                  name="title"
+                  required
+                  defaultValue={afterparty.title}
+                  className="h-10 rounded-lg border bg-white px-3"
+                  style={{ borderColor: "var(--line)" }}
+                />
+                <input
+                  name="location"
+                  required
+                  defaultValue={afterparty.location}
+                  className="h-10 rounded-lg border bg-white px-3"
+                  style={{ borderColor: "var(--line)" }}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    name="eventDate"
+                    type="date"
+                    required
+                    defaultValue={afterparty.eventDate}
+                    className="h-10 rounded-lg border bg-white px-3"
+                    style={{ borderColor: "var(--line)" }}
+                  />
+                  <input
+                    name="startTime"
+                    type="time"
+                    required
+                    defaultValue={afterparty.startTime}
+                    className="h-10 rounded-lg border bg-white px-3"
+                    style={{ borderColor: "var(--line)" }}
+                  />
+                </div>
+                <input
+                  name="description"
+                  defaultValue={afterparty.description ?? ""}
+                  className="h-10 rounded-lg border bg-white px-3"
+                  style={{ borderColor: "var(--line)" }}
+                  placeholder="메모"
+                />
+                <input
+                  name="nextAfterpartyPassword"
+                  type="password"
+                  className="h-10 rounded-lg border bg-white px-3"
+                  style={{ borderColor: "var(--line)" }}
+                  placeholder={afterparty.hasPassword ? "새 비밀번호 (비워두면 유지)" : "관리 비밀번호 설정 (선택)"}
+                  autoComplete="new-password"
+                />
+                {afterparty.hasPassword ? (
+                  <label className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>
+                    <input type="checkbox" name="clearAfterpartyPassword" value="true" />
+                    비밀번호 보호 해제
+                  </label>
+                ) : null}
+                <button
+                  type="submit"
+                  className="btn-press h-10 rounded-lg text-sm font-semibold text-white md:w-28"
+                  style={{ backgroundColor: "var(--ink)" }}
+                >
                   정보 저장
                 </button>
               </form>
@@ -607,7 +730,11 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
             >
               <h3 className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>정산 관리</h3>
 
-              <form action={createAfterpartySettlementAction} className="mt-3 grid gap-2 text-sm md:grid-cols-12">
+              <form
+                id="afterparty-create-settlement-form"
+                action={createAfterpartySettlementAction}
+                className="mt-3 grid gap-2 text-sm md:grid-cols-12"
+              >
                 <input type="hidden" name="afterpartyId" value={afterparty.id} />
                 <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
                 <input type="hidden" name="returnPath" value={returnPath} />
@@ -670,16 +797,16 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                       </form>
                     </div>
 
-                    <div className="grid gap-2 text-xs">
-                      <form
-                        id={`settlement-update-${settlement.id}`}
-                        action={updateAfterpartySettlementAction}
-                        className="grid gap-2 md:grid-cols-3"
-                      >
-                        <input type="hidden" name="afterpartyId" value={afterparty.id} />
-                        <input type="hidden" name="settlementId" value={settlement.id} />
-                        <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
-                        <input type="hidden" name="returnPath" value={returnPath} />
+                    <form
+                      id={`afterparty-settlement-update-${settlement.id}`}
+                      action={updateAfterpartySettlementAction}
+                      className="grid gap-2 text-xs"
+                    >
+                      <input type="hidden" name="afterpartyId" value={afterparty.id} />
+                      <input type="hidden" name="settlementId" value={settlement.id} />
+                      <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
+                      <input type="hidden" name="returnPath" value={returnPath} />
+                      <div className="grid gap-2 md:grid-cols-3">
                         <input
                           name="title"
                           required
@@ -701,39 +828,43 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                           style={{ borderColor: "var(--line)" }}
                           placeholder="계좌"
                         />
-                      </form>
-
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      </div>
+                      <div className="flex justify-end">
                         <button
                           type="submit"
-                          form={`settlement-update-${settlement.id}`}
                           className="btn-press h-8 rounded-lg border px-2 text-[11px] font-semibold"
                           style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                         >
                           저장
                         </button>
-
-                        {settlements.length > 1 ? (
-                          <form action={deleteAfterpartySettlementAction}>
-                            <input type="hidden" name="afterpartyId" value={afterparty.id} />
-                            <input type="hidden" name="settlementId" value={settlement.id} />
-                            <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <button
-                              type="submit"
-                              className="btn-press h-8 rounded-lg border px-2 text-[11px] font-semibold"
-                              style={{ borderColor: "#fecaca", color: "var(--danger)", backgroundColor: "var(--danger-bg)" }}
-                            >
-                              삭제
-                            </button>
-                          </form>
-                        ) : (
-                          <span className="text-[10px]" style={{ color: "var(--ink-muted)" }}>
-                            최소 1개 유지
-                          </span>
-                        )}
                       </div>
-                    </div>
+                    </form>
+
+                    {settlements.length > 1 ? (
+                      <form
+                        id={`afterparty-settlement-delete-${settlement.id}`}
+                        action={deleteAfterpartySettlementAction}
+                        className="mt-2 grid gap-2 text-xs"
+                      >
+                        <input type="hidden" name="afterpartyId" value={afterparty.id} />
+                        <input type="hidden" name="settlementId" value={settlement.id} />
+                        <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
+                        <input type="hidden" name="returnPath" value={returnPath} />
+                        <div className="flex justify-end">
+                          <DeleteConfirmButton
+                            confirmMessage={`"${settlement.title}" 정산을 삭제합니다. 계속하시겠습니까?`}
+                            className="btn-press h-8 rounded-lg border px-2 text-[11px] font-semibold"
+                            style={{ borderColor: "#fecaca", color: "var(--danger)", backgroundColor: "var(--danger-bg)" }}
+                          >
+                            삭제
+                          </DeleteConfirmButton>
+                        </div>
+                      </form>
+                    ) : (
+                      <span className="mt-2 block text-[10px]" style={{ color: "var(--ink-muted)" }}>
+                        최소 1개 유지
+                      </span>
+                    )}
                   </section>
                 ))}
               </div>
@@ -747,16 +878,21 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
               <p className="mt-1 text-xs" style={{ color: "var(--ink-soft)" }}>
                 이 뒷풀이와 참여자 데이터가 함께 삭제됩니다.
               </p>
-              <form action={deleteAfterpartyAction} className="mt-3">
+              <form
+                id="afterparty-delete-form"
+                action={deleteAfterpartyAction}
+                className="mt-3 grid gap-2 text-sm"
+              >
                 <input type="hidden" name="afterpartyId" value={afterparty.id} />
                 <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
-                <button
-                  type="submit"
-                  className="btn-press h-9 rounded-lg px-3 text-xs font-semibold text-white"
+                <input type="hidden" name="returnPath" value={returnPath} />
+                <DeleteConfirmButton
+                  confirmMessage={`"${afterparty.title}" 뒷풀이와 모든 참여자 데이터가 삭제됩니다. 계속하시겠습니까?`}
+                  className="btn-press h-9 rounded-lg px-3 text-xs font-semibold text-white md:w-36"
                   style={{ backgroundColor: "var(--danger)" }}
                 >
                   이 뒷풀이 삭제
-                </button>
+                </DeleteConfirmButton>
               </form>
             </section>
           </EditManageModal>
