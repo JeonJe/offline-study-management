@@ -7,6 +7,8 @@ create table if not exists public.meetings (
   start_time time without time zone not null,
   location text not null,
   description text,
+  leaders text[] not null default '{}'::text[],
+  password_hash text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

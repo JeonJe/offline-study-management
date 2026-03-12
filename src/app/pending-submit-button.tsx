@@ -1,13 +1,16 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 type PendingSubmitButtonProps = {
-  idleLabel: string;
+  idleLabel?: string;
   pendingLabel?: string;
   className?: string;
   style?: CSSProperties;
+  children?: ReactNode;
+  pendingChildren?: ReactNode;
+  disabled?: boolean;
 };
 
 export function PendingSubmitButton({
@@ -15,19 +18,22 @@ export function PendingSubmitButton({
   pendingLabel = "처리중...",
   className,
   style,
+  children,
+  pendingChildren,
+  disabled = false,
 }: PendingSubmitButtonProps) {
   const { pending } = useFormStatus();
+  const isDisabled = pending || disabled;
 
   return (
     <button
       type="submit"
       className={className}
       style={style}
-      disabled={pending}
+      disabled={isDisabled}
       aria-busy={pending}
     >
-      {pending ? pendingLabel : idleLabel}
+      {pending ? (pendingChildren ?? pendingLabel) : (children ?? idleLabel)}
     </button>
   );
 }
-

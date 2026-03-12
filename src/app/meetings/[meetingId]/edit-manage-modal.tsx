@@ -11,11 +11,19 @@ import { createPortal } from "react-dom";
 
 type EditManageModalProps = {
   children: ReactNode;
+  defaultOpen?: boolean;
 };
 
-export function EditManageModal({ children }: EditManageModalProps) {
-  const [open, setOpen] = useState(false);
+export function EditManageModal({
+  children,
+  defaultOpen = false,
+}: EditManageModalProps) {
+  const [open, setOpen] = useState(defaultOpen);
   const portalTarget = typeof window === "undefined" ? null : document.body;
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [defaultOpen]);
 
   useEffect(() => {
     if (!open) return;

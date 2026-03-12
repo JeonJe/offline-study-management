@@ -24,7 +24,7 @@ export default async function globalSetup() {
 
   // 대시보드 로드 대기 (로그인 성공)
   await page.waitForURL(/\/\?date=\d{4}-\d{2}-\d{2}/, { timeout: 15_000 });
-  await page.waitForSelector("text=참여 커버리지", { timeout: 15_000 });
+  await page.waitForSelector("text=참여율", { timeout: 15_000 });
 
   await page.context().storageState({ path: AUTH_FILE });
   await browser.close();

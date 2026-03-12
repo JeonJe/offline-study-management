@@ -77,6 +77,7 @@ async function getMeetingParticipantCount(
 test.describe.serial("캐시 정합성", () => {
   let meetingDetailUrl = "";
   let afterpartyDetailUrl = "";
+  let leadersSupported = false;
 
   // 이전 실행에서 남은 테스트 데이터 정리
   test.beforeAll(async () => {
@@ -106,6 +107,11 @@ test.describe.serial("캐시 정합성", () => {
     // 폼 작성
     await fab.locator('input[name="title"]').fill("E2E테스트모임");
     await fab.locator('input[name="location"]').fill("테스트장소");
+    const leadersInput = fab.locator('input[data-leader-input="true"]');
+    leadersSupported = (await leadersInput.count()) > 0;
+    if (leadersSupported) {
+      await leadersInput.fill("E2E방장A, E2E방장B");
+    }
 
     // 제출
     await fab.locator('button[type="submit"]:has-text("생성")').click();
@@ -117,6 +123,11 @@ test.describe.serial("캐시 정합성", () => {
     await expect(
       page.locator('article:has-text("E2E테스트모임")').first(),
     ).toBeVisible();
+    if (leadersSupported) {
+      await expect(
+        page.locator('article:has-text("E2E테스트모임")').first().getByText("방장: E2E방장A, E2E방장B"),
+      ).toBeVisible();
+    }
 
     // 상세 URL 저장
     const link = page
@@ -131,6 +142,9 @@ test.describe.serial("캐시 정합성", () => {
     test.skip(!meetingDetailUrl, "시나리오 1 실패로 건너뜀");
 
     await page.goto(meetingDetailUrl);
+    if (leadersSupported) {
+      await expect(page.getByText("방장: E2E방장A, E2E방장B")).toBeVisible();
+    }
 
     // 현재 참여자 수 기록
     const beforeCount = await getMeetingParticipantCount(page);

@@ -5,10 +5,11 @@ import {
 } from "@/app/actions";
 import { DatePicker } from "@/app/date-picker";
 import { DashboardHeader } from "@/app/dashboard-header";
+import { LeaderChipInput } from "@/app/leader-chip-input";
 import { OfflineStudyCaptureButton } from "@/app/offline-study-capture-button";
 import { OfflineStudyCopyTextButton } from "@/app/offline-study-copy-text-button";
 import { isAuthenticated } from "@/lib/auth";
-import { toKstIsoDate } from "@/lib/date-utils";
+import { pickNearestUpcomingIsoDate, toKstIsoDate } from "@/lib/date-utils";
 import { extractHttpUrl } from "@/lib/location-utils";
 import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
@@ -58,6 +59,47 @@ function formatStartTime(timeText: string): string {
   const period = hour >= 12 ? "오후" : "오전";
   const hour12 = hour % 12 || 12;
   return `${period} ${hour12}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeLeaders(leaders?: string[] | null): string[] {
+  if (!Array.isArray(leaders)) return [];
+  return leaders
+    .filter((leader): leader is string => typeof leader === "string")
+    .map((leader) => leader.trim())
+    .filter((leader) => leader.length > 0);
+}
+
+function formatLeaders(leaders?: string[] | null): string {
+  const normalized = normalizeLeaders(leaders);
+  return normalized.length > 0 ? normalized.join(", ") : "미지정";
+}
+
+function LeaderChips({ leaders }: { leaders?: string[] | null }) {
+  const normalized = normalizeLeaders(leaders);
+  if (normalized.length === 0) {
+    return (
+      <span
+        className="inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+        style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-muted)" }}
+      >
+        미지정
+      </span>
+    );
+  }
+
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {normalized.map((leader) => (
+        <li
+          key={`leader-${leader}`}
+          className="flex h-7 items-center rounded-full border px-2.5 text-sm font-semibold leading-none"
+          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+        >
+          {leader}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function LoginScreen({ authStatus }: { authStatus: string }) {
@@ -213,55 +255,86 @@ function CreateMeetingModal({ selectedDate }: { selectedDate: string }) {
         <form action={createMeetingAction} className="grid gap-3 md:grid-cols-12">
           <input type="hidden" name="returnDate" value={selectedDate} />
 
-          <label className="grid gap-1 text-sm md:col-span-5" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">모임 이름</span>
-            <input
-              name="title"
-              required
-              maxLength={80}
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-              placeholder="예: 강남 토요 스터디 A조 + B조"
-            />
-          </label>
+          <section
+            className="grid gap-3 rounded-[1.25rem] border p-3 md:col-span-12 md:grid-cols-12"
+            style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.72)" }}
+          >
+            <label className="grid gap-1 text-sm md:col-span-8" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">모임 이름</span>
+              <input
+                name="title"
+                required
+                maxLength={80}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="예: 강남 토요 스터디 A조 + B조"
+              />
+            </label>
 
-          <label className="grid gap-1 text-sm md:col-span-2" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">날짜</span>
-            <input
-              name="meetingDate"
-              type="date"
-              defaultValue={selectedDate}
-              required
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-            />
-          </label>
+            <label className="grid gap-1 text-sm md:col-span-4" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">비밀번호 (선택)</span>
+              <input
+                name="meetingPassword"
+                type="password"
+                maxLength={80}
+                autoComplete="new-password"
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="비워두면 누구나 수정할 수 있어요"
+              />
+            </label>
 
-          <label className="grid gap-1 text-sm md:col-span-2" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">시작 시간</span>
-            <input
-              name="startTime"
-              type="time"
-              defaultValue="14:00"
-              required
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-            />
-          </label>
+            <label className="grid gap-1 text-sm md:col-span-12" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">방장</span>
+              <LeaderChipInput
+                name="leaders"
+                placeholder="방장 이름 입력"
+              />
+            </label>
+          </section>
 
-          <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">장소/주소</span>
-            <input
-              name="location"
-              required
-              maxLength={160}
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-              placeholder="예: 강남역 10번 출구 / https://map.naver.com/..."
-            />
-          </label>
+          <section
+            className="grid gap-3 rounded-[1.25rem] border p-3 md:col-span-12 md:grid-cols-12"
+            style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.72)" }}
+          >
+            <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">날짜</span>
+              <input
+                name="meetingDate"
+                type="date"
+                defaultValue={selectedDate}
+                required
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+              />
+            </label>
 
-          <label className="grid gap-1 text-sm md:col-span-9" style={{ color: "var(--ink-soft)" }}>
+            <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">시작 시간</span>
+              <input
+                name="startTime"
+                type="time"
+                defaultValue="14:00"
+                required
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm md:col-span-6" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">장소/주소</span>
+              <input
+                name="location"
+                required
+                maxLength={160}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="예: 강남역 10번 출구 / https://map.naver.com/..."
+              />
+            </label>
+          </section>
+
+          <label className="grid gap-1 text-sm md:col-span-12" style={{ color: "var(--ink-soft)" }}>
             <span className="font-medium">설명 (선택)</span>
             <input
               name="description"
@@ -274,7 +347,7 @@ function CreateMeetingModal({ selectedDate }: { selectedDate: string }) {
 
           <button
             type="submit"
-            className="btn-press h-10 rounded-full px-4 text-sm font-semibold text-white transition hover:opacity-90 md:col-span-3 md:self-end"
+            className="btn-press h-10 rounded-full px-4 text-sm font-semibold text-white transition hover:opacity-90 md:col-span-12"
             style={{ backgroundColor: "var(--accent)", boxShadow: "0 10px 20px rgba(13, 127, 242, 0.25)" }}
           >
             생성
@@ -493,6 +566,14 @@ function MeetingCard({
                 {formatStartTime(meeting.startTime)}
               </span>
             </span>
+            {meeting.hasPassword ? (
+              <span
+                className="inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+                style={{ borderColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#b45309" }}
+              >
+                비밀번호 설정
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-soft)" }}>
             <span className="font-semibold">장소:</span> <LocationValue location={meeting.location} />
@@ -500,6 +581,10 @@ function MeetingCard({
           <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-muted)" }}>
             <span className="font-semibold">메모:</span> {meeting.description || "없음"}
           </p>
+          <div className="mt-1 flex flex-wrap items-start gap-2 text-xs" style={{ color: "var(--ink-muted)" }}>
+            <span className="font-semibold">방장:</span>
+            <LeaderChips leaders={meeting.leaders} />
+          </div>
         </div>
 
         <div className="relative z-20 flex min-w-[140px] shrink-0 flex-col items-end gap-2 sm:ml-auto">
@@ -594,6 +679,7 @@ function buildOfflineStudyShareText({
     lines.push(`- 시간: ${formatStartTime(meeting.startTime)}`);
     lines.push(`- 장소: ${meeting.location}`);
     lines.push(`- 메모: ${meeting.description || "없음"}`);
+    lines.push(`- 방장: ${formatLeaders(meeting.leaders)}`);
     lines.push(`- 인원: 총 ${meeting.totalCount}명 (멤버 ${meeting.studentCount}, 운영진 ${meeting.operationCount})`);
     for (const role of PARTICIPANT_ROLE_ORDER) {
       const roleMeta = PARTICIPANT_ROLE_META[role];
@@ -636,7 +722,8 @@ export default async function Home({ searchParams }: HomePageProps) {
   const teamLabelByMemberName = new Map<string, string>();
   let loadError = "";
 
-  let selectedDate = isIsoDate(requestDate) ? requestDate : toKstIsoDate(new Date());
+  const todayIsoDate = toKstIsoDate(new Date());
+  let selectedDate = isIsoDate(requestDate) ? requestDate : todayIsoDate;
 
   try {
     const [fetchedMeetings, memberPreset] = await Promise.all([
@@ -645,7 +732,10 @@ export default async function Home({ searchParams }: HomePageProps) {
     ]);
     meetings = fetchedMeetings;
     if (!isIsoDate(requestDate)) {
-      selectedDate = meetings[0]?.meetingDate ?? selectedDate;
+      selectedDate = pickNearestUpcomingIsoDate(
+        meetings.map((meeting) => meeting.meetingDate),
+        todayIsoDate
+      );
     }
 
     meetingsOnDate = meetings.filter((meeting) => meeting.meetingDate === selectedDate);
@@ -751,7 +841,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                 className="rounded-full border px-2 py-1 text-xs font-semibold"
                 style={{ borderColor: "var(--line)", color: "var(--accent)", backgroundColor: "var(--accent-weak)" }}
               >
-                참여 커버리지 {memberCoverageRate}%
+                참여율 {memberCoverageRate}%
               </span>
             </div>
 

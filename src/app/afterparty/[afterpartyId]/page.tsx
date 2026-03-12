@@ -34,6 +34,7 @@ import {
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
 import { PendingSubmitButton } from "@/app/pending-submit-button";
+import { QuerySelectFilter } from "@/app/query-select-filter";
 
 type PageProps = {
   params: Promise<{ afterpartyId: string }>;
@@ -71,6 +72,7 @@ function QuickAddButton({
   name,
   role,
   label,
+  isAssigned,
 }: {
   afterpartyId: string;
   settlementId: string;
@@ -79,10 +81,11 @@ function QuickAddButton({
   name: string;
   role: ParticipantRole;
   label?: string;
+  isAssigned: boolean;
 }) {
   const roleMeta = PARTICIPANT_ROLE_META[role];
   return (
-    <form action={bulkCreateAfterpartyParticipantsAction} className="inline">
+    <form action={bulkCreateAfterpartyParticipantsAction} className="w-full">
       <input type="hidden" name="afterpartyId" value={afterpartyId} />
       <input type="hidden" name="settlementId" value={settlementId} />
       <input type="hidden" name="returnDate" value={returnDate} />
@@ -91,11 +94,36 @@ function QuickAddButton({
       <input type="hidden" name="role" value={role} />
       <input type="hidden" name="mutationSource" value="quick-add" />
       <PendingSubmitButton
-        idleLabel={`${roleMeta.emoji ? `${roleMeta.emoji} ` : ""}${label ?? name}`}
-        pendingLabel="추가중..."
-        className="underline-offset-2 hover:underline"
-        style={{ color: roleMeta.textColor }}
-      />
+        pendingChildren={
+          <div className="flex h-8 items-center justify-between gap-2">
+            <span className="truncate text-xs font-semibold" style={{ color: "var(--ink)" }}>
+              {roleMeta.emoji ? `${roleMeta.emoji} ` : ""}{label ?? name}
+            </span>
+            <span className="text-[10px] font-semibold" style={{ color: "var(--ink-soft)" }}>
+              추가중...
+            </span>
+          </div>
+        }
+        disabled={isAssigned}
+        className="btn-press flex h-8 w-full items-center justify-between gap-2 rounded-md border px-2.5 text-left text-xs transition active:scale-[0.99] disabled:cursor-default disabled:opacity-100"
+        style={{
+          borderColor: "var(--line)",
+          backgroundColor: isAssigned ? "var(--surface-alt)" : "#ffffff",
+        }}
+      >
+        <span
+          className="min-w-0 truncate text-xs font-semibold"
+          style={{ color: isAssigned ? "var(--ink-muted)" : "var(--ink)" }}
+        >
+          {roleMeta.emoji ? `${roleMeta.emoji} ` : ""}{label ?? name}
+        </span>
+        <span
+          className="shrink-0 text-[10px] font-semibold"
+          style={isAssigned ? { color: "var(--ink-muted)" } : { color: roleMeta.textColor }}
+        >
+          {isAssigned ? "추가됨" : "추가"}
+        </span>
+      </PendingSubmitButton>
     </form>
   );
 }
@@ -199,12 +227,76 @@ function sortParticipantsForRole(
   return sorted;
 }
 
+type ParticipantFeedbackTone = "error" | "notice";
+
+type ParticipantFeedback = {
+  title: string;
+  description: string;
+  tone: ParticipantFeedbackTone;
+};
+
+function resolveParticipantFeedback(status: string, source: string): ParticipantFeedback | null {
+  if (status === "invalid-input") {
+    return {
+      title: "이름 추가 실패",
+      description: "이름을 읽지 못했습니다. 한 명은 그대로 입력하고, 여러 명은 쉼표로 구분해 주세요.",
+      tone: "error",
+    };
+  }
+
+  if (status === "already-added") {
+    return {
+      title: "변경된 참여자가 없습니다",
+      description:
+        source === "quick"
+          ? "이미 추가된 이름이라 빠른추가에서 변경된 항목이 없습니다."
+          : "이미 추가된 이름만 입력되어 새로 반영된 참여자가 없습니다.",
+      tone: "notice",
+    };
+  }
+
+  return null;
+}
+
+function ParticipantFeedbackBanner({ feedback }: { feedback: ParticipantFeedback }) {
+  const palette =
+    feedback.tone === "error"
+      ? {
+          borderColor: "#fecaca",
+          backgroundColor: "#fff1f2",
+          titleColor: "var(--danger)",
+        }
+      : {
+          borderColor: "#fde68a",
+          backgroundColor: "#fffbeb",
+          titleColor: "#b45309",
+        };
+
+  return (
+    <section
+      className="rounded-xl border px-3 py-2.5"
+      style={{ borderColor: palette.borderColor, backgroundColor: palette.backgroundColor }}
+    >
+      <p className="text-sm font-semibold" style={{ color: palette.titleColor }}>
+        {feedback.title}
+      </p>
+      <p className="mt-1 text-xs" style={{ color: "var(--ink-soft)" }}>
+        {feedback.description}
+      </p>
+    </section>
+  );
+}
+
 export default async function AfterpartyDetailPage({ params, searchParams }: PageProps) {
   const { afterpartyId } = await params;
   const query = await searchParams;
   const date = singleParam(query.date);
   const teamFilter = singleParam(query.team);
+  const participantSearch = singleParam(query.participantSearch).trim();
   const requestedSettlementId = singleParam(query.settlement);
+  const participantStatus = singleParam(query.participantStatus);
+  const participantSource = singleParam(query.participantSource);
+  const participantDraft = singleParam(query.participantDraft);
 
   const authenticated = await isAuthenticated();
   if (!authenticated) {
@@ -227,6 +319,13 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   if (!selectedSettlement) {
     redirect(date ? `/afterparty?date=${date}` : "/afterparty");
   }
+
+  const participantFeedback = resolveParticipantFeedback(participantStatus, participantSource);
+  const manualParticipantFeedback =
+    participantFeedback && participantSource === "manual" ? participantFeedback : null;
+  const quickParticipantFeedback =
+    participantFeedback && participantSource === "quick" ? participantFeedback : null;
+  const manualParticipantDraft = participantSource === "manual" ? participantDraft : "";
 
   const participants = await cachedListParticipantsForSettlement(selectedSettlement.id, "");
   const settledCount = participants.filter((row) => row.isSettled).length;
@@ -360,9 +459,23 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
         ]
       : []),
   ];
-  const visibleQuickAddGroups = teamFilter
+  const normalizedParticipantSearch = normalizeName(participantSearch);
+  const quickAddGroupsByFilter = teamFilter
     ? quickAddGroups.filter((group) => group.teamName === teamFilter)
     : quickAddGroups;
+  const visibleQuickAddGroups = quickAddGroupsByFilter
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((entry) => {
+        if (!normalizedParticipantSearch) return true;
+        const displayName = withTeamLabel(entry.name, teamLabelByMemberName);
+        return (
+          normalizeName(entry.name).includes(normalizedParticipantSearch) ||
+          normalizeName(displayName).includes(normalizedParticipantSearch)
+        );
+      }),
+    }))
+    .filter((group) => group.entries.length > 0);
 
   const totalAssignableCount = visibleQuickAddGroups.reduce(
     (sum, group) => sum + group.entries.length,
@@ -378,24 +491,19 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   const returnParams = new URLSearchParams();
   if (date) returnParams.set("date", date);
   if (teamFilter) returnParams.set("team", teamFilter);
+  if (participantSearch) returnParams.set("participantSearch", participantSearch);
   returnParams.set("settlement", selectedSettlement.id);
   const returnQuery = returnParams.toString();
   const returnPath = `/afterparty/${afterpartyId}${returnQuery ? `?${returnQuery}` : ""}`;
+  const manualReturnPath = `${returnPath}#participant-manual-add`;
+  const quickAddReturnPath = `${returnPath}#participant-quick-add`;
   const backPath = date ? `/afterparty?date=${date}` : "/afterparty";
-
-  function teamFilterHref(teamName?: string): string {
-    const params = new URLSearchParams();
-    if (date) params.set("date", date);
-    if (teamName) params.set("team", teamName);
-    params.set("settlement", selectedSettlement.id);
-    const queryText = params.toString();
-    return `/afterparty/${afterpartyId}${queryText ? `?${queryText}` : ""}`;
-  }
 
   function settlementHref(settlementId: string): string {
     const params = new URLSearchParams();
     if (date) params.set("date", date);
     if (teamFilter) params.set("team", teamFilter);
+    if (participantSearch) params.set("participantSearch", participantSearch);
     params.set("settlement", settlementId);
     const queryText = params.toString();
     return `/afterparty/${afterpartyId}${queryText ? `?${queryText}` : ""}`;
@@ -423,6 +531,13 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
             <p className="mt-2 text-sm" style={{ color: "var(--ink-muted)" }}>
               현재 정산 참여자 {participants.length}명 · 현재 정산 미정산 {unsettledCount}명
             </p>
+            <a
+              href="#participant-quick-add"
+              className="btn-press mt-3 inline-flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-semibold lg:hidden"
+              style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--accent)" }}
+            >
+              내 이름 빠르게 추가
+            </a>
 
             <section
               className="mt-3 rounded-xl border p-3"
@@ -538,6 +653,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                       <form action={`/afterparty/${afterpartyId}`} method="get">
                         {date ? <input type="hidden" name="date" value={date} /> : null}
                         {teamFilter ? <input type="hidden" name="team" value={teamFilter} /> : null}
+                        {participantSearch ? <input type="hidden" name="participantSearch" value={participantSearch} /> : null}
                         <input type="hidden" name="settlement" value={settlement.id} />
                         <button
                           type="submit"
@@ -688,35 +804,49 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
             </span>
           </div>
         </div>
+        <div id="participant-manual-add" className="scroll-mt-24" />
+        {manualParticipantFeedback ? (
+          <div className="mt-3">
+            <ParticipantFeedbackBanner feedback={manualParticipantFeedback} />
+          </div>
+        ) : null}
 
-        <form action={bulkCreateAfterpartyParticipantsAction} className="mt-3 flex flex-wrap items-center gap-2">
+        <form action={bulkCreateAfterpartyParticipantsAction} className="mt-3">
           <input type="hidden" name="afterpartyId" value={afterparty.id} />
           <input type="hidden" name="settlementId" value={selectedSettlement.id} />
           <input type="hidden" name="returnDate" value={date || afterparty.eventDate} />
-          <input type="hidden" name="returnPath" value={returnPath} />
-          <input
-            name="names"
-            className="h-9 w-full rounded-lg border bg-white px-2 text-xs sm:w-80"
-            style={{ borderColor: "var(--line)" }}
-            placeholder="이름 또는 이름,이름"
-          />
-          <select
-            name="role"
-            defaultValue=""
-            className="h-9 rounded-lg border bg-white px-2 text-xs"
-            style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
+          <input type="hidden" name="returnPath" value={manualReturnPath} />
+          <input type="hidden" name="mutationSource" value="manual-add" />
+          <div
+            className="flex overflow-hidden rounded-md border bg-white"
+            style={{ borderColor: manualParticipantFeedback ? "#fda4af" : "var(--line)" }}
           >
-            <option value="">역할 자동 분류</option>
-            {PARTICIPANT_ROLE_ORDER.map((role) => (
-              <option key={`afterparty-role-option-${role}`} value={role}>
-                {PARTICIPANT_ROLE_META[role].label}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn-press h-9 rounded-lg border px-2 text-xs font-semibold" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>
-            참여자 추가
-          </button>
+            <input
+              name="names"
+              defaultValue={manualParticipantDraft}
+              className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
+              placeholder="예: 김민수 또는 김민수, 박서준"
+            />
+            <PendingSubmitButton
+              idleLabel="추가"
+              pendingLabel="추가중..."
+              className="btn-press h-11 shrink-0 border-l px-4 text-sm font-semibold"
+              style={{ borderColor: "var(--line)", color: "var(--accent)", backgroundColor: "var(--surface-alt)" }}
+            />
+          </div>
         </form>
+        <div className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed" style={{ color: "var(--ink-soft)" }}>
+          <span
+            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold leading-none"
+            style={{ borderColor: "#bfdbfe", backgroundColor: "#eff6ff", color: "#2563eb" }}
+            aria-hidden="true"
+          >
+            i
+          </span>
+          <p>
+            직접 입력은 자동 역할 분류 없이 멤버로 추가됩니다. 여러 명은 쉼표로 구분해 입력하세요.
+          </p>
+        </div>
 
         {sortedParticipantRows.length > 0 ? (
           <section
@@ -743,11 +873,16 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
           </section>
         </div>
 
-        <aside className="card-static p-4 fade-in lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-hidden lg:flex lg:flex-col">
+        <aside id="participant-quick-add" className="card-static scroll-mt-24 p-4 fade-in lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-hidden lg:flex lg:flex-col">
         <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>참여자</h2>
         <p className="mt-2 rounded-lg border border-dashed px-2.5 py-2 text-[11px]" style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}>
           팀/운영진 필터를 고른 뒤 이름을 클릭하면 선택된 정산에 바로 추가됩니다.
         </p>
+        {quickParticipantFeedback ? (
+          <div className="mt-3">
+            <ParticipantFeedbackBanner feedback={quickParticipantFeedback} />
+          </div>
+        ) : null}
 
         <div className="mt-2">
           <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-soft)" }}>
@@ -759,63 +894,81 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1">
-          <Link
-            href={teamFilterHref()}
-            className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
-            style={!teamFilter ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" } : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+        <form
+          action={`/afterparty/${afterpartyId}`}
+          method="get"
+          className="mt-3"
+        >
+          {date ? <input type="hidden" name="date" value={date} /> : null}
+          <input type="hidden" name="settlement" value={selectedSettlement.id} />
+          <div
+            className="flex overflow-hidden rounded-md border bg-white"
+            style={{ borderColor: "var(--line)" }}
           >
-            전체
-          </Link>
-          {quickAddGroups.map((group) => (
-            <Link
-              key={`filter-${group.kind}-${group.teamName}`}
-              href={teamFilterHref(group.teamName)}
-              className="btn-press rounded-full border px-2 py-1 text-[11px] font-semibold transition"
-              style={teamFilter === group.teamName ? { borderColor: "var(--accent)", backgroundColor: "var(--accent-weak)", color: "var(--accent)" } : { borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
+            <input
+              name="participantSearch"
+              defaultValue={participantSearch}
+              className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
+              placeholder="빠른추가 이름 검색"
+            />
+            <button
+              type="submit"
+              className="btn-press h-10 shrink-0 border-l px-3 text-sm font-semibold"
+              style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface-alt)" }}
             >
-              {group.teamName}
-            </Link>
-          ))}
+              검색
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-3">
+          <QuerySelectFilter
+            pathname={`/afterparty/${afterpartyId}`}
+            paramName="team"
+            selectedValue={teamFilter}
+            params={{
+              date,
+              settlement: selectedSettlement.id,
+            }}
+            hash="participant-quick-add"
+            options={[
+              { label: "전체", value: "" },
+              ...quickAddGroups.map((group) => ({
+                label: group.teamName,
+                value: group.teamName,
+              })),
+            ]}
+          />
         </div>
 
         <div className="mt-3 grid gap-3 pr-1 stagger-children lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          {participantSearch && visibleQuickAddGroups.length === 0 ? (
+            <section
+              className="rounded-xl border px-3 py-2.5 text-sm"
+              style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)", color: "var(--ink-soft)" }}
+            >
+              검색 결과가 없습니다. 팀 필터를 바꾸거나 이름 일부만 입력해 보세요.
+            </section>
+          ) : null}
           {visibleQuickAddGroups.map((group) => (
             <section key={`${group.kind}-${group.teamName}`} className="rounded-xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
               <p className="mb-2 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>{group.teamName}</p>
               <ul className="grid gap-1">
                 {group.entries.map((entry) => {
                   const normalizedEntryName = normalizeName(entry.name);
+                  const isAssigned = currentSettlementNames.has(normalizedEntryName);
                   return (
-                    <li key={`${group.teamName}-${entry.role}-${entry.name}`} className="rounded-md px-2 py-1 text-xs" style={{ backgroundColor: "var(--surface)" }}>
-                      <div className="flex items-start justify-between gap-2">
-                        <QuickAddButton
-                          afterpartyId={afterparty.id}
-                          settlementId={selectedSettlement.id}
-                          returnDate={date || afterparty.eventDate}
-                          returnPath={returnPath}
-                          name={entry.name}
-                          role={entry.role}
-                          label={withTeamLabel(entry.name, teamLabelByMemberName)}
-                        />
-                        <div className="flex flex-wrap justify-end gap-1">
-                          {currentSettlementNames.has(normalizedEntryName) ? (
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={{ backgroundColor: "var(--success-bg)", color: "var(--success)" }}
-                            >
-                              추가됨
-                            </span>
-                          ) : (
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}
-                            >
-                              미할당
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    <li key={`${group.teamName}-${entry.role}-${entry.name}`} className="text-xs">
+                      <QuickAddButton
+                        afterpartyId={afterparty.id}
+                        settlementId={selectedSettlement.id}
+                        returnDate={date || afterparty.eventDate}
+                        returnPath={quickAddReturnPath}
+                        name={entry.name}
+                        role={entry.role}
+                        label={withTeamLabel(entry.name, teamLabelByMemberName)}
+                        isAssigned={isAssigned}
+                      />
                     </li>
                   );
                 })}

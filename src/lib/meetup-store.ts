@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
 
 export type ParticipantRole =
@@ -16,6 +16,8 @@ export type MeetingSummary = {
   startTime: string;
   location: string;
   description: string | null;
+  leaders: string[];
+  hasPassword: boolean;
   studentCount: number;
   operationCount: number;
   totalCount: number;
@@ -36,6 +38,8 @@ type CreateMeetingInput = {
   startTime: string;
   location: string;
   description?: string;
+  leaders?: string[];
+  password?: string;
 };
 
 type CreateRsvpInput = {
@@ -52,7 +56,58 @@ type UpdateMeetingInput = {
   startTime: string;
   location: string;
   description?: string;
+  leaders?: string[];
+  accessPassword?: string;
+  nextPassword?: string;
+  clearPassword?: boolean;
 };
+
+export class MeetingPasswordError extends Error {
+  constructor(public readonly code: "password-required" | "password-invalid") {
+    super(
+      code === "password-required"
+        ? "Meeting password is required."
+        : "Meeting password is invalid."
+    );
+    this.name = "MeetingPasswordError";
+  }
+}
+
+export function isMeetingPasswordError(error: unknown): error is MeetingPasswordError {
+  return error instanceof MeetingPasswordError;
+}
+
+function normalizeLeaders(leaders?: string[]): string[] {
+  if (!leaders) return [];
+  const unique = new Set<string>();
+  const normalized: string[] = [];
+  for (const raw of leaders) {
+    const name = raw.trim();
+    if (!name || unique.has(name)) continue;
+    unique.add(name);
+    normalized.push(name);
+  }
+  return normalized;
+}
+
+function normalizeMeetingPassword(password?: string): string | null {
+  const normalized = password?.trim() ?? "";
+  return normalized ? normalized : null;
+}
+
+function hashMeetingPassword(password: string): string {
+  return createHash("sha256")
+    .update(`saturday-meetup:meeting:${password}`)
+    .digest("hex");
+}
+
+function safeEquals(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
 
 let schemaReady = false;
 let schemaPromise: Promise<void> | null = null;
@@ -70,15 +125,54 @@ async function hasMeetupSchema(): Promise<boolean> {
   return Boolean(row?.meetings && row?.rsvps);
 }
 
+async function hasMeetingColumn(columnName: string): Promise<boolean> {
+  const [row] = await query<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'meetings'
+         and column_name = $1
+     ) as exists`,
+    [columnName]
+  );
+
+  return Boolean(row?.exists);
+}
+
+async function ensureMeetingLeadersColumn(): Promise<void> {
+  const hasColumn = await hasMeetingColumn("leaders");
+  if (hasColumn) return;
+
+  await query(
+    `alter table public.meetings
+     add column if not exists leaders text[] not null default '{}'::text[]`
+  );
+}
+
+async function ensureMeetingPasswordHashColumn(): Promise<void> {
+  const hasColumn = await hasMeetingColumn("password_hash");
+  if (hasColumn) return;
+
+  await query(
+    `alter table public.meetings
+     add column if not exists password_hash text`
+  );
+}
+
 export async function ensureSchema(): Promise<void> {
   if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
 
   schemaPromise = (async () => {
     const schemaExists = await hasMeetupSchema();
-    if (schemaExists && !runtimeMigrationsEnabled) {
-      schemaReady = true;
-      return;
+    if (schemaExists) {
+      await ensureMeetingLeadersColumn();
+      await ensureMeetingPasswordHashColumn();
+      if (!runtimeMigrationsEnabled) {
+        schemaReady = true;
+        return;
+      }
     }
 
     await query(
@@ -89,9 +183,21 @@ export async function ensureSchema(): Promise<void> {
         start_time time without time zone not null,
         location text not null,
         description text,
+        leaders text[] not null default '{}'::text[],
+        password_hash text,
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       )`
+    );
+
+    await query(
+      `alter table public.meetings
+       add column if not exists leaders text[] not null default '{}'::text[]`
+    );
+
+    await query(
+      `alter table public.meetings
+       add column if not exists password_hash text`
     );
 
     await query(
@@ -163,6 +269,8 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
        to_char(m.start_time, 'HH24:MI') as "startTime",
        m.location,
        m.description,
+       coalesce(m.leaders, '{}'::text[]) as leaders,
+       (m.password_hash is not null) as "hasPassword",
        count(r.id) filter (where r.role = 'student')::int as "studentCount",
        count(r.id) filter (where r.role <> 'student')::int as "operationCount",
        count(r.id)::int as "totalCount"
@@ -184,6 +292,8 @@ export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSu
        to_char(m.start_time, 'HH24:MI') as "startTime",
        m.location,
        m.description,
+       coalesce(m.leaders, '{}'::text[]) as leaders,
+       (m.password_hash is not null) as "hasPassword",
        count(r.id) filter (where r.role = 'student')::int as "studentCount",
        count(r.id) filter (where r.role <> 'student')::int as "operationCount",
        count(r.id)::int as "totalCount"
@@ -207,6 +317,8 @@ export async function getMeetingById(meetingId: string): Promise<MeetingSummary 
        to_char(m.start_time, 'HH24:MI') as "startTime",
        m.location,
        m.description,
+       coalesce(m.leaders, '{}'::text[]) as leaders,
+       (m.password_hash is not null) as "hasPassword",
        count(r.id) filter (where r.role = 'student')::int as "studentCount",
        count(r.id) filter (where r.role <> 'student')::int as "operationCount",
        count(r.id)::int as "totalCount"
@@ -238,10 +350,13 @@ export async function getMeetingTitle(meetingId: string): Promise<string> {
 
 export async function createMeeting(input: CreateMeetingInput): Promise<MeetingSummary> {
   await ensureSchema();
+  const leaders = normalizeLeaders(input.leaders);
+  const password = normalizeMeetingPassword(input.password);
+  const passwordHash = password ? hashMeetingPassword(password) : null;
 
   const [created] = await query<MeetingSummary>(
-    `insert into public.meetings (id, title, meeting_date, start_time, location, description)
-     values ($1, $2, $3, $4, $5, nullif($6, ''))
+    `insert into public.meetings (id, title, meeting_date, start_time, location, description, leaders, password_hash)
+     values ($1, $2, $3, $4, $5, nullif($6, ''), $7::text[], $8)
      returning
        id,
        title,
@@ -249,6 +364,8 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
        to_char(start_time, 'HH24:MI') as "startTime",
        location,
        description,
+       coalesce(leaders, '{}'::text[]) as leaders,
+       (password_hash is not null) as "hasPassword",
        0::int as "studentCount",
        0::int as "operationCount",
        0::int as "totalCount"`,
@@ -259,6 +376,8 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
       input.startTime,
       input.location.trim(),
       input.description?.trim() ?? "",
+      leaders,
+      passwordHash,
     ]
   );
 
@@ -410,8 +529,47 @@ export async function createRsvpsBulk(
   return row?.insertedCount ?? 0;
 }
 
+async function getMeetingPasswordHash(meetingId: string): Promise<string | null> {
+  const [row] = await query<{ passwordHash: string | null }>(
+    `select password_hash as "passwordHash"
+     from public.meetings
+     where id = $1
+     limit 1`,
+    [meetingId]
+  );
+
+  return row?.passwordHash ?? null;
+}
+
+function assertMeetingPasswordAccess(
+  passwordHash: string | null,
+  accessPassword?: string
+): void {
+  if (!passwordHash) return;
+
+  const normalizedAccessPassword = normalizeMeetingPassword(accessPassword);
+  if (!normalizedAccessPassword) {
+    throw new MeetingPasswordError("password-required");
+  }
+
+  const inputHash = hashMeetingPassword(normalizedAccessPassword);
+  if (!safeEquals(inputHash, passwordHash)) {
+    throw new MeetingPasswordError("password-invalid");
+  }
+}
+
 export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
   await ensureSchema();
+  const leaders = normalizeLeaders(input.leaders);
+  const currentPasswordHash = await getMeetingPasswordHash(input.id);
+  assertMeetingPasswordAccess(currentPasswordHash, input.accessPassword);
+
+  const nextPassword = normalizeMeetingPassword(input.nextPassword);
+  const nextPasswordHash = input.clearPassword
+    ? null
+    : nextPassword
+      ? hashMeetingPassword(nextPassword)
+      : currentPasswordHash;
 
   await query(
     `update public.meetings
@@ -420,6 +578,8 @@ export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
          start_time = $4,
          location = $5,
          description = nullif($6, ''),
+         leaders = $7::text[],
+         password_hash = $8,
          updated_at = now()
      where id = $1`,
     [
@@ -429,12 +589,19 @@ export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
       input.startTime,
       input.location.trim(),
       input.description?.trim() ?? "",
+      leaders,
+      nextPasswordHash,
     ]
   );
 }
 
-export async function deleteMeeting(meetingId: string): Promise<void> {
+export async function deleteMeeting(
+  meetingId: string,
+  accessPassword?: string
+): Promise<void> {
   await ensureSchema();
+  const currentPasswordHash = await getMeetingPasswordHash(meetingId);
+  assertMeetingPasswordAccess(currentPasswordHash, accessPassword);
 
   await query(
     `delete from public.meetings

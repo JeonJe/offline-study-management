@@ -6,7 +6,7 @@ import {
 import { DatePicker } from "@/app/date-picker";
 import { DashboardHeader } from "@/app/dashboard-header";
 import { isAuthenticated } from "@/lib/auth";
-import { toKstIsoDate } from "@/lib/date-utils";
+import { pickNearestUpcomingIsoDate, toKstIsoDate } from "@/lib/date-utils";
 import { extractHttpUrl } from "@/lib/location-utils";
 import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
@@ -119,58 +119,90 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
         style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.95)" }}
       >
         <p className="mb-3 text-sm font-semibold" style={{ color: "var(--ink)" }}>뒷풀이 만들기</p>
-        <form action={createAfterpartyAction} className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <form action={createAfterpartyAction} className="grid gap-3 md:grid-cols-12">
           <input type="hidden" name="returnDate" value={selectedDate} />
 
-          <label className="grid gap-1 text-sm lg:col-span-2" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">뒷풀이 이름</span>
-            <input
-              name="title"
-              required
-              maxLength={80}
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-              placeholder="예: 홍대 저녁 뒷풀이"
-            />
-          </label>
+          <section
+            className="grid gap-3 rounded-[1.25rem] border p-3 md:col-span-12 md:grid-cols-12"
+            style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.72)" }}
+          >
+            <label className="grid gap-1 text-sm md:col-span-5" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">뒷풀이 이름</span>
+              <input
+                name="title"
+                required
+                maxLength={80}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="예: 홍대 저녁 뒷풀이"
+              />
+            </label>
 
-          <label className="grid gap-1 text-sm" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">날짜</span>
-            <input
-              name="eventDate"
-              type="date"
-              defaultValue={selectedDate}
-              required
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-            />
-          </label>
+            <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">정산자 (선택)</span>
+              <input
+                name="settlementManager"
+                maxLength={40}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="예: 제니"
+              />
+            </label>
 
-          <label className="grid gap-1 text-sm" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">시작 시간</span>
-            <input
-              name="startTime"
-              type="time"
-              defaultValue="19:00"
-              required
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-            />
-          </label>
+            <label className="grid gap-1 text-sm md:col-span-4" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">정산 계좌 (선택)</span>
+              <input
+                name="settlementAccount"
+                maxLength={120}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="예: 카카오뱅크 3333-12-1234567"
+              />
+            </label>
+          </section>
 
-          <label className="grid gap-1 text-sm md:col-span-2 lg:col-span-2" style={{ color: "var(--ink-soft)" }}>
-            <span className="font-medium">장소/주소</span>
-            <input
-              name="location"
-              required
-              maxLength={160}
-              className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
-              style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
-              placeholder="예: 합정역 근처"
-            />
-          </label>
+          <section
+            className="grid gap-3 rounded-[1.25rem] border p-3 md:col-span-12 md:grid-cols-12"
+            style={{ borderColor: "var(--line)", backgroundColor: "rgba(255, 255, 255, 0.72)" }}
+          >
+            <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">날짜</span>
+              <input
+                name="eventDate"
+                type="date"
+                defaultValue={selectedDate}
+                required
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+              />
+            </label>
 
-          <label className="grid gap-1 text-sm md:col-span-2 lg:col-span-4" style={{ color: "var(--ink-soft)" }}>
+            <label className="grid gap-1 text-sm md:col-span-3" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">시작 시간</span>
+              <input
+                name="startTime"
+                type="time"
+                defaultValue="19:00"
+                required
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm md:col-span-6" style={{ color: "var(--ink-soft)" }}>
+              <span className="font-medium">장소/주소</span>
+              <input
+                name="location"
+                required
+                maxLength={160}
+                className="h-10 rounded-xl border bg-white px-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "var(--line)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+                placeholder="예: 합정역 근처 / https://map.naver.com/..."
+              />
+            </label>
+          </section>
+
+          <label className="grid gap-1 text-sm md:col-span-12" style={{ color: "var(--ink-soft)" }}>
             <span className="font-medium">메모 (선택)</span>
             <input
               name="description"
@@ -183,7 +215,7 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
 
           <button
             type="submit"
-            className="btn-press h-10 self-end rounded-full px-4 text-sm font-semibold text-white transition hover:opacity-90"
+            className="btn-press h-10 rounded-full px-4 text-sm font-semibold text-white transition hover:opacity-90 md:col-span-12"
             style={{ backgroundColor: "var(--accent)", boxShadow: "0 10px 20px rgba(13, 127, 242, 0.25)" }}
           >
             생성
@@ -350,7 +382,8 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     redirect("/?auth=required");
   }
 
-  let selectedDate = isIsoDate(requestDate) ? requestDate : toKstIsoDate(new Date());
+  const todayIsoDate = toKstIsoDate(new Date());
+  let selectedDate = isIsoDate(requestDate) ? requestDate : todayIsoDate;
   let afterpartiesOnDate: AfterpartySummary[] = [];
   let participantsByAfterparty: Record<string, AfterpartyParticipant[]> = {};
   let settlementsByAfterparty: Record<string, AfterpartySettlement[]> = {};
@@ -380,7 +413,10 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
       afterpartiesOnDate = await cachedListAfterpartiesByDate(selectedDate);
     } else {
       const allAfterparties = await cachedListAfterparties();
-      selectedDate = allAfterparties[0]?.eventDate ?? selectedDate;
+      selectedDate = pickNearestUpcomingIsoDate(
+        allAfterparties.map((item) => item.eventDate),
+        todayIsoDate
+      );
       afterpartiesOnDate = await cachedListAfterpartiesByDate(selectedDate);
     }
     participantsByAfterparty = await cachedListParticipantsForAfterparties(

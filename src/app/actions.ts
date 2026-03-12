@@ -3,7 +3,6 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAuthenticated, login, logout } from "@/lib/auth";
-import { toKstIsoDate } from "@/lib/date-utils";
 import { withSettlementInPath } from "@/lib/navigation-utils";
 import {
   createAfterparty,
@@ -24,6 +23,7 @@ import {
   deleteMeeting,
   deleteRsvp,
   getMeetingTitle,
+  isMeetingPasswordError,
   type ParticipantRole,
   updateMeeting,
   updateRsvp,
@@ -40,6 +40,25 @@ type DashboardState = {
   date?: string;
   keyword?: string;
 };
+
+type ParticipantAddFeedbackStatus = "invalid-input" | "already-added";
+type ParticipantAddFeedbackSource = "manual" | "quick";
+
+const PARTICIPANT_INPUT_STOP_WORDS = new Set([
+  "이름",
+  "엔젤",
+  "학생",
+  "멤버",
+  "팀",
+  "서포터",
+  "버디",
+  "멘토",
+  "매니저",
+  "supporter",
+  "buddy",
+  "mentor",
+  "manager",
+]);
 
 function textFrom(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -66,34 +85,43 @@ function normalizeMemberName(raw: string): string {
 }
 
 function parseDelimitedNames(raw: string): string[] {
-  const stopWords = new Set([
-    "이름",
-    "엔젤",
-    "학생",
-    "멤버",
-    "팀",
-    "서포터",
-    "버디",
-    "멘토",
-    "매니저",
-    "supporter",
-    "buddy",
-    "mentor",
-    "manager",
-  ]);
-
   const fromDelimiter = raw
     .split(/[\n,;<>|/，]+/)
     .map((chunk) => normalizeMemberName(chunk))
     .filter(Boolean)
-    .filter((name) => !stopWords.has(name.toLowerCase()));
+    .filter((name) => !PARTICIPANT_INPUT_STOP_WORDS.has(name.toLowerCase()));
 
   const fromText = (raw.match(/[가-힣A-Za-z]{1,}(?:\s*\([^)]*\))?/g) ?? [])
     .map((chunk) => normalizeMemberName(chunk))
     .filter(Boolean)
-    .filter((name) => !stopWords.has(name.toLowerCase()));
+    .filter((name) => !PARTICIPANT_INPUT_STOP_WORDS.has(name.toLowerCase()));
 
   return Array.from(new Set([...fromDelimiter, ...fromText]));
+}
+
+function parseDelimitedPeople(raw: string): string[] {
+  const unique = new Set<string>();
+  const people: string[] = [];
+  for (const token of raw.split(/[\n,;]+/)) {
+    const name = token.trim();
+    if (!name || unique.has(name)) continue;
+    unique.add(name);
+    people.push(name);
+  }
+  return people;
+}
+
+function parseDirectParticipantNames(raw: string): string[] {
+  const unique = new Set<string>();
+  const people: string[] = [];
+  for (const token of raw.split(/[\n,;]+/)) {
+    const name = normalizeMemberName(token);
+    if (!name || unique.has(name)) continue;
+    if (PARTICIPANT_INPUT_STOP_WORDS.has(name.toLowerCase())) continue;
+    unique.add(name);
+    people.push(name);
+  }
+  return people;
 }
 
 async function resolveMeetingLabel(meetingId: string): Promise<string> {
@@ -146,6 +174,55 @@ function safeReturnPath(formData: FormData): string | null {
   if (raw.startsWith("//")) return null;
   if (raw.startsWith("/\\")) return null;
   return raw;
+}
+
+function withUpdatedSearchParams(
+  path: string,
+  updates: Record<string, string | null | undefined>
+): string {
+  const [pathPart, hashPart = ""] = path.split("#", 2);
+  const [pathname, searchPart = ""] = pathPart.split("?", 2);
+  const params = new URLSearchParams(searchPart);
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+  }
+
+  const query = params.toString();
+  return `${pathname}${query ? `?${query}` : ""}${hashPart ? `#${hashPart}` : ""}`;
+}
+
+function meetingManagePath(meetingId: string, returnPath: string | null, status: string): string {
+  return withUpdatedSearchParams(returnPath ?? `/meetings/${meetingId}`, {
+    manage: status,
+  });
+}
+
+function participantFeedbackSourceFromMutation(
+  mutationSource: string
+): ParticipantAddFeedbackSource {
+  return mutationSource === "quick-add" || mutationSource === "quick-assign"
+    ? "quick"
+    : "manual";
+}
+
+function participantFeedbackPath(
+  path: string,
+  status: ParticipantAddFeedbackStatus,
+  source: ParticipantAddFeedbackSource,
+  rawInput?: string,
+  role?: string
+): string {
+  return withUpdatedSearchParams(path, {
+    participantStatus: status,
+    participantSource: source,
+    participantDraft: rawInput?.trim() ? rawInput.trim().slice(0, 200) : null,
+    participantRole: isParticipantRole(role ?? "") ? role ?? "" : null,
+  });
 }
 
 function pathWithoutQueryAndHash(path: string | null): string | null {
@@ -216,7 +293,7 @@ export async function loginAction(formData: FormData): Promise<void> {
     redirect("/?auth=invalid");
   }
 
-  redirect(dashboardPath({ date: toKstIsoDate(new Date()) }));
+  redirect(dashboardPath());
 }
 
 export async function logoutAction(): Promise<void> {
@@ -237,6 +314,8 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
   const startTime = textFrom(formData, "startTime").trim() || "14:00";
   const location = textFrom(formData, "location").trim();
   const description = textFrom(formData, "description").trim();
+  const leaders = parseDelimitedPeople(textFrom(formData, "leaders"));
+  const password = textFrom(formData, "meetingPassword").trim();
 
   if (!title || !meetingDate || !location) {
     redirect(dashboardPath(state));
@@ -248,6 +327,8 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
     startTime,
     location,
     description,
+    leaders,
+    password,
   });
 
   revalidateTag("meetup-data", { expire: 300 });
@@ -326,32 +407,46 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
   const mutationSource = textFrom(formData, "mutationSource").trim();
+  const feedbackSource = participantFeedbackSourceFromMutation(mutationSource);
 
   await requireAuthOrRedirect();
 
   const namesRaw = textFrom(formData, "names");
   const roleRaw = textFrom(formData, "role").trim();
-  const names = parseDelimitedNames(namesRaw);
+  const fallbackPath = returnPath ?? (afterpartyId ? `/afterparty/${afterpartyId}` : afterpartyPath({ date }));
+  const names =
+    feedbackSource === "manual"
+      ? parseDirectParticipantNames(namesRaw)
+      : parseDelimitedNames(namesRaw);
 
   if (!afterpartyId || names.length === 0) {
-    redirect(afterpartyPath({ date }));
+    redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw, roleRaw));
   }
 
   const participantInputs =
-    isParticipantRole(roleRaw)
-      ? names.map((name) => ({ name, role: roleRaw }))
-      : await resolveParticipantRoleEntries(names);
+    feedbackSource === "manual"
+      ? names.map((name) => ({
+          name,
+          role: isParticipantRole(roleRaw) ? roleRaw : ("student" as const),
+        }))
+      : isParticipantRole(roleRaw)
+        ? names.map((name) => ({ name, role: roleRaw }))
+        : await resolveParticipantRoleEntries(names);
 
-  await createAfterpartyParticipantsBulk(
+  const insertedCount = await createAfterpartyParticipantsBulk(
     afterpartyId,
     participantInputs,
     settlementId || undefined
   );
 
+  if (insertedCount === 0) {
+    redirect(participantFeedbackPath(fallbackPath, "already-added", feedbackSource, namesRaw, roleRaw));
+  }
+
   revalidateAfterpartyViews(afterpartyId, returnPath, {
     skipDashboardPath: mutationSource === "quick-add",
   });
-  redirect(returnPath ?? afterpartyPath({ date }));
+  redirect(fallbackPath);
 }
 
 export async function deleteAfterpartyParticipantAction(formData: FormData): Promise<void> {
@@ -584,6 +679,7 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
   const keyword = textFrom(formData, "returnKeyword").trim();
   const returnPath = safeReturnPath(formData);
   const mutationSource = textFrom(formData, "mutationSource").trim();
+  const feedbackSource = participantFeedbackSourceFromMutation(mutationSource);
 
   await requireAuthOrRedirect();
 
@@ -591,18 +687,30 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
   const roleRaw = textFrom(formData, "role").trim();
   const note = textFrom(formData, "note").trim();
   const meetingLabel = note || (await resolveMeetingLabel(meetingId));
+  const fallbackPath = returnPath ?? (meetingId ? `/meetings/${meetingId}` : dashboardPath({ date, keyword }));
 
   if (!meetingId) {
     redirect(dashboardPath({ date, keyword }));
   }
 
-  const names = parseDelimitedNames(namesRaw);
+  const names =
+    feedbackSource === "manual"
+      ? parseDirectParticipantNames(namesRaw)
+      : parseDelimitedNames(namesRaw);
   if (names.length === 0) {
-    redirect(dashboardPath({ date, keyword }));
+    redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw, roleRaw));
   }
 
-  if (isParticipantRole(roleRaw)) {
-    await createRsvpsBulk(meetingId, roleRaw, names, meetingLabel);
+  let insertedCount = 0;
+  if (feedbackSource === "manual") {
+    insertedCount = await createRsvpsBulk(
+      meetingId,
+      isParticipantRole(roleRaw) ? roleRaw : "student",
+      names,
+      meetingLabel
+    );
+  } else if (isParticipantRole(roleRaw)) {
+    insertedCount = await createRsvpsBulk(meetingId, roleRaw, names, meetingLabel);
   } else {
     const roleEntries = await resolveParticipantRoleEntries(names);
 
@@ -620,15 +728,19 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
     for (const role of PARTICIPANT_ROLE_ORDER) {
       const namesByRole = roleBuckets.get(role) ?? [];
       if (namesByRole.length > 0) {
-        await createRsvpsBulk(meetingId, role, namesByRole, meetingLabel);
+        insertedCount += await createRsvpsBulk(meetingId, role, namesByRole, meetingLabel);
       }
     }
+  }
+
+  if (insertedCount === 0) {
+    redirect(participantFeedbackPath(fallbackPath, "already-added", feedbackSource, namesRaw, roleRaw));
   }
 
   revalidateMeetupViews(meetingId, returnPath, {
     skipDashboardPath: mutationSource === "quick-assign",
   });
-  redirect(returnPath ?? dashboardPath({ date, keyword }));
+  redirect(fallbackPath);
 }
 
 export async function updateMeetingAction(formData: FormData): Promise<void> {
@@ -644,19 +756,34 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
   const startTime = textFrom(formData, "startTime").trim();
   const location = textFrom(formData, "location").trim();
   const description = textFrom(formData, "description").trim();
+  const leaders = parseDelimitedPeople(textFrom(formData, "leaders"));
+  const accessPassword = textFrom(formData, "meetingPassword").trim();
+  const nextPassword = textFrom(formData, "nextMeetingPassword").trim();
+  const clearPassword = textFrom(formData, "clearMeetingPassword") === "true";
 
   if (!meetingId || !title || !meetingDate || !startTime || !location) {
     redirect(dashboardPath({ date, keyword }));
   }
 
-  await updateMeeting({
-    id: meetingId,
-    title,
-    meetingDate,
-    startTime,
-    location,
-    description,
-  });
+  try {
+    await updateMeeting({
+      id: meetingId,
+      title,
+      meetingDate,
+      startTime,
+      location,
+      description,
+      leaders,
+      accessPassword,
+      nextPassword,
+      clearPassword,
+    });
+  } catch (error) {
+    if (isMeetingPasswordError(error)) {
+      redirect(meetingManagePath(meetingId, returnPath, error.code));
+    }
+    throw error;
+  }
 
   revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date: meetingDate, keyword }));
@@ -665,6 +792,8 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
 export async function deleteMeetingAction(formData: FormData): Promise<void> {
   const meetingId = textFrom(formData, "meetingId").trim();
   const date = textFrom(formData, "returnDate").trim();
+  const returnPath = safeReturnPath(formData);
+  const accessPassword = textFrom(formData, "meetingPassword").trim();
 
   await requireAuthOrRedirect();
 
@@ -672,7 +801,14 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
     redirect(dashboardPath({ date }));
   }
 
-  await deleteMeeting(meetingId);
+  try {
+    await deleteMeeting(meetingId, accessPassword);
+  } catch (error) {
+    if (isMeetingPasswordError(error)) {
+      redirect(meetingManagePath(meetingId, returnPath, error.code));
+    }
+    throw error;
+  }
 
   revalidateMeetupViews(meetingId, null);
   redirect(dashboardPath({ date }));
