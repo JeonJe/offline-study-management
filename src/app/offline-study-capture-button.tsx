@@ -121,6 +121,16 @@ function sanitizeCaptureClone(clonedDocument: Document, clonedTarget: HTMLElemen
   normalizeCapturePills(clonedTarget, clonedWindow);
 }
 
+function lockCaptureElementLayout(source: HTMLElement, clone: HTMLElement): void {
+  const sourceRect = source.getBoundingClientRect();
+  const width = Math.max(1, Math.ceil(sourceRect.width));
+
+  clone.style.setProperty("width", `${width}px`, "important");
+  clone.style.setProperty("min-width", `${width}px`, "important");
+  clone.style.setProperty("max-width", `${width}px`, "important");
+  clone.style.setProperty("box-sizing", "border-box", "important");
+}
+
 async function tryHtml2CanvasPng(element: HTMLElement): Promise<Blob> {
   if ("fonts" in document) {
     await (document as Document & { fonts: FontFaceSet }).fonts.ready;
@@ -141,6 +151,7 @@ async function tryHtml2CanvasPng(element: HTMLElement): Promise<Blob> {
         return;
       }
 
+      lockCaptureElementLayout(element, clonedTarget);
       sanitizeCaptureClone(clonedDocument, clonedTarget);
     },
   });
@@ -154,6 +165,13 @@ function normalizeCaptureButtons(root: ParentNode): void {
     button.textContent = DEFAULT_CAPTURE_BUTTON_LABEL;
     button.disabled = false;
     button.style.opacity = "1";
+    button.style.setProperty("display", "inline-flex", "important");
+    button.style.setProperty("align-items", "center", "important");
+    button.style.setProperty("justify-content", "center", "important");
+    button.style.setProperty("white-space", "nowrap", "important");
+    button.style.setProperty("flex-wrap", "nowrap", "important");
+    button.style.setProperty("width", "fit-content", "important");
+    button.style.setProperty("max-width", "none", "important");
   }
 }
 
@@ -171,6 +189,10 @@ function normalizeCapturePills(root: ParentNode, clonedWindow: Window): void {
     pill.style.setProperty("line-height", "1", "important");
     pill.style.setProperty("min-height", `${minHeight}px`, "important");
     pill.style.setProperty("height", "auto", "important");
+    pill.style.setProperty("white-space", "nowrap", "important");
+    pill.style.setProperty("flex-wrap", "nowrap", "important");
+    pill.style.setProperty("width", "fit-content", "important");
+    pill.style.setProperty("max-width", "none", "important");
   }
 
   const pillTexts = Array.from(root.querySelectorAll('[data-capture-pill-text="true"]')) as HTMLElement[];
@@ -181,6 +203,8 @@ function normalizeCapturePills(root: ParentNode, clonedWindow: Window): void {
     text.style.setProperty("vertical-align", "middle", "important");
     text.style.setProperty("line-height", "1", "important");
     text.style.setProperty("transform", "none", "important");
+    text.style.setProperty("white-space", "nowrap", "important");
+    text.style.setProperty("word-break", "keep-all", "important");
   }
 }
 
@@ -201,6 +225,12 @@ function createHiddenCaptureClone(element: HTMLElement): { clone: HTMLElement; c
   if (clone.id) {
     clone.id = `${clone.id}-clone`;
   }
+
+  lockCaptureElementLayout(element, clone);
+  host.style.width = clone.style.width;
+  host.style.minWidth = clone.style.minWidth;
+  host.style.maxWidth = clone.style.maxWidth;
+  host.style.overflow = "hidden";
 
   host.appendChild(clone);
   document.body.appendChild(host);
