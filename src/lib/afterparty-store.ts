@@ -1,5 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query, withTransaction } from "@/lib/db";
+import { isMasterOverridePassword } from "@/lib/master-password";
 import type { ParticipantRole } from "@/lib/meetup-store";
 
 export type AfterpartySummary = {
@@ -1309,6 +1310,7 @@ function assertAfterpartyPasswordAccess(
   accessPassword?: string
 ): void {
   if (!passwordHash) return;
+  if (isMasterOverridePassword(accessPassword)) return;
 
   const normalizedAccessPassword = normalizeAfterpartyPassword(accessPassword);
   if (!normalizedAccessPassword) {

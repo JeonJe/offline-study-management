@@ -122,6 +122,27 @@ describe("meetup-store meeting password flows", () => {
     expect(params[7]).toBeNull();
   });
 
+  it("allows meeting updates with the master password override", async () => {
+    queryMock
+      .mockResolvedValueOnce([
+        {
+          passwordHash: hashMeetingPassword("current-secret"),
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await updateMeeting({
+      id: "meeting-1",
+      title: "토요 스터디",
+      meetingDate: "2026-03-12",
+      startTime: "14:00",
+      location: "강남역",
+      accessPassword: "갈!",
+    });
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects meeting deletion when the password does not match", async () => {
     queryMock.mockResolvedValueOnce([
       {
@@ -134,5 +155,19 @@ describe("meetup-store meeting password flows", () => {
     });
 
     expect(queryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows meeting deletion with the master password override", async () => {
+    queryMock
+      .mockResolvedValueOnce([
+        {
+          passwordHash: hashMeetingPassword("room-secret"),
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await deleteMeeting("meeting-1", "갈!");
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
   });
 });

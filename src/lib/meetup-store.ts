@@ -1,5 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
+import { isMasterOverridePassword } from "@/lib/master-password";
 
 export type ParticipantRole =
   | "student"
@@ -546,6 +547,7 @@ function assertMeetingPasswordAccess(
   accessPassword?: string
 ): void {
   if (!passwordHash) return;
+  if (isMasterOverridePassword(accessPassword)) return;
 
   const normalizedAccessPassword = normalizeMeetingPassword(accessPassword);
   if (!normalizedAccessPassword) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type PasswordTarget = {
   formId: string;
@@ -25,6 +25,28 @@ export function SharedFormPasswordField({
   className,
 }: SharedFormPasswordFieldProps) {
   const [value, setValue] = useState("");
+
+  useEffect(() => {
+    const cleanups = targets.map((target) => {
+      const form = document.getElementById(target.formId);
+      if (!(form instanceof HTMLFormElement)) {
+        return () => {};
+      }
+
+      const handleFormData = (event: FormDataEvent) => {
+        event.formData.set(target.name, value);
+      };
+
+      form.addEventListener("formdata", handleFormData);
+      return () => {
+        form.removeEventListener("formdata", handleFormData);
+      };
+    });
+
+    return () => {
+      cleanups.forEach((cleanup) => cleanup());
+    };
+  }, [targets, value]);
 
   return (
     <>
