@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => ({
 
 import {
   createMeeting,
+  createRsvpsBulk,
   deleteMeeting,
   ensureSchema,
   updateMeeting,
@@ -169,5 +170,20 @@ describe("meetup-store meeting password flows", () => {
     await deleteMeeting("meeting-1", "갈!");
 
     expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("promotes existing student rows to the selected role when adding participants in bulk", async () => {
+    queryMock.mockResolvedValueOnce([{ changedCount: 1 }]);
+
+    const changedCount = await createRsvpsBulk("meeting-1", "angel", ["이전제"], "11주차 오프라인");
+
+    expect(changedCount).toBe(1);
+
+    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("update public.rsvps r");
+    expect(sql).toContain("and r.role = 'student'");
+    expect(sql).toContain("and i.role <> 'student'");
+    expect(params[0]).toEqual(["이전제"]);
+    expect(params[1]).toEqual(["angel"]);
   });
 });

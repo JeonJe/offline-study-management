@@ -796,7 +796,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                 i
               </span>
               <p>
-                직접 입력은 자동 역할 분류 없이 멤버로 추가됩니다. 여러 명은 쉼표로 구분해 입력하세요.
+                직접 입력은 이름 기준으로 엔젤/운영진을 자동 분류합니다. 프리셋에 없는 이름은 멤버로 추가됩니다.
               </p>
             </div>
             {sortedParticipantRows.length > 0 ? (

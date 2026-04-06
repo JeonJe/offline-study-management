@@ -77,6 +77,10 @@ export const PARTICIPANT_ROLE_ORDER: ParticipantRole[] = [
   "student",
 ];
 
+export function isParticipantRole(value: string): value is ParticipantRole {
+  return PARTICIPANT_ROLE_ORDER.includes(value as ParticipantRole);
+}
+
 export function normalizeParticipantName(raw: string): string {
   return raw
     .replace(/\([^)]*\)/g, "")

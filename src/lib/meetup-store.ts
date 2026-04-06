@@ -451,26 +451,7 @@ export async function listRsvpsForMeetings(
 }
 
 export async function createRsvp(input: CreateRsvpInput): Promise<void> {
-  await ensureSchema();
-
-  await query(
-    `insert into public.rsvps (id, meeting_id, name, role, note)
-     select $1, $2, $3, $4, nullif($5, '')
-     where not exists (
-       select 1
-       from public.rsvps
-       where meeting_id = $2
-         and role = $4
-         and lower(name) = lower($3)
-     )`,
-    [
-      randomUUID(),
-      input.meetingId,
-      input.name.trim(),
-      input.role,
-      input.note?.trim() ?? "",
-    ]
-  );
+  await createRsvpsBulk(input.meetingId, input.role, [input.name], input.note);
 }
 
 export async function createRsvpsBulk(
@@ -495,39 +476,55 @@ export async function createRsvpsBulk(
   }
 
   const ids = normalized.map(() => randomUUID());
+  const roles = normalized.map(() => role);
   const trimmedNote = note?.trim() ?? "";
 
-  const [row] = await query<{ insertedCount: number }>(
+  const [row] = await query<{ changedCount: number }>(
     `with incoming as (
        select
          i.name,
+         i.role,
          i.id
-       from unnest($1::text[], $2::uuid[]) as i(name, id)
+       from unnest($1::text[], $2::text[], $3::uuid[]) as i(name, role, id)
      ),
      inserted as (
        insert into public.rsvps (id, meeting_id, name, role, note)
        select
          i.id,
-         $3,
-         i.name,
          $4,
+         i.name,
+         i.role,
          nullif($5, '')
        from incoming i
        where not exists (
          select 1
          from public.rsvps r
-         where r.meeting_id = $3
-           and r.role = $4
+         where r.meeting_id = $4
            and lower(r.name) = lower(i.name)
        )
-       returning 1
+       returning lower(name) as normalized_name
+     ),
+     upgraded as (
+       update public.rsvps r
+       set role = i.role,
+           note = nullif($5, '')
+       from incoming i
+       where r.meeting_id = $4
+         and lower(r.name) = lower(i.name)
+         and r.role = 'student'
+         and i.role <> 'student'
+       returning lower(r.name) as normalized_name
      )
-     select count(*)::int as "insertedCount"
-     from inserted`,
-    [normalized, ids, meetingId, role, trimmedNote]
+     select count(*)::int as "changedCount"
+     from (
+       select normalized_name from inserted
+       union
+       select normalized_name from upgraded
+     ) changed`,
+    [normalized, roles, ids, meetingId, trimmedNote]
   );
 
-  return row?.insertedCount ?? 0;
+  return row?.changedCount ?? 0;
 }
 
 async function getMeetingPasswordHash(meetingId: string): Promise<string | null> {

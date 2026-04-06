@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRoleMatchSet,
+  isParticipantRole,
   normalizeParticipantName,
   PARTICIPANT_ROLE_META,
   resolveRoleByName,
@@ -10,6 +11,12 @@ describe("participant-role-utils", () => {
   it("normalizes participant names for matching", () => {
     expect(normalizeParticipantName(" 2팀 annie (매니저) ")).toBe("annie");
     expect(normalizeParticipantName(" 7팀   김지웅 ")).toBe("김지웅");
+  });
+
+  it("validates participant roles", () => {
+    expect(isParticipantRole("angel")).toBe(true);
+    expect(isParticipantRole("student")).toBe(true);
+    expect(isParticipantRole("owner")).toBe(false);
   });
 
   it("resolves special roles by name", () => {

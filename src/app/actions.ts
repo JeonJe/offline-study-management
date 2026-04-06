@@ -32,6 +32,7 @@ import {
 import { loadMemberPreset } from "@/lib/member-store";
 import {
   buildRoleMatchSet,
+  isParticipantRole,
   normalizeParticipantName,
   PARTICIPANT_ROLE_ORDER,
   resolveRoleByName,
@@ -66,20 +67,10 @@ function textFrom(formData: FormData, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function isParticipantRole(value: string): value is ParticipantRole {
-  return (
-    value === "student" ||
-    value === "angel" ||
-    value === "supporter" ||
-    value === "buddy" ||
-    value === "mentor" ||
-    value === "manager"
-  );
-}
-
 function normalizeMemberName(raw: string): string {
   return raw
     .replace(/\([^)]*\)/g, "")
+    .replace(/^(?:\d+\s*팀\s*)+/i, "")
     .replace(/^\d+\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -225,14 +216,12 @@ function participantFeedbackPath(
   path: string,
   status: ParticipantAddFeedbackStatus,
   source: ParticipantAddFeedbackSource,
-  rawInput?: string,
-  role?: string
+  rawInput?: string
 ): string {
   return withUpdatedSearchParams(path, {
     participantStatus: status,
     participantSource: source,
     participantDraft: rawInput?.trim() ? rawInput.trim().slice(0, 200) : null,
-    participantRole: isParticipantRole(role ?? "") ? role ?? "" : null,
   });
 }
 
@@ -433,7 +422,7 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
       : parseDelimitedNames(namesRaw);
 
   if (!afterpartyId || names.length === 0) {
-    redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw, roleRaw));
+    redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw));
   }
 
   const participantInputs =
@@ -453,7 +442,7 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
   );
 
   if (insertedCount === 0) {
-    redirect(participantFeedbackPath(fallbackPath, "already-added", feedbackSource, namesRaw, roleRaw));
+    redirect(participantFeedbackPath(fallbackPath, "already-added", feedbackSource, namesRaw));
   }
 
   revalidateAfterpartyViews(afterpartyId, returnPath, {
@@ -754,18 +743,11 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
       ? parseDirectParticipantNames(namesRaw)
       : parseDelimitedNames(namesRaw);
   if (names.length === 0) {
-    redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw, roleRaw));
+    redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw));
   }
 
   let insertedCount = 0;
-  if (feedbackSource === "manual") {
-    insertedCount = await createRsvpsBulk(
-      meetingId,
-      isParticipantRole(roleRaw) ? roleRaw : "student",
-      names,
-      meetingLabel
-    );
-  } else if (isParticipantRole(roleRaw)) {
+  if (isParticipantRole(roleRaw)) {
     insertedCount = await createRsvpsBulk(meetingId, roleRaw, names, meetingLabel);
   } else {
     const roleEntries = await resolveParticipantRoleEntries(names);
@@ -790,7 +772,7 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
   }
 
   if (insertedCount === 0) {
-    redirect(participantFeedbackPath(fallbackPath, "already-added", feedbackSource, namesRaw, roleRaw));
+    redirect(participantFeedbackPath(fallbackPath, "already-added", feedbackSource, namesRaw));
   }
 
   revalidateMeetupViews(meetingId, returnPath, {
