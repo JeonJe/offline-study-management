@@ -1,25 +1,23 @@
-# SM-5B 히스토리 대시보드 표 화면 계획
+# SM-6B 모바일 뷰 + 접근성 점검 계획
 
 ## 목표
-- `/admin/history`에서 기간별 팀/멤버 참여 집계를 표로 확인한다.
-- `/admin` 카드의 "팀/멤버 히스토리"를 실제 화면으로 연결하고 준비 중 상태를 제거한다.
+- 주요 7개 화면을 390x844 모바일 뷰포트에서 자동 캡처한다.
+- 버튼/텍스트 겹침, 라벨, 키보드 포커스, 색 대비 점검 결과를 문서화한다.
 
 ## 범위
-- `src/app/admin/history/page.tsx`: 서버 컴포넌트 화면, 탭/정렬/기간 query 파싱.
-- `src/app/admin/history/period-picker.tsx`: 기간 선택 폼.
-- `src/app/admin/page.tsx`: 관리자 카드 링크 연결.
-- `e2e/regression-history-dashboard.spec.ts`: 기간 변경 시 화면 갱신 검증.
+- `scripts/capture-mobile-screenshots.mjs`: Playwright 기반 모바일 캡처/간단 접근성 점검 스크립트.
+- `docs/qa/mobile-checklist.md`: 실행 방법과 7개 화면 검증 결과 표.
 
 ## 구현 순서
-1. 기간 preset(`current-quarter`, `previous-quarter`, `custom`)과 ISO date 파싱 helper를 page 내부에 둔다.
-2. 팀별/멤버별 탭은 query string `tab=team|member`, 정렬은 `sort`와 `dir`로 처리한다.
-3. 표는 모바일에서 `overflow-x-auto`로 감싸고 숫자/율 컬럼을 우측 정렬한다.
-4. 빈 상태와 로드 실패 상태를 기존 `card-static` 패턴으로 표현한다.
-5. Playwright는 `/admin/history` 진입, 사용자 정의 기간 변경, URL/query와 표 갱신 heading을 확인한다.
+1. 스크립트가 `.env`/`.env.local`을 로드하고 app/admin role 인증 쿠키를 생성한다.
+2. `PLAYWRIGHT_BASE_URL` 또는 기본 production URL을 대상으로 390x844 캡처를 수행한다.
+3. 7개 대상 경로를 순회하며 screenshot, focusable count, image alt 누락, label 없는 form control을 기록한다.
+4. 스크립트 출력은 git 추적 제외 경로인 `test-results/mobile-screenshots`에 저장한다.
+5. 문서에 체크리스트와 이번 실행 결과를 표로 남긴다.
 
 ## 검증
+- `node scripts/capture-mobile-screenshots.mjs --base-url http://localhost:{port}`
 - `npm run typecheck`
 - `npm run lint`
 - `npm test`
 - `npx next build --webpack`
-- `PLAYWRIGHT_BASE_URL=http://localhost:{port} npx playwright test e2e/regression-history-dashboard.spec.ts --project=regression`
