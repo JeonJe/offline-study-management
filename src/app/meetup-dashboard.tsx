@@ -734,7 +734,7 @@ function MeetingCard({
   const detailPath = cohortAwarePath(unitSlug, `/meetings/${meeting.id}?date=${selectedDate}`);
 
   return (
-    <article className="card study-card relative p-4 sm:p-5">
+    <article className="card study-card relative overflow-hidden p-0">
       <Link
         href={detailPath}
         aria-label={`${meeting.title} 상세 보기`}
@@ -743,13 +743,12 @@ function MeetingCard({
       >
         <span className="sr-only">{meeting.title} 상세 보기</span>
       </Link>
-      <div className="flex flex-wrap items-start gap-4 sm:flex-nowrap">
+      <div className="flex flex-wrap items-start gap-4 p-4 sm:flex-nowrap sm:p-5">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{meeting.title}</p>
+          <div className="flex flex-wrap items-start gap-2">
+            <p className="text-base font-extrabold leading-6" style={{ color: "var(--ink)" }}>{meeting.title}</p>
             <span
-              className="inline-flex h-6 items-center rounded-full px-2 text-[11px] font-semibold leading-none"
-              style={{ backgroundColor: "rgba(3, 105, 161, 0.12)", color: "#0369a1" }}
+              className="meta-chip meta-chip-strong"
               data-capture-pill="true"
             >
               <span className="inline-block leading-none" data-capture-pill-text="true">
@@ -758,17 +757,17 @@ function MeetingCard({
             </span>
             {meeting.hasPassword ? (
               <span
-                className="inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+                className="meta-chip"
                 style={{ borderColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#b45309" }}
               >
                 비밀번호 설정
               </span>
             ) : null}
           </div>
-          <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-soft)" }}>
+          <p className="mt-2 break-all text-xs leading-5" style={{ color: "var(--ink-soft)" }}>
             <span className="font-semibold">장소:</span> <LocationValue location={meeting.location} />
           </p>
-          <p className="mt-1 break-all text-xs" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-1 break-all text-xs leading-5" style={{ color: "var(--ink-muted)" }}>
             <span className="font-semibold">메모:</span> {meeting.description || "없음"}
           </p>
           <div className="mt-1 flex flex-wrap items-start gap-2 text-xs" style={{ color: "var(--ink-muted)" }}>
@@ -778,7 +777,7 @@ function MeetingCard({
         </div>
 
         <div className="relative z-20 flex min-w-[140px] shrink-0 flex-col items-end gap-2 sm:ml-auto">
-          <div className="flex flex-wrap justify-end gap-1.5">
+          <div className="metric-row justify-end">
             {[
               { label: "총참여", value: meeting.totalCount, color: "var(--ink)" },
               { label: "멤버", value: meeting.studentCount, color: "#15803d" },
@@ -786,7 +785,7 @@ function MeetingCard({
             ].map((item) => (
               <span
                 key={`${meeting.id}-${item.label}`}
-                className="inline-flex h-6 items-center justify-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+                className="meta-chip"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: item.color }}
                 data-capture-pill="true"
               >
@@ -799,10 +798,9 @@ function MeetingCard({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3">
+      <div className="m-4 mt-0 grid gap-3 sm:m-5 sm:mt-0">
         <section
-          className="rounded-xl border p-3"
-          style={{ borderColor: "var(--line)", backgroundColor: "rgba(21, 128, 61, 0.04)" }}
+          className="role-list-panel p-3"
         >
           <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#166534" }}>
             참여자

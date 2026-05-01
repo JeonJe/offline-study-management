@@ -18,10 +18,10 @@
   --success-bg: #dcfce7;
   --danger: #dc2626;
   --danger-bg: #fef2f2;
-  --radius-sm: 0.75rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.5rem;
-  --radius-xl: 2rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
   --font-ui:
     var(--font-plus-jakarta),
     var(--font-noto-korean),
@@ -50,9 +50,7 @@ body {
   margin: 0;
   background-color: var(--bg);
   background-image:
-    radial-gradient(circle at 12% -5%, rgba(13, 127, 242, 0.16), transparent 32%),
-    radial-gradient(circle at 92% 0%, rgba(13, 127, 242, 0.09), transparent 36%),
-    linear-gradient(180deg, #f8fbff 0%, var(--bg) 42%, var(--bg) 100%);
+    linear-gradient(180deg, #f8fbff 0%, #f4f7fb 34%, var(--bg) 100%);
   background-repeat: no-repeat;
   background-size: cover;
   color: var(--ink);
@@ -120,16 +118,15 @@ textarea:focus-visible {
   border-radius: var(--radius-lg);
   box-shadow:
     0 1px 1px rgba(15, 23, 42, 0.03),
-    0 12px 28px rgba(15, 23, 42, 0.08);
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    0 8px 20px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
 }
 
 .card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(13, 127, 242, 0.32);
+  border-color: rgba(13, 127, 242, 0.28);
   box-shadow:
-    0 2px 2px rgba(15, 23, 42, 0.03),
-    0 18px 36px rgba(13, 127, 242, 0.14);
+    0 1px 1px rgba(15, 23, 42, 0.03),
+    0 12px 26px rgba(15, 23, 42, 0.08);
 }
 
 .study-card:hover,
@@ -143,7 +140,46 @@ textarea:focus-visible {
   border-radius: var(--radius-lg);
   box-shadow:
     0 1px 1px rgba(15, 23, 42, 0.03),
-    0 10px 24px rgba(15, 23, 42, 0.06);
+    0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.panel-surface {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+}
+
+.meta-chip {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-soft);
+}
+
+.meta-chip-strong {
+  border-color: rgba(13, 127, 242, 0.22);
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+}
+
+.metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.role-list-panel {
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: var(--radius-md);
+  background: #fbfcff;
 }
 
 /* Stagger animation for children */
