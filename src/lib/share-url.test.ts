@@ -1,5 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-import { shareOrCopyUrl } from "@/lib/share-url";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildShareUrl, resolveShareOrigin, shareOrCopyUrl } from "@/lib/share-url";
+
+const originalPublicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+afterEach(() => {
+  if (originalPublicBaseUrl === undefined) {
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+  } else {
+    process.env.NEXT_PUBLIC_BASE_URL = originalPublicBaseUrl;
+  }
+});
 
 describe("shareOrCopyUrl", () => {
   it("uses native share when available", async () => {
@@ -71,5 +81,24 @@ describe("shareOrCopyUrl", () => {
         origin: "https://example.com",
       })
     ).rejects.toThrow("이 브라우저는 링크 공유를 지원하지 않습니다.");
+  });
+
+  it("uses NEXT_PUBLIC_BASE_URL when configured", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "https://offline-study-management.vercel.app";
+
+    expect(resolveShareOrigin("https://preview.vercel.app")).toBe(
+      "https://offline-study-management.vercel.app"
+    );
+    expect(buildShareUrl("/meetings/m-4?date=2026-05-01", "https://preview.vercel.app")).toBe(
+      "https://offline-study-management.vercel.app/meetings/m-4?date=2026-05-01"
+    );
+  });
+
+  it("falls back to runtime origin when NEXT_PUBLIC_BASE_URL is invalid", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "not-a-url";
+
+    expect(buildShareUrl("/meetings/m-5", "https://preview.vercel.app")).toBe(
+      "https://preview.vercel.app/meetings/m-5"
+    );
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buildShareUrl } from "@/lib/share-url";
 
 type OfflineStudyCopyTextButtonProps = {
   textToCopy: string;
@@ -43,7 +44,7 @@ export function OfflineStudyCopyTextButton({ textToCopy, linkPath }: OfflineStud
     setCopyState("copying");
     try {
       const shareText = linkPath
-        ? `${textToCopy.trim()}\n\n참여 링크: ${new URL(linkPath, window.location.origin).toString()}`
+        ? `${textToCopy.trim()}\n\n참여 링크: ${buildShareUrl(linkPath, window.location.origin)}`
         : textToCopy;
       await writeTextToClipboard(shareText);
       setCopyState("copied");

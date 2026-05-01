@@ -7,6 +7,26 @@ type ShareUrlOptions = {
   copy?: (text: string) => Promise<void>;
 };
 
+export function resolveShareOrigin(fallbackOrigin: string): string {
+  const configuredOrigin = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (!configuredOrigin) return fallbackOrigin;
+
+  try {
+    const parsed = new URL(configuredOrigin);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return parsed.origin;
+    }
+  } catch {
+    return fallbackOrigin;
+  }
+
+  return fallbackOrigin;
+}
+
+export function buildShareUrl(path: string, fallbackOrigin: string): string {
+  return new URL(path, resolveShareOrigin(fallbackOrigin)).toString();
+}
+
 function isAbortError(error: unknown): boolean {
   if (error instanceof DOMException) {
     return error.name === "AbortError";
@@ -26,7 +46,7 @@ export async function shareOrCopyUrl({
   share,
   copy,
 }: ShareUrlOptions): Promise<ShareUrlResult> {
-  const url = new URL(path, origin).toString();
+  const url = buildShareUrl(path, origin);
 
   if (share) {
     try {

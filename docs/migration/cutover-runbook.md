@@ -68,3 +68,49 @@ node scripts/migrate-data.mjs \
 | 운영 전환 후 장애 | Vercel `DATABASE_URL`을 이전 값으로 되돌리고 redeploy, 새 DB는 읽기 전용 분석 대상으로 보존 |
 
 운영 DB는 SM-7C 완료 전까지 계속 원본이다. cutover 전 단계에서 원본 DB에 쓰기 작업을 하지 않는다.
+
+## 6. 도메인과 Vercel 환경변수 전환
+
+별도 custom domain이 준비되지 않았으면 cutover 기준 주소는 `https://offline-study-management.vercel.app`로 둔다. custom domain을 붙이는 경우에도 구 Vercel production URL은 롤백용으로 유지한다.
+
+| 환경변수 | 값 | 비고 |
+|----------|----|------|
+| `DATABASE_URL` | 새 Supabase project connection string | SM-7A/SM-7B 검증 완료 후에만 변경 |
+| `NEXT_PUBLIC_BASE_URL` | 최종 공유 기준 URL | 공유 링크가 preview origin을 쓰지 않게 고정 |
+| `APP_PASSWORD` | 기존 값 유지 | 운영자/멤버 접근 회귀 방지 |
+| `ADMIN_PAGE_PASSWORD` | 기존 값 유지 | 관리자 접근 회귀 방지 |
+| `ANGEL_PAGE_PASSWORD` | 기존 값 유지 | 엔젤 접근 회귀 방지 |
+| `OPERATING_UNITS_ENABLED` | 기존 운영 값 유지 | feature flag 회귀 방지 |
+
+전환 순서:
+
+1. Vercel Preview 또는 Staging 환경에 새 `DATABASE_URL`과 `NEXT_PUBLIC_BASE_URL`을 먼저 설정한다.
+2. Preview에서 `node scripts/migrate-data.mjs --verify-only` 결과와 주요 화면 점검표를 확인한다.
+3. Production 환경변수를 변경하고 redeploy한다.
+4. Production에서 공유 링크 복사/카드 링크가 `NEXT_PUBLIC_BASE_URL` 기준으로 생성되는지 확인한다.
+
+## 7. 공유 링크 검증
+
+| 시나리오 | 기대값 |
+|----------|--------|
+| 모임 카드 링크 공유 | `/meetings/[id]`가 `NEXT_PUBLIC_BASE_URL` origin으로 생성 |
+| 메인 공유 문구 복사 | `참여 링크:`가 최종 URL origin으로 생성 |
+| preview 배포에서 공유 | preview host가 아니라 `NEXT_PUBLIC_BASE_URL` 사용 |
+| invalid base URL | 런타임 `window.location.origin`으로 fallback |
+
+단위 테스트:
+
+```bash
+npm test -- src/lib/share-url.test.ts
+```
+
+## 8. 사용자 공지문 초안
+
+```text
+토요모임 신청/공유 링크가 새 주소로 이전됐습니다.
+
+새 주소: https://offline-study-management.vercel.app
+
+기존 링크도 당분간 유지하지만, 새로 공유할 때는 위 주소를 사용해 주세요.
+문제가 있으면 기존 링크로 접속한 뒤 운영자에게 알려 주세요.
+```
