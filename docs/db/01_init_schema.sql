@@ -30,6 +30,8 @@ create table if not exists public.meetings (
   description text,
   leaders text[] not null default '{}'::text[],
   password_hash text,
+  capacity integer,
+  constraint chk_meetings_capacity check (capacity is null or capacity >= 0),
   operating_unit_slug text not null default '3기',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

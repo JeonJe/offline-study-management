@@ -20,6 +20,7 @@ describe("share text builders", () => {
           description: "노트북 지참",
           leaders: ["애니"],
           hasPassword: false,
+          capacity: null,
           studentCount: 1,
           operationCount: 1,
           totalCount: 2,

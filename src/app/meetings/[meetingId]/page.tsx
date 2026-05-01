@@ -7,6 +7,7 @@ import {
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
 import {
+  MAX_MEETING_CAPACITY,
   type ParticipantRole,
   type RsvpRecord,
 } from "@/lib/meetup-store";
@@ -357,7 +358,9 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
       ? "이 방은 비밀번호가 설정되어 있어 저장 또는 삭제 전에 비밀번호를 입력해야 합니다."
       : manageStatus === "password-invalid"
         ? "방 비밀번호가 일치하지 않습니다."
-        : "";
+        : manageStatus === "capacity-invalid"
+          ? `정원은 0 이상 ${MAX_MEETING_CAPACITY} 이하 정수로 입력해 주세요.`
+          : "";
   const managePasswordFieldMessage =
     manageStatus === "password-required"
       ? "현재 방 비밀번호를 입력해 주세요."
@@ -627,6 +630,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                 </section>
                 <p className="mt-2 text-sm" style={{ color: "var(--ink-muted)" }}>
                   총 {meeting.totalCount}명 · 멤버 {meeting.studentCount}명 · 운영진 {meeting.operationCount}명
+                  {meeting.capacity !== null ? ` · 정원 ${meeting.capacity}명` : null}
                 </p>
                 <a
                   href="#team-assignment"
@@ -705,6 +709,17 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                       className="h-10 rounded-lg border bg-white px-3"
                       style={{ borderColor: "var(--line)" }}
                       placeholder="설명"
+                    />
+                    <input
+                      name="capacity"
+                      type="number"
+                      min="0"
+                      max={MAX_MEETING_CAPACITY}
+                      step="1"
+                      defaultValue={meeting.capacity ?? ""}
+                      className="h-10 rounded-lg border bg-white px-3"
+                      style={{ borderColor: "var(--line)" }}
+                      placeholder="정원 (비워두면 제한 없음)"
                     />
                     <input
                       name="nextMeetingPassword"
