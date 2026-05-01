@@ -1,31 +1,30 @@
-# LFP-5A 전체 관리자 인증 경계 고정
+# LFP-5B 관리자 스코프 분리
 
 ## 범위
 
 | 파일 | 변경 |
 |------|------|
-| `src/lib/auth.ts` | 전체 관리자 전용 인증 함수 추가 |
-| `src/app/admin/**` | 관리자 페이지/액션이 전역 관리자 토큰만 허용하도록 변경 |
-| `src/app/api/db/ping/route.ts` | DB 점검 API도 전역 관리자 토큰만 허용 |
-| `src/lib/auth.test.ts` | 기수 토큰이 전체 관리자 인증으로 통과하지 않는 회귀 테스트 추가 |
-| `src/lib/operating-unit-store.test.ts` | auth mock을 전체 관리자 인증 함수에 맞춤 |
+| `src/lib/auth.ts` | 특정 기수 토큰만 허용하는 `isAuthenticatedForUnit` 추가 |
+| `src/app/admin/page.tsx` | `/admin` 전체 관리자 허브와 `/cohorts/{slug}/admin` 기수 관리자 허브 분리 |
+| `src/app/role-shell.tsx` | 전역 관리자 헤더 라벨/역할 nav 표시 제어 |
+| `src/lib/auth.test.ts` | 기수 토큰 slug 매칭 테스트 추가 |
 
 ## 결정
 
-- `isAuthenticated()`는 기존 사용자 화면 호환을 위해 기수 토큰을 계속 허용한다.
-- `/admin` 계열과 DB 점검 API는 `isGlobalAuthenticated()`만 사용한다.
-- LFP-5B에서 사용자 화면별 `unitSlug` 매칭을 강화한다.
+- `/admin`은 전체 관리자 코드로 들어와 기수 관리만 보여준다.
+- `/cohorts/{slug}/admin`은 해당 기수 토큰 또는 전체 관리자 토큰으로 들어와 기수 내부 관리 카드만 보여준다.
+- `ADMIN_PAGE_PASSWORD`로 role을 얻는 흐름은 유지한다.
 
 ## 검증 계획
 
 | 검증 | 기준 |
 |------|------|
-| 단위 테스트 | auth + operating-unit-store 회귀 테스트 통과 |
+| 단위 테스트 | auth slug 매칭 테스트 통과 |
 | 타입체크 | `npm run typecheck` 통과 |
 | Lint | `npm run lint` 통과 |
 | 전체 테스트 | `npm test` 통과 |
 | 빌드 | `npx next build --webpack` 통과 |
 
-## 비범위
+## 후속
 
-- 일반 사용자 화면의 기수별 토큰 매칭 강제는 LFP-5B에서 처리한다.
+- admin 하위 보고/히스토리 화면의 데이터 store를 `unitSlug` 인자로 완전 분리한다.
