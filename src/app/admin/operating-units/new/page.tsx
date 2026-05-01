@@ -7,7 +7,6 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { isGlobalAuthenticated } from "@/lib/auth";
-import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
 import {
   canOpenRolePage,
   getRolePage,
@@ -106,10 +105,6 @@ export default async function NewOperatingUnitPage() {
     redirect("/?auth=required");
   }
 
-  if (!isOperatingUnitsEnabled()) {
-    redirect("/admin");
-  }
-
   const currentRole = await getCurrentRolePageRole();
   const page = getRolePage("admin");
   const access = canOpenRolePage("admin", currentRole, getConfiguredRolePages());
@@ -128,6 +123,8 @@ export default async function NewOperatingUnitPage() {
       activeRole="admin"
       title="운영 단위 생성"
       summary="기수 식별자와 표시 이름을 등록합니다."
+      scopeLabel="전체 관리자"
+      showRoleNav={false}
     >
       {content}
     </RoleShell>

@@ -18,7 +18,6 @@ import {
   getConfiguredRolePages,
   getCurrentRolePageRole,
 } from "@/lib/role-session";
-import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
 
 type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -84,9 +83,7 @@ function AdminHome({
 }) {
   const visibleCards =
     scope === "global"
-      ? isOperatingUnitsEnabled()
-        ? GLOBAL_ADMIN_CARDS
-        : []
+      ? GLOBAL_ADMIN_CARDS
       : COHORT_ADMIN_CARDS;
 
   return (
