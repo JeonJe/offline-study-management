@@ -43,16 +43,6 @@ const COHORT_ADMIN_CARDS: AdminCard[] = [
     description: "기간별 참여 흐름 확인",
     href: "/admin/history",
   },
-  {
-    title: "오프라인 모임",
-    description: "모임 생성과 참석 현황",
-    href: "/",
-  },
-  {
-    title: "뒷풀이",
-    description: "뒷풀이 생성과 정산",
-    href: "/afterparty",
-  },
 ];
 
 function singleParam(value: string | string[] | undefined): string {

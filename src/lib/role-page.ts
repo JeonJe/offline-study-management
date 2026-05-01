@@ -82,16 +82,6 @@ export const ROLE_PAGES: RolePageDefinition[] = [
             href: "/angel/reports",
             description: "팀 현황과 특이사항 작성",
           },
-          {
-            label: "오프라인 모임",
-            href: "/",
-            description: "모임 참여 현황 확인",
-          },
-          {
-            label: "뒷풀이",
-            href: "/afterparty",
-            description: "뒷풀이 참석 확인",
-          },
         ],
       },
     ],

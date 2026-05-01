@@ -58,15 +58,6 @@ function ReportCycleList({
 }) {
   return (
     <section className="grid gap-4">
-      <div>
-        <h2 className="text-2xl font-extrabold" style={{ color: "var(--ink)" }}>
-          주간 보고
-        </h2>
-        <p className="mt-2 text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
-          작성할 주차를 선택합니다.
-        </p>
-      </div>
-
       {loadError ? (
         <article className="card-static p-5 sm:p-6">
           <h3 className="text-lg font-extrabold" style={{ color: "var(--ink)" }}>

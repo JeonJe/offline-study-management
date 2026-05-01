@@ -107,7 +107,7 @@ export function RoleShell({
           </p>
         </div>
       </header>
-      <div className="h-[118px] sm:h-[76px]" aria-hidden="true" />
+      <div className="h-[134px] sm:h-[92px]" aria-hidden="true" />
 
       {children}
     </main>

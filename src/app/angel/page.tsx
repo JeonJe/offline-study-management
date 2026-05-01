@@ -34,16 +34,6 @@ const ANGEL_CARDS: AngelCard[] = [
     href: "/angel/reports",
   },
   {
-    title: "오프라인 모임",
-    description: "팀 참여 현황 확인",
-    href: "/",
-  },
-  {
-    title: "뒷풀이",
-    description: "뒷풀이 참석 확인",
-    href: "/afterparty",
-  },
-  {
     title: "담당 팀 히스토리",
     description: "기간별 참여 흐름 확인",
     href: "/angel",
