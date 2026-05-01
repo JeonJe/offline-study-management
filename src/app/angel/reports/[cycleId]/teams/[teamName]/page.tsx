@@ -89,6 +89,10 @@ function commentAuthorRoleLabel(comment: WeeklyReportComment): string {
   return "엔젤";
 }
 
+function commentInitial(name: string): string {
+  return name.trim().slice(0, 1) || "?";
+}
+
 async function loadAngelTeamReportPageData(
   cycleId: string,
   teamName: string
@@ -407,82 +411,107 @@ function TeamReportForm({
         </div>
 
         {!report ? (
-          <p className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
-            보고를 먼저 저장하면 댓글을 남길 수 있습니다.
+          <p className="rounded-xl border border-dashed px-4 py-5 text-center text-sm" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+            보고 저장 후 댓글을 남길 수 있습니다.
           </p>
         ) : (
           <>
-            <div className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: "var(--line)" }}>
+            <div className="rounded-2xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "#f8fbff" }}>
               {comments.length === 0 ? (
-                <p className="px-4 py-5 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
-                  아직 댓글이 없습니다.
-                </p>
+                <div className="rounded-xl border border-dashed bg-white px-4 py-8 text-center" style={{ borderColor: "var(--line)" }}>
+                  <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                    아직 댓글이 없습니다.
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+                    첫 확인 사항을 남겨주세요.
+                  </p>
+                </div>
               ) : (
-                comments.map((comment) => {
-                  const canDelete =
-                    currentRole === "admin" ||
-                    (currentRole === "angel" &&
-                      comment.authorRole === "angel" &&
-                      comment.authorLabel === defaultAngelName);
-                  return (
-                    <article key={comment.id} className="border-b px-4 py-3 last:border-b-0" style={{ borderColor: "var(--line)" }}>
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
-                              {comment.authorLabel}
-                            </p>
-                            <span className="rounded-md border px-1.5 py-0.5 text-[11px] font-semibold" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
-                              {commentAuthorRoleLabel(comment)}
-                            </span>
-                            {formatCommentDate(comment.createdAt) ? (
-                              <time className="text-xs" style={{ color: "var(--ink-muted)" }} dateTime={comment.createdAt}>
-                                {formatCommentDate(comment.createdAt)}
-                              </time>
+                <ol className="grid gap-3">
+                  {comments.map((comment) => {
+                    const canDelete =
+                      currentRole === "admin" ||
+                      (currentRole === "angel" &&
+                        comment.authorRole === "angel" &&
+                        comment.authorLabel === defaultAngelName);
+                    const commentDate = formatCommentDate(comment.createdAt);
+                    return (
+                      <li key={comment.id} className="grid grid-cols-[2.25rem_1fr] gap-3">
+                        <div
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-extrabold"
+                          style={{ backgroundColor: "var(--accent-weak)", color: "var(--accent-strong)" }}
+                          aria-hidden="true"
+                        >
+                          {commentInitial(comment.authorLabel)}
+                        </div>
+                        <article className="rounded-2xl border bg-white px-4 py-3 shadow-sm" style={{ borderColor: "var(--line)" }}>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-extrabold" style={{ color: "var(--ink)" }}>
+                                  {comment.authorLabel}
+                                </p>
+                                <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}>
+                                  {commentAuthorRoleLabel(comment)}
+                                </span>
+                                {commentDate ? (
+                                  <time className="text-xs" style={{ color: "var(--ink-muted)" }} dateTime={comment.createdAt}>
+                                    {commentDate}
+                                  </time>
+                                ) : null}
+                              </div>
+                            </div>
+                            {canDelete ? (
+                              <form action={deleteWeeklyReportCommentAction}>
+                                <input type="hidden" name="commentId" value={comment.id} />
+                                <input type="hidden" name="reportId" value={report.id} />
+                                <input type="hidden" name="authorLabel" value={defaultAngelName} />
+                                <input
+                                  type="hidden"
+                                  name="ownershipToken"
+                                  value={
+                                    createRoleScopedToken(
+                                      "angel",
+                                      "weekly-report-comment-delete",
+                                      `${report.id}:${comment.id}:${defaultAngelName}`
+                                    ) ?? ""
+                                  }
+                                />
+                                <input type="hidden" name="returnPath" value={returnPath} />
+                                <button
+                                  type="submit"
+                                  className="btn-press rounded-md px-2 py-1 text-xs font-semibold transition hover:bg-red-50"
+                                  style={{ color: "var(--danger)" }}
+                                >
+                                  삭제
+                                </button>
+                              </form>
                             ) : null}
                           </div>
-                        </div>
-                        {canDelete ? (
-                          <form action={deleteWeeklyReportCommentAction}>
-                            <input type="hidden" name="commentId" value={comment.id} />
-                            <input type="hidden" name="reportId" value={report.id} />
-                            <input type="hidden" name="authorLabel" value={defaultAngelName} />
-                            <input
-                              type="hidden"
-                              name="ownershipToken"
-                              value={
-                                createRoleScopedToken(
-                                  "angel",
-                                  "weekly-report-comment-delete",
-                                  `${report.id}:${comment.id}:${defaultAngelName}`
-                                ) ?? ""
-                              }
-                            />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <button
-                              type="submit"
-                              className="btn-press rounded-md border px-2 py-1 text-xs font-semibold"
-                              style={{ borderColor: "var(--line)", color: "var(--ink-muted)", backgroundColor: "var(--surface)" }}
-                            >
-                              삭제
-                            </button>
-                          </form>
-                        ) : null}
-                      </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
-                        {comment.body}
-                      </p>
-                    </article>
-                  );
-                })
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
+                            {comment.body}
+                          </p>
+                        </article>
+                      </li>
+                    );
+                  })}
+                </ol>
               )}
             </div>
 
-            <form action={addWeeklyReportCommentAction} className="grid gap-2 rounded-xl border bg-white p-3" style={{ borderColor: "var(--line)" }}>
+            <form action={addWeeklyReportCommentAction} className="grid gap-3 rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: "var(--line)" }}>
               <input type="hidden" name="reportId" value={report.id} />
               <input type="hidden" name="authorToken" value={commentAuthorToken ?? ""} />
               <input type="hidden" name="returnPath" value={returnPath} />
-              <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+              <div>
+                <p className="text-sm font-extrabold" style={{ color: "var(--ink)" }}>
+                  댓글 작성
+                </p>
+                <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+                  이름과 확인 내용을 남겨주세요.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[13rem_1fr]">
                 <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }} htmlFor="weekly-report-comment-author">
                   이름
                   <input
@@ -491,7 +520,7 @@ function TeamReportForm({
                     required
                     maxLength={80}
                     defaultValue={currentRole === "admin" ? "관리자" : defaultAngelName}
-                    className="h-10 rounded-lg border px-3 text-sm"
+                    className="h-11 rounded-xl border px-3 text-sm"
                     style={{ borderColor: "var(--line)", color: "var(--ink)" }}
                     placeholder="이름"
                   />
@@ -505,7 +534,7 @@ function TeamReportForm({
                     rows={4}
                     maxLength={4000}
                     placeholder="댓글 내용을 입력하세요."
-                    className="rounded-lg border px-3 py-3 text-sm"
+                    className="min-h-28 rounded-xl border px-3 py-3 text-sm"
                     style={{ borderColor: "var(--line)", color: "var(--ink)" }}
                   />
                 </label>
