@@ -209,7 +209,63 @@ function LoginScreen({
         }
         .login-submit:hover { opacity: 0.9; }
         .login-submit:active { transform: scale(0.98); }
-        .admin-login-summary::-webkit-details-marker { display: none; }
+        .admin-entry-link {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--ink-soft);
+          font-size: 13px;
+          font-weight: 700;
+          text-decoration: underline;
+          text-decoration-thickness: 1px;
+          text-underline-offset: 4px;
+          transition: opacity 0.15s;
+        }
+        .admin-entry-link:hover { opacity: 0.8; }
+        .admin-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 60;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          background: rgba(15, 23, 42, 0.42);
+          backdrop-filter: blur(10px);
+        }
+        .admin-modal:target,
+        .admin-modal.is-open {
+          display: flex;
+        }
+        .admin-modal-panel {
+          position: relative;
+          width: min(100%, 360px);
+          background: var(--surface);
+          border: 1px solid var(--line);
+          border-radius: 1.25rem;
+          padding: 1.35rem;
+          box-shadow: 0 24px 56px rgba(15, 23, 42, 0.22);
+        }
+        .admin-modal-close {
+          position: absolute;
+          top: 0.8rem;
+          right: 0.9rem;
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          color: var(--ink-muted);
+          font-size: 22px;
+          line-height: 1;
+          text-decoration: none;
+          transition: background 0.15s, color 0.15s;
+        }
+        .admin-modal-close:hover {
+          background: var(--surface-muted);
+          color: var(--ink);
+        }
       `}</style>
 
       <div
@@ -297,18 +353,39 @@ function LoginScreen({
           </button>
         </form>
 
-        <details
-          className="li li-d2"
-          open={Boolean(adminAuthMessage)}
-          style={{ marginTop: "1rem" }}
-        >
-          <summary
-            className="admin-login-summary cursor-pointer text-center text-sm font-semibold underline decoration-1 underline-offset-4 transition hover:opacity-80"
-            style={{ color: "var(--ink-soft)", listStyle: "none" }}
-          >
+        <div className="li li-d2" style={{ marginTop: "1rem", textAlign: "center" }}>
+          <a href="#admin-login-modal" className="admin-entry-link">
             전체 관리자
-          </summary>
-          <form action={loginAction} className="mt-4 grid gap-3">
+          </a>
+        </div>
+      </div>
+
+      <div
+        id="admin-login-modal"
+        className={`admin-modal${adminAuthMessage ? " is-open" : ""}`}
+      >
+        <div
+          className="admin-modal-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-login-title"
+        >
+          <a href="#" className="admin-modal-close" aria-label="전체 관리자 로그인 닫기">
+            ×
+          </a>
+          <h2 id="admin-login-title" style={{
+            fontFamily: "var(--font-heading), sans-serif",
+            fontSize: "1.25rem",
+            lineHeight: 1.2,
+            margin: "0 2rem 0.35rem 0",
+            color: "var(--ink)",
+          }}>
+            전체 관리자
+          </h2>
+          <p style={{ margin: "0 0 1rem", color: "var(--ink-muted)", fontSize: "13px" }}>
+            기수 생성과 전체 설정 관리를 위한 코드입니다.
+          </p>
+          <form action={loginAction} className="grid gap-3">
             <input type="hidden" name="authScope" value="admin" />
             <input type="hidden" name="returnPath" value="/admin" />
             <label htmlFor="adminPassword" className="grid gap-2 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>
@@ -321,6 +398,7 @@ function LoginScreen({
                 autoComplete="current-password"
                 placeholder="관리자 코드 입력"
                 className="login-field"
+                autoFocus={Boolean(adminAuthMessage)}
                 style={adminAuthMessage ? { borderColor: "var(--danger)" } : undefined}
               />
             </label>
@@ -333,7 +411,7 @@ function LoginScreen({
               관리자 입장
             </button>
           </form>
-        </details>
+        </div>
       </div>
     </main>
   );
