@@ -7,7 +7,7 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { createWeeklyReportTemplateAction } from "@/app/weekly-report-actions";
 import { WeeklyReportTemplateForm } from "@/app/admin/reports/templates/new/weekly-report-template-form";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   canOpenRolePage,
   getRolePage,
@@ -64,7 +64,7 @@ function TemplateForm() {
 export default async function NewWeeklyReportTemplatePage({
   searchParams,
 }: NewTemplatePageProps) {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

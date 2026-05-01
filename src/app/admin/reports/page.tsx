@@ -6,7 +6,7 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { deleteWeeklyReportTemplateAction } from "@/app/weekly-report-actions";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   canOpenRolePage,
   getRolePage,
@@ -303,7 +303,7 @@ function WeeklyReportAdminPanel({
 }
 
 export default async function AdminReportsPage({ searchParams }: AdminReportsPageProps) {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

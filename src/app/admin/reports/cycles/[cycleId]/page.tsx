@@ -6,7 +6,7 @@ import {
   RoleNotConfigured,
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   type TeamMemberGroup,
   loadMemberPreset,
@@ -283,7 +283,7 @@ export default async function AdminReportCycleDetailPage({
   params,
   searchParams,
 }: AdminReportCycleDetailPageProps) {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

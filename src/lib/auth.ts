@@ -39,8 +39,7 @@ export async function isAuthenticated(): Promise<boolean> {
   const currentToken = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   if (!currentToken) return false;
 
-  const expectedToken = makeAuthToken(requireAppPassword());
-  if (safeEquals(currentToken, expectedToken)) {
+  if (isGlobalAuthToken(currentToken)) {
     return true;
   }
 
@@ -49,6 +48,12 @@ export async function isAuthenticated(): Promise<boolean> {
     return false;
   }
   return verifyOperatingUnitAccessToken(unitToken.slug, unitToken.token);
+}
+
+export async function isGlobalAuthenticated(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const currentToken = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+  return Boolean(currentToken && isGlobalAuthToken(currentToken));
 }
 
 export async function login(
@@ -120,4 +125,8 @@ function parseUnitAuthToken(
   } catch {
     return null;
   }
+}
+
+function isGlobalAuthToken(token: string): boolean {
+  return safeEquals(token, makeAuthToken(requireAppPassword()));
 }

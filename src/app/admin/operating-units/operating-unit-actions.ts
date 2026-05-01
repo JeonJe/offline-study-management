@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   createOperatingUnit,
   setOperatingUnitAccessCode,
@@ -22,7 +22,7 @@ async function requireAdminMutation(
   formData: FormData,
   invalidPasswordRedirect = "/admin/operating-units?unit=password-invalid"
 ): Promise<void> {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

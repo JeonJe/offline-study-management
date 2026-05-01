@@ -5,7 +5,7 @@ import {
   RoleNotConfigured,
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
 import {
   canOpenRolePage,
@@ -143,7 +143,7 @@ function OperatingUnitsPanel({
 }
 
 export default async function OperatingUnitsPage() {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

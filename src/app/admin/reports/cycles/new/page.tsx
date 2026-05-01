@@ -6,7 +6,7 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { createWeeklyReportCycleAction } from "@/app/weekly-report-actions";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   canOpenRolePage,
   getRolePage,
@@ -183,7 +183,7 @@ function CycleForm({
 export default async function NewWeeklyReportCyclePage({
   searchParams,
 }: NewCyclePageProps) {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

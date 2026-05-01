@@ -5,7 +5,7 @@ import {
   RoleNotConfigured,
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
@@ -124,7 +124,7 @@ function AdminHome({ unitSlug }: { unitSlug: string }) {
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

@@ -7,7 +7,7 @@ import {
   RoleNotConfigured,
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
-import { isAuthenticated } from "@/lib/auth";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   cachedGetMemberAttendanceByPeriod,
   cachedGetTeamAttendanceByPeriod,
@@ -408,7 +408,7 @@ function HistoryPanel({
 }
 
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }

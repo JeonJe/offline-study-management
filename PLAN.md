@@ -1,24 +1,26 @@
-# LFP-4B 기수별 입장 코드 관리자 UI
+# LFP-5A 전체 관리자 인증 경계 고정
 
 ## 범위
 
 | 파일 | 변경 |
 |------|------|
-| `src/app/admin/operating-units/operating-unit-actions.ts` | 입장 코드 변경 server action 추가 |
-| `src/app/admin/operating-units/[id]/edit/page.tsx` | 기수 편집 화면에 입장 코드 변경 form 추가 |
-| `src/lib/operating-unit-store.test.ts` | 관리자 비밀번호 검증 및 hash 저장 action 테스트 추가 |
+| `src/lib/auth.ts` | 전체 관리자 전용 인증 함수 추가 |
+| `src/app/admin/**` | 관리자 페이지/액션이 전역 관리자 토큰만 허용하도록 변경 |
+| `src/app/api/db/ping/route.ts` | DB 점검 API도 전역 관리자 토큰만 허용 |
+| `src/lib/auth.test.ts` | 기수 토큰이 전체 관리자 인증으로 통과하지 않는 회귀 테스트 추가 |
+| `src/lib/operating-unit-store.test.ts` | auth mock을 전체 관리자 인증 함수에 맞춤 |
 
 ## 결정
 
-- 기수 이름/활성 상태 편집과 입장 코드 변경은 별도 form/server action으로 분리한다.
-- 입장 코드 변경은 전체 관리자 role + 관리자 비밀번호 재입력 후에만 실행한다.
-- 새 입장 코드는 `setOperatingUnitAccessCode`를 통해 hash로만 저장한다.
+- `isAuthenticated()`는 기존 사용자 화면 호환을 위해 기수 토큰을 계속 허용한다.
+- `/admin` 계열과 DB 점검 API는 `isGlobalAuthenticated()`만 사용한다.
+- LFP-5B에서 사용자 화면별 `unitSlug` 매칭을 강화한다.
 
 ## 검증 계획
 
 | 검증 | 기준 |
 |------|------|
-| 단위 테스트 | `operating-unit-store.test.ts` action 테스트 통과 |
+| 단위 테스트 | auth + operating-unit-store 회귀 테스트 통과 |
 | 타입체크 | `npm run typecheck` 통과 |
 | Lint | `npm run lint` 통과 |
 | 전체 테스트 | `npm test` 통과 |
@@ -26,4 +28,4 @@
 
 ## 비범위
 
-- 운영 단위별 강한 페이지 권한 경계는 LFP-5에서 처리한다.
+- 일반 사용자 화면의 기수별 토큰 매칭 강제는 LFP-5B에서 처리한다.

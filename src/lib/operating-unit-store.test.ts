@@ -32,7 +32,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  isAuthenticated: isAuthenticatedMock,
+  isGlobalAuthenticated: isAuthenticatedMock,
 }));
 
 vi.mock("@/lib/role-session", () => ({

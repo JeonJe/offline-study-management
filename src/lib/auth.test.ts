@@ -31,7 +31,12 @@ vi.mock("@/lib/operating-unit-store", () => ({
   verifyOperatingUnitAccessToken: verifyOperatingUnitAccessTokenMock,
 }));
 
-import { isAuthenticated, login, logout } from "@/lib/auth";
+import {
+  isAuthenticated,
+  isGlobalAuthenticated,
+  login,
+  logout,
+} from "@/lib/auth";
 
 describe("auth", () => {
   const prevAppPassword = process.env.APP_PASSWORD;
@@ -97,10 +102,19 @@ describe("auth", () => {
     );
   });
 
+  it("does not accept a scoped unit auth cookie as global admin auth", async () => {
+    cookieGetMock.mockReturnValue({ value: "unit:cohort-4:unit-token" });
+
+    await expect(isGlobalAuthenticated()).resolves.toBe(false);
+
+    expect(verifyOperatingUnitAccessTokenMock).not.toHaveBeenCalled();
+  });
+
   it("keeps the existing global admin token compatible", async () => {
     cookieGetMock.mockReturnValue({ value: globalToken("global-admin-code") });
 
     await expect(isAuthenticated()).resolves.toBe(true);
+    await expect(isGlobalAuthenticated()).resolves.toBe(true);
 
     expect(verifyOperatingUnitAccessTokenMock).not.toHaveBeenCalled();
   });
