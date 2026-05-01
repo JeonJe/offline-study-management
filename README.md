@@ -4,6 +4,57 @@ LOOPERS MEETUP은 루프팩, 스터디, 뒷풀이 운영을 한 곳에서 관리
 
 운영자는 항목별 입장 코드로 강의/기수별 공간에 들어가고, 멤버는 모임과 뒷풀이를 확인합니다. 엔젤과 관리자는 별도 비밀번호로 전용 화면에 접근해 주간 보고, 팀 배정, 히스토리, 운영 항목 관리를 수행합니다.
 
+## 한눈에 보기
+
+```mermaid
+flowchart TB
+  Entry["첫 진입<br/>항목 선택 + 입장 코드"] --> Unit["선택한 항목<br/>예: loop-pak-3"]
+
+  Unit --> LoopPak["루프팩<br/>정규 오프라인 수업"]
+  Unit --> Study["스터디<br/>모임 카드"]
+  Unit --> Afterparty["뒷풀이<br/>참석 + 정산"]
+  Unit --> Member["멤버<br/>공용 진입"]
+  Unit --> Angel["엔젤<br/>주간 보고"]
+  Unit --> UnitAdmin["관리자<br/>팀/보고/히스토리"]
+
+  GlobalAdmin["전체 관리자<br/>항목 생성/편집"] --> Unit
+  GlobalAdmin --> AccessCode["항목별 입장 코드"]
+  AccessCode --> Entry
+
+  Member --> LoopPak
+  Member --> Study
+  Member --> Afterparty
+  Angel --> Reports["팀별 주간 보고 작성"]
+  UnitAdmin --> ReportAdmin["보고 주차/제출 현황 관리"]
+  UnitAdmin --> Members["멤버/팀/엔젤 배정"]
+  UnitAdmin --> History["참여 히스토리"]
+```
+
+## 권한 흐름
+
+```mermaid
+flowchart LR
+  Visitor["사용자"] --> SelectUnit["항목 선택"]
+  SelectUnit --> UnitCode{"입장 코드"}
+
+  UnitCode -->|항목별 코드| UnitSession["항목 세션<br/>meetup_auth"]
+  UnitCode -->|공용 코드| GlobalSession["전역 세션<br/>meetup_auth"]
+
+  UnitSession --> PublicPages["루프팩/스터디/뒷풀이/멤버"]
+  GlobalSession --> PublicPages
+  GlobalSession --> GlobalAdmin["전체 관리자"]
+
+  PublicPages --> AngelGate{"엔젤 비밀번호"}
+  PublicPages --> AdminGate{"관리자 비밀번호"}
+
+  AngelGate --> AngelSession["엔젤 역할 세션<br/>meetup_role_access"]
+  AdminGate --> AdminSession["관리자 역할 세션<br/>meetup_role_access"]
+
+  AngelSession --> AngelPages["엔젤 페이지"]
+  AdminSession --> AngelPages
+  AdminSession --> AdminPages["관리자 페이지"]
+```
+
 ## 현재 제품 구조
 
 | 영역 | 주요 경로 | 용도 |
@@ -68,6 +119,28 @@ LOOPERS MEETUP은 루프팩, 스터디, 뒷풀이 운영을 한 곳에서 관리
 - 기수/항목 관리자: 선택한 항목의 보고 주차, 멤버/팀/엔젤 배정, 히스토리 관리
 - 전체 관리자: 항목 생성/편집, 항목별 입장 코드 관리
 - 전체 관리자와 항목 관리자는 화면 파일과 진입 경로가 분리되어 있습니다.
+
+## 데이터 관계
+
+```mermaid
+erDiagram
+  OPERATING_UNIT ||--o{ MEETING : owns
+  OPERATING_UNIT ||--o{ AFTERPARTY : owns
+  OPERATING_UNIT ||--|| MEMBER_PRESET : configures
+  OPERATING_UNIT ||--o{ WEEKLY_REPORT_CYCLE : owns
+
+  MEETING ||--o{ RSVP : has
+  AFTERPARTY ||--o{ AFTERPARTY_PARTICIPANT : has
+  AFTERPARTY ||--o{ SETTLEMENT : has
+  SETTLEMENT ||--o{ SETTLEMENT_PARTICIPANT : tracks
+
+  MEMBER_PRESET ||--o{ TEAM : groups
+  TEAM ||--o{ MEMBER : contains
+  TEAM ||--o{ ANGEL_ASSIGNMENT : assigns
+
+  WEEKLY_REPORT_CYCLE ||--o{ WEEKLY_REPORT : has
+  WEEKLY_REPORT ||--o{ WEEKLY_REPORT_COMMENT : has
+```
 
 ## 권한과 비밀번호
 
@@ -165,6 +238,26 @@ npm run quality:harness
 ## 스크린샷
 
 샘플 스크린샷은 `docs/screenshots/`에 있습니다.
+
+### 스터디 대시보드
+
+![스터디 대시보드 샘플](docs/screenshots/study-dashboard-sample.png)
+
+### 스터디 상세
+
+![스터디 상세 샘플](docs/screenshots/study-detail-sample.png)
+
+### 뒷풀이 대시보드
+
+![뒷풀이 대시보드 샘플](docs/screenshots/afterparty-dashboard-sample.png)
+
+### 뒷풀이 상세
+
+![뒷풀이 상세 샘플](docs/screenshots/afterparty-detail-sample.png)
+
+### 멤버 관리
+
+![멤버 관리 샘플](docs/screenshots/members-sample.png)
 
 | 화면 | 파일 |
 |------|------|
