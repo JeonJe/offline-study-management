@@ -13,6 +13,12 @@ import { pickNearestUpcomingIsoDate, toKstIsoDate } from "@/lib/date-utils";
 import { extractHttpUrl } from "@/lib/location-utils";
 import { normalizeMemberName, toTeamLabel, withTeamLabel } from "@/lib/member-label-utils";
 import {
+  DEFAULT_OPERATING_UNIT_NAME,
+  DEFAULT_OPERATING_UNIT_SLUG,
+  type OperatingUnit,
+  listOperatingUnits,
+} from "@/lib/operating-unit-store";
+import {
   type MeetingSummary,
   type ParticipantRole,
   type RsvpRecord,
@@ -102,13 +108,49 @@ function LeaderChips({ leaders }: { leaders?: string[] | null }) {
   );
 }
 
-function LoginScreen({ authStatus }: { authStatus: string }) {
+type EntryOperatingUnit = Pick<OperatingUnit, "slug" | "name" | "description">;
+
+async function safeListEntryOperatingUnits(): Promise<EntryOperatingUnit[]> {
+  try {
+    const units = await listOperatingUnits();
+    const activeUnits = units.filter((unit) => unit.isActive);
+    if (activeUnits.length > 0) {
+      return activeUnits.map(({ slug, name, description }) => ({ slug, name, description }));
+    }
+  } catch (error) {
+    console.error("[entry] 운영 단위 목록 로드 실패:", error);
+  }
+
+  return [
+    {
+      slug: DEFAULT_OPERATING_UNIT_SLUG,
+      name: DEFAULT_OPERATING_UNIT_NAME,
+      description: null,
+    },
+  ];
+}
+
+function LoginScreen({
+  authStatus,
+  units,
+  selectedUnitSlug,
+}: {
+  authStatus: string;
+  units: EntryOperatingUnit[];
+  selectedUnitSlug: string;
+}) {
   const authMessage =
     authStatus === "invalid"
       ? "비밀번호가 맞지 않습니다."
       : authStatus === "required"
         ? "세션이 만료됐습니다."
         : "";
+  const selectedUnit =
+    units.find((unit) => unit.slug === selectedUnitSlug) ?? units[0] ?? {
+      slug: DEFAULT_OPERATING_UNIT_SLUG,
+      name: DEFAULT_OPERATING_UNIT_NAME,
+      description: null,
+    };
 
   return (
     <main style={{
@@ -184,11 +226,49 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
           LOOPERS MEETUP
         </h1>
         <p className="li li-d1" style={{ margin: "0 0 1.8rem", color: "var(--ink-muted)", fontSize: "13px" }}>
-          운영 중인 기수로 입장하세요.
+          기수를 선택하고 입장하세요.
         </p>
 
         {/* 폼 */}
         <form action={loginAction} className="li li-d2" style={{ display: "grid", gap: "1.25rem" }}>
+          <section style={{ display: "grid", gap: "0.5rem" }}>
+            <p style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              margin: 0,
+            }}>
+              기수
+            </p>
+            <div style={{ display: "grid", gap: "0.5rem" }}>
+              {units.map((unit) => {
+                const selected = unit.slug === selectedUnit.slug;
+                return (
+                  <Link
+                    key={unit.slug}
+                    href={`/?unit=${encodeURIComponent(unit.slug)}`}
+                    aria-current={selected ? "true" : undefined}
+                    className="btn-press rounded-xl border px-3 py-2 text-left text-sm font-semibold transition hover:opacity-85"
+                    style={{
+                      borderColor: selected ? "rgba(13, 127, 242, 0.35)" : "var(--line)",
+                      backgroundColor: selected ? "var(--accent-weak)" : "var(--surface)",
+                      color: selected ? "var(--accent-strong)" : "var(--ink-soft)",
+                    }}
+                  >
+                    <span>{unit.name}</span>
+                    {unit.description ? (
+                      <span className="mt-1 block text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
+                        {unit.description}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+          <input type="hidden" name="selectedUnit" value={selectedUnit.slug} />
           <div style={{ display: "grid", gap: "0.5rem" }}>
             <label htmlFor="password" style={{
               fontSize: "11px",
@@ -675,10 +755,18 @@ export async function MeetupDashboard({
   const params = await searchParams;
   const authStatus = singleParam(params.auth);
   const requestDate = singleParam(params.date);
+  const selectedUnitSlug = singleParam(params.unit);
 
   const authenticated = await isAuthenticated();
   if (!authenticated) {
-    return <LoginScreen authStatus={authStatus} />;
+    const units = await safeListEntryOperatingUnits();
+    return (
+      <LoginScreen
+        authStatus={authStatus}
+        units={units}
+        selectedUnitSlug={selectedUnitSlug}
+      />
+    );
   }
 
   let meetings: MeetingSummary[] = [];

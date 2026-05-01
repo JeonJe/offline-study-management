@@ -289,13 +289,18 @@ async function requireAuthOrRedirect(): Promise<void> {
 
 export async function loginAction(formData: FormData): Promise<void> {
   const password = textFrom(formData, "password").trim();
+  const selectedUnit = textFrom(formData, "selectedUnit").trim();
+  const returnPath = safeReturnPath(formData);
   const success = await login(password);
+  const loginParams = new URLSearchParams();
+  if (selectedUnit) loginParams.set("unit", selectedUnit);
 
   if (!success) {
-    redirect("/?auth=invalid");
+    loginParams.set("auth", "invalid");
+    redirect(`/?${loginParams.toString()}`);
   }
 
-  redirect(dashboardPath());
+  redirect(returnPath ?? dashboardPath());
 }
 
 export async function logoutAction(): Promise<void> {
