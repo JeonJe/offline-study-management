@@ -19,5 +19,12 @@ export default defineConfig({
       name: "chromium",
       use: { browserName: "chromium" },
     },
+    // regression 시나리오 전용 프로젝트 — 네트워크 flakiness 대비 retries: 1
+    {
+      name: "regression",
+      use: { browserName: "chromium" },
+      testMatch: "**/regression-*.spec.ts",
+      retries: 1,
+    },
   ],
 });
