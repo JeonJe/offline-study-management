@@ -145,7 +145,9 @@ export async function listOperatingUnits(): Promise<OperatingUnit[]> {
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"
      from public.operating_units
-     order by is_default desc, is_active desc, created_at asc, slug asc`
+     where slug <> $1
+     order by is_default desc, is_active desc, created_at asc, slug asc`,
+    [LEGACY_OPERATING_UNIT_SLUG]
   );
 }
 
@@ -182,6 +184,7 @@ export async function createOperatingUnit(input: {
   slug: string;
   name: string;
   description?: string;
+  accessPassword?: string;
 }): Promise<OperatingUnit> {
   await ensureOperatingUnitSchema();
 
@@ -190,10 +193,13 @@ export async function createOperatingUnit(input: {
   if (!slug || !name) {
     throw new Error("운영 단위 이름과 식별자가 필요합니다.");
   }
+  const accessPassword = input.accessPassword
+    ? normalizeAccessPassword(input.accessPassword)
+    : "";
 
   const [created] = await query<OperatingUnit>(
-    `insert into public.operating_units (slug, name, description)
-     values ($1, $2, nullif($3, ''))
+    `insert into public.operating_units (slug, name, description, access_password_hash)
+     values ($1, $2, nullif($3, ''), $4)
      on conflict (slug) do nothing
      returning
        slug,
@@ -204,7 +210,12 @@ export async function createOperatingUnit(input: {
        (access_password_hash is not null) as "hasAccessPassword",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"`,
-    [slug, name, input.description?.trim() ?? ""]
+    [
+      slug,
+      name,
+      input.description?.trim() ?? "",
+      accessPassword ? makeOperatingUnitAccessHash(slug, accessPassword) : null,
+    ]
   );
 
   if (!created) {
@@ -356,7 +367,7 @@ export function isProtectedOperatingUnitSlug(slug: string): boolean {
 }
 
 export function normalizeOperatingUnitSlug(raw: string): string {
-  const trimmed = raw.trim();
+  const trimmed = safeDecode(raw.trim());
   if (trimmed === DEFAULT_OPERATING_UNIT_SLUG) {
     return DEFAULT_OPERATING_UNIT_SLUG;
   }
@@ -366,6 +377,14 @@ export function normalizeOperatingUnitSlug(raw: string): string {
     .replace(/[^a-z0-9_-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function assertSqlIdentifier(value: string): void {

@@ -58,7 +58,7 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
 
       <div className="grid gap-2">
         <span className="text-sm font-bold" style={{ color: "var(--ink)" }}>
-          슬러그
+          주소 식별자
         </span>
         <code
           className="rounded-xl border px-3 py-2 text-sm"
@@ -66,11 +66,14 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
         >
           {unit.slug}
         </code>
+        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+          이 기수의 URL에 쓰이는 값입니다. 예: /cohorts/{unit.slug}/admin
+        </p>
       </div>
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="name" style={{ color: "var(--ink)" }}>
-          이름
+          기수 이름
         </label>
         <input
           id="name"
@@ -91,6 +94,7 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
           name="description"
           rows={4}
           defaultValue={unit.description ?? ""}
+          placeholder="예: 2026년 상반기 루프팩 오프라인 수업"
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
@@ -122,7 +126,7 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="adminPassword" style={{ color: "var(--ink)" }}>
-          관리자 비밀번호
+          전체 관리자 확인 코드
         </label>
         <input
           id="adminPassword"
@@ -130,9 +134,13 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
           type="password"
           required
           autoComplete="current-password"
+          placeholder="기수 정보 수정 권한 확인"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
+        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+          전체 관리자만 기수 이름, 설명, 활성 상태를 바꿀 수 있어 한 번 더 확인합니다.
+        </p>
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
@@ -184,14 +192,14 @@ function AccessCodeForm({
         </h2>
         <p className="text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
           {unit.hasAccessPassword
-            ? "현재 이 운영 단위는 별도 입장 코드를 사용합니다."
-            : "아직 별도 입장 코드가 없어 공용 코드로 입장합니다."}
+            ? "이 기수로 입장할 때 쓰는 전용 코드가 설정돼 있습니다."
+            : "아직 이 기수 전용 입장 코드가 없어 공용 코드로 입장합니다."}
         </p>
       </div>
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="accessPassword" style={{ color: "var(--ink)" }}>
-          새 입장 코드
+          새 기수 입장 코드
         </label>
         <input
           id="accessPassword"
@@ -200,6 +208,7 @@ function AccessCodeForm({
           required
           minLength={1}
           autoComplete="new-password"
+          placeholder="이 기수 참가자가 첫 화면에서 입력할 코드"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
@@ -207,7 +216,7 @@ function AccessCodeForm({
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="accessCodeAdminPassword" style={{ color: "var(--ink)" }}>
-          관리자 비밀번호
+          전체 관리자 확인 코드
         </label>
         <input
           id="accessCodeAdminPassword"
@@ -215,9 +224,13 @@ function AccessCodeForm({
           type="password"
           required
           autoComplete="current-password"
+          placeholder="입장 코드 변경 권한 확인"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
+        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+          전체 관리자만 기수 입장 코드를 바꿀 수 있어 한 번 더 확인합니다.
+        </p>
       </div>
 
       {statusMessage ? (

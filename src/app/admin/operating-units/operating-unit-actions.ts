@@ -40,10 +40,16 @@ async function requireAdminMutation(
 export async function createOperatingUnitAction(formData: FormData): Promise<void> {
   await requireAdminMutation(formData);
 
+  const accessPassword = textFrom(formData, "accessPassword").trim();
+  if (!accessPassword) {
+    redirect("/admin/operating-units/new?unit=access-code-required");
+  }
+
   const unit = await createOperatingUnit({
     slug: textFrom(formData, "slug"),
     name: textFrom(formData, "name"),
     description: textFrom(formData, "description"),
+    accessPassword,
   });
 
   revalidatePath("/admin");

@@ -105,7 +105,12 @@ describe("operating-unit-store", () => {
     expect(normalizeOperatingUnitSlug("4기 루퍼스")).not.toContain("기");
   });
 
-  it("protects legacy and current default operating unit slugs", () => {
+  it("keeps the current default operating unit stable even when URL-encoded", () => {
+    expect(normalizeOperatingUnitSlug("3%EA%B8%B0")).toBe("3기");
+    expect(normalizeOperatingUnitSlug("3기")).toBe("3기");
+  });
+
+  it("protects legacy migration and current default operating unit slugs", () => {
     expect(isProtectedOperatingUnitSlug("default")).toBe(true);
     expect(isProtectedOperatingUnitSlug("3기")).toBe(true);
     expect(isProtectedOperatingUnitSlug("cohort-4")).toBe(false);
@@ -157,6 +162,7 @@ describe("operating-unit-store", () => {
       expect(units[0].isDefault).toBe(true);
       const lastCall = queryMock.mock.calls.at(-1) as [string];
       expect(lastCall[0]).toContain("from public.operating_units");
+      expect(lastCall[0]).toContain("where slug <> $1");
     });
   });
 
@@ -203,6 +209,38 @@ describe("operating-unit-store", () => {
       expect(sql).not.toContain("do update");
       expect(params[0]).toBe("4");
       expect(params[1]).toBe("4기");
+      expect(params[3]).toBeNull();
+    });
+  });
+
+  it("can create a named operating unit with its own access code", async () => {
+    await withSkipSchemaCheck(async () => {
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: null,
+          isDefault: false,
+          isActive: true,
+          hasAccessPassword: true,
+          createdAt: "2026-04-27",
+          updatedAt: "2026-04-27",
+        },
+      ]);
+
+      await createOperatingUnit({
+        slug: "cohort-4",
+        name: "4기",
+        accessPassword: "unit-secret",
+      });
+
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("access_password_hash");
+      expect(params[3]).toBe(
+        createHash("sha256")
+          .update("saturday-meetup:operating-unit:cohort-4:unit-secret")
+          .digest("hex")
+      );
     });
   });
 
@@ -420,6 +458,61 @@ describe("operating-unit-store", () => {
         String(sql).includes("insert into public.operating_units")
       )
     ).toBe(false);
+  });
+
+  it("createOperatingUnitAction requires a unit access code before mutation", async () => {
+    isAuthenticatedMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("admin");
+    verifyRolePagePasswordMock.mockReturnValue(true);
+    const formData = new FormData();
+    formData.set("slug", "cohort-4");
+    formData.set("name", "4기");
+    formData.set("adminPassword", "admin-secret");
+
+    await expect(createOperatingUnitAction(formData)).rejects.toThrow(
+      "redirect:/admin/operating-units/new?unit=access-code-required"
+    );
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("insert into public.operating_units")
+      )
+    ).toBe(false);
+  });
+
+  it("createOperatingUnitAction stores the unit access code when creating", async () => {
+    await withSkipSchemaCheck(async () => {
+      isAuthenticatedMock.mockResolvedValue(true);
+      getCurrentRolePageRoleMock.mockResolvedValue("admin");
+      verifyRolePagePasswordMock.mockReturnValue(true);
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: null,
+          isDefault: false,
+          isActive: true,
+          hasAccessPassword: true,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+      const formData = new FormData();
+      formData.set("slug", "cohort-4");
+      formData.set("name", "4기");
+      formData.set("adminPassword", "admin-secret");
+      formData.set("accessPassword", "unit-secret");
+
+      await expect(createOperatingUnitAction(formData)).rejects.toThrow(
+        "redirect:/admin/operating-units/cohort-4/edit?unit=created"
+      );
+
+      const [, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(params[3]).toBe(
+        createHash("sha256")
+          .update("saturday-meetup:operating-unit:cohort-4:unit-secret")
+          .digest("hex")
+      );
+    });
   });
 
   it("updateOperatingUnitAction mutates when admin role password is valid", async () => {

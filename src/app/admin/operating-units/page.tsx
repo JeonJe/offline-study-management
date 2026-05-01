@@ -77,7 +77,7 @@ function OperatingUnitsPanel({
                 className="px-5 py-3 text-left font-bold"
                 style={{ color: "var(--ink-muted)" }}
               >
-                슬러그
+                주소 식별자
               </th>
               <th
                 className="px-5 py-3 text-left font-bold"

@@ -16,36 +16,48 @@ import {
   getCurrentRolePageRole,
 } from "@/lib/role-session";
 
-function OperatingUnitForm() {
+function OperatingUnitForm({ unitStatus }: { unitStatus?: string }) {
+  const message =
+    unitStatus === "access-code-required" ? "기수 입장 코드를 입력하세요." : "";
+
   return (
     <form action={createOperatingUnitAction} className="card-static grid gap-4 p-5 sm:p-6">
+      {message ? (
+        <div
+          className="rounded-xl border px-3 py-2 text-sm font-semibold"
+          style={{ borderColor: "#fecaca", backgroundColor: "#fef2f2", color: "#991b1b" }}
+        >
+          {message}
+        </div>
+      ) : null}
+
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="slug" style={{ color: "var(--ink)" }}>
-          슬러그
+          주소 식별자
         </label>
         <input
           id="slug"
           name="slug"
           required
           pattern="[a-z0-9_-]+"
-          placeholder="cohort-4"
+          placeholder="예: loop-pak-4"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
         <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
-          영문 소문자, 숫자, 하이픈, 언더스코어만 사용합니다.
+          주소에 들어갈 짧은 값입니다. 예: /cohorts/loop-pak-4/admin
         </p>
       </div>
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="name" style={{ color: "var(--ink)" }}>
-          이름
+          기수 이름
         </label>
         <input
           id="name"
           name="name"
           required
-          placeholder="4기"
+          placeholder="예: 루프팩 4기"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
@@ -59,14 +71,34 @@ function OperatingUnitForm() {
           id="description"
           name="description"
           rows={4}
+          placeholder="예: 2026년 상반기 루프팩 오프라인 수업"
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
       </div>
 
       <div className="grid gap-2">
+        <label className="text-sm font-bold" htmlFor="accessPassword" style={{ color: "var(--ink)" }}>
+          기수 입장 코드
+        </label>
+        <input
+          id="accessPassword"
+          name="accessPassword"
+          type="password"
+          required
+          autoComplete="new-password"
+          placeholder="이 기수 참가자가 첫 화면에서 입력할 코드"
+          className="h-11 rounded-xl border px-3 text-sm outline-none"
+          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+        />
+        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+          참가자는 첫 화면에서 기수를 고른 뒤 이 코드로 입장합니다.
+        </p>
+      </div>
+
+      <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="adminPassword" style={{ color: "var(--ink)" }}>
-          관리자 비밀번호
+          전체 관리자 확인 코드
         </label>
         <input
           id="adminPassword"
@@ -74,9 +106,13 @@ function OperatingUnitForm() {
           type="password"
           required
           autoComplete="current-password"
+          placeholder="기수 생성 권한 확인"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
+        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
+          전체 관리자만 기수를 만들 수 있어 한 번 더 확인합니다.
+        </p>
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
@@ -99,12 +135,17 @@ function OperatingUnitForm() {
   );
 }
 
-export default async function NewOperatingUnitPage() {
+export default async function NewOperatingUnitPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ unit?: string }>;
+}) {
   const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
   }
 
+  const unitStatus = (await searchParams)?.unit;
   const currentRole = await getCurrentRolePageRole();
   const page = getRolePage("admin");
   const access = canOpenRolePage("admin", currentRole, getConfiguredRolePages());
@@ -115,14 +156,14 @@ export default async function NewOperatingUnitPage() {
   } else if (access === "role-required") {
     content = <RoleAccessRequired role="admin" label={page.label} invalid={false} />;
   } else {
-    content = <OperatingUnitForm />;
+    content = <OperatingUnitForm unitStatus={unitStatus} />;
   }
 
   return (
     <RoleShell
       activeRole="admin"
       title="운영 단위 생성"
-      summary="기수 식별자와 표시 이름을 등록합니다."
+      summary="새 기수의 주소, 이름, 입장 코드를 등록합니다."
       scopeLabel="전체 관리자"
       showRoleNav={false}
     >
