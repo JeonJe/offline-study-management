@@ -48,6 +48,7 @@ create table if not exists public.rsvps (
   meeting_id uuid not null references public.meetings(id) on delete cascade,
   name text not null,
   role text not null check (role in ('student', 'angel', 'supporter', 'buddy', 'mentor', 'manager')),
+  status text not null default 'confirmed' check (status in ('confirmed', 'waitlist')),
   note text,
   created_at timestamptz not null default now()
 );

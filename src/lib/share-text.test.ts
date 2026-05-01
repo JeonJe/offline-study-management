@@ -33,6 +33,7 @@ describe("share text builders", () => {
             meetingId: "meeting-1",
             name: "민수",
             role: "student",
+            status: "confirmed",
             note: null,
             createdAt: "2026-04-27",
           },

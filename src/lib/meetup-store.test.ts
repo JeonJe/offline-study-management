@@ -191,6 +191,19 @@ describe("meetup-store meeting password flows", () => {
     expect(params[0]).toEqual(["이전제"]);
     expect(params[1]).toEqual(["angel"]);
   });
+
+  it("locks the meeting and assigns waitlist status from confirmed capacity", async () => {
+    queryMock.mockResolvedValueOnce([{ changedCount: 2 }]);
+
+    await createRsvpsBulk("meeting-1", "student", ["민수", "지수"], "정원 테스트");
+
+    const [sql] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("for update");
+    expect(sql).toContain("where r.status = 'confirmed'");
+    expect(sql).toContain("insert into public.rsvps (id, meeting_id, name, role, status, note)");
+    expect(sql).toContain("when ml.capacity is null then 'confirmed'");
+    expect(sql).toContain("else 'waitlist'");
+  });
 });
 
 describe("meetup-store capacity flows", () => {

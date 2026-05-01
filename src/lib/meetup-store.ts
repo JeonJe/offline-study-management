@@ -71,9 +71,12 @@ export type RsvpRecord = {
   meetingId: string;
   name: string;
   role: ParticipantRole;
+  status: RsvpStatus;
   note: string | null;
   createdAt: string;
 };
+
+export type RsvpStatus = "confirmed" | "waitlist";
 
 type CreateMeetingInput = {
   operatingUnitSlug?: string;
@@ -190,6 +193,21 @@ async function hasMeetingColumn(columnName: string): Promise<boolean> {
   return Boolean(row?.exists);
 }
 
+async function hasRsvpColumn(columnName: string): Promise<boolean> {
+  const [row] = await query<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'rsvps'
+         and column_name = $1
+     ) as exists`,
+    [columnName]
+  );
+
+  return Boolean(row?.exists);
+}
+
 async function ensureMeetingLeadersColumn(): Promise<void> {
   const hasColumn = await hasMeetingColumn("leaders");
   if (hasColumn) return;
@@ -229,6 +247,47 @@ async function ensureMeetingsCapacityColumn(): Promise<void> {
   );
 }
 
+async function ensureRsvpStatusColumn(): Promise<void> {
+  const hasColumn = await hasRsvpColumn("status");
+  if (!hasColumn) {
+    await query(
+      `alter table public.rsvps
+       add column if not exists status text not null default 'confirmed'`
+    );
+  }
+
+  await query(
+    `update public.rsvps
+     set status = 'confirmed'
+     where status is null
+        or status not in ('confirmed', 'waitlist')`
+  );
+
+  await query(
+    `do $$
+     declare
+       item record;
+     begin
+       for item in
+         select conname
+         from pg_constraint
+         where conrelid = 'public.rsvps'::regclass
+           and contype = 'c'
+           and pg_get_constraintdef(oid) ilike '%status%'
+       loop
+         execute format('alter table public.rsvps drop constraint if exists %I', item.conname);
+       end loop;
+     end
+     $$`
+  );
+
+  await query(
+    `alter table public.rsvps
+     add constraint chk_rsvps_status_allowed
+     check (status in ('confirmed', 'waitlist'))`
+  );
+}
+
 export async function ensureSchema(): Promise<void> {
   if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
@@ -241,6 +300,7 @@ export async function ensureSchema(): Promise<void> {
       await ensureMeetingPasswordHashColumn();
       await ensureMeetingsCapacityColumn();
       await ensureMeetingOperatingUnitColumn();
+      await ensureRsvpStatusColumn();
       if (!runtimeMigrationsEnabled) {
         schemaReady = true;
         return;
@@ -288,6 +348,7 @@ export async function ensureSchema(): Promise<void> {
         meeting_id uuid not null references public.meetings(id) on delete cascade,
         name text not null,
         role text not null check (role in ('student', 'angel', 'supporter', 'buddy', 'mentor', 'manager')),
+        status text not null default 'confirmed' check (status in ('confirmed', 'waitlist')),
         note text,
         created_at timestamptz not null default now()
       )`
@@ -316,6 +377,8 @@ export async function ensureSchema(): Promise<void> {
        add constraint chk_rsvps_role_allowed
        check (role in ('student', 'angel', 'supporter', 'buddy', 'mentor', 'manager'))`
     );
+
+    await ensureRsvpStatusColumn();
 
     await query(
       `create index if not exists idx_rsvps_meeting_created
@@ -350,9 +413,9 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
        coalesce(m.leaders, '{}'::text[]) as leaders,
        (m.password_hash is not null) as "hasPassword",
        m.capacity,
-       count(r.id) filter (where r.role = 'student')::int as "studentCount",
-       count(r.id) filter (where r.role <> 'student')::int as "operationCount",
-       count(r.id)::int as "totalCount"
+       count(r.id) filter (where r.status = 'confirmed' and r.role = 'student')::int as "studentCount",
+       count(r.id) filter (where r.status = 'confirmed' and r.role <> 'student')::int as "operationCount",
+       count(r.id) filter (where r.status = 'confirmed')::int as "totalCount"
      from public.meetings m
      left join public.rsvps r on r.meeting_id = m.id
      where coalesce(m.operating_unit_slug, $1) = $1
@@ -377,9 +440,9 @@ export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSu
        coalesce(m.leaders, '{}'::text[]) as leaders,
        (m.password_hash is not null) as "hasPassword",
        m.capacity,
-       count(r.id) filter (where r.role = 'student')::int as "studentCount",
-       count(r.id) filter (where r.role <> 'student')::int as "operationCount",
-       count(r.id)::int as "totalCount"
+       count(r.id) filter (where r.status = 'confirmed' and r.role = 'student')::int as "studentCount",
+       count(r.id) filter (where r.status = 'confirmed' and r.role <> 'student')::int as "operationCount",
+       count(r.id) filter (where r.status = 'confirmed')::int as "totalCount"
      from public.meetings m
      left join public.rsvps r on r.meeting_id = m.id
      where m.meeting_date = $1
@@ -405,9 +468,9 @@ export async function getMeetingById(meetingId: string): Promise<MeetingSummary 
        coalesce(m.leaders, '{}'::text[]) as leaders,
        (m.password_hash is not null) as "hasPassword",
        m.capacity,
-       count(r.id) filter (where r.role = 'student')::int as "studentCount",
-       count(r.id) filter (where r.role <> 'student')::int as "operationCount",
-       count(r.id)::int as "totalCount"
+       count(r.id) filter (where r.status = 'confirmed' and r.role = 'student')::int as "studentCount",
+       count(r.id) filter (where r.status = 'confirmed' and r.role <> 'student')::int as "operationCount",
+       count(r.id) filter (where r.status = 'confirmed')::int as "totalCount"
      from public.meetings m
      left join public.rsvps r on r.meeting_id = m.id
      where m.id = $1
@@ -488,6 +551,7 @@ export async function listRsvps(
        meeting_id as "meetingId",
        name,
        role,
+       status,
        note,
        created_at::text as "createdAt"
      from public.rsvps
@@ -515,6 +579,7 @@ export async function listRsvpsForMeetings(
        meeting_id as "meetingId",
        name,
        role,
+       status,
        note,
        created_at::text as "createdAt"
      from public.rsvps
@@ -569,22 +634,42 @@ export async function createRsvpsBulk(
   const trimmedNote = note?.trim() ?? "";
 
   const [row] = await query<{ changedCount: number }>(
-    `with incoming as (
+    `with meeting_lock as (
+       select id, capacity
+       from public.meetings
+       where id = $4
+       for update
+     ),
+     confirmed_count as (
+       select count(r.id)::int as count
+       from public.rsvps r
+       join meeting_lock ml on ml.id = r.meeting_id
+       where r.status = 'confirmed'
+     ),
+     incoming as (
        select
          i.name,
          i.role,
-         i.id
+         i.id,
+         row_number() over () as position
        from unnest($1::text[], $2::text[], $3::uuid[]) as i(name, role, id)
      ),
      inserted as (
-       insert into public.rsvps (id, meeting_id, name, role, note)
+       insert into public.rsvps (id, meeting_id, name, role, status, note)
        select
          i.id,
          $4,
          i.name,
          i.role,
+         case
+           when ml.capacity is null then 'confirmed'
+           when cc.count + i.position <= ml.capacity then 'confirmed'
+           else 'waitlist'
+         end,
          nullif($5, '')
        from incoming i
+       cross join meeting_lock ml
+       cross join confirmed_count cc
        where not exists (
          select 1
          from public.rsvps r
