@@ -5,7 +5,7 @@ import { cohortAwarePath } from "@/lib/cohort-routes";
 import { DEFAULT_OPERATING_UNIT_NAME } from "@/lib/operating-unit-store";
 import type { CSSProperties, ReactNode } from "react";
 
-type DashboardTab = "loopPak" | "study" | "afterparty" | "members";
+type DashboardTab = "loopPak" | "study" | "afterparty" | "members" | "angel" | "admin";
 
 type DashboardHeaderProps = {
   title: string;
@@ -20,6 +20,8 @@ const TAB_ITEMS: { key: DashboardTab; href: string; label: string }[] = [
   { key: "study", href: "/", label: "스터디" },
   { key: "afterparty", href: "/afterparty", label: "뒷풀이" },
   { key: "members", href: "/members", label: "멤버" },
+  { key: "angel", href: "/angel", label: "엔젤" },
+  { key: "admin", href: "/admin", label: "관리자" },
 ];
 
 const INACTIVE_TAB_STYLE: CSSProperties = {
