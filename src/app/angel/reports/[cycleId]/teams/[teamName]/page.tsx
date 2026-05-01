@@ -511,7 +511,7 @@ function TeamReportForm({
                   이름과 확인 내용을 남겨주세요.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-[13rem_1fr]">
+              <div className="grid gap-3">
                 <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }} htmlFor="weekly-report-comment-author">
                   이름
                   <input
@@ -520,7 +520,7 @@ function TeamReportForm({
                     required
                     maxLength={80}
                     defaultValue={currentRole === "admin" ? "관리자" : defaultAngelName}
-                    className="h-11 rounded-xl border px-3 text-sm"
+                    className="h-11 max-w-sm rounded-xl border px-3 text-sm"
                     style={{ borderColor: "var(--line)", color: "var(--ink)" }}
                     placeholder="이름"
                   />
