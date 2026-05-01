@@ -297,7 +297,10 @@ export async function loginAction(formData: FormData): Promise<void> {
   const selectedUnit = textFrom(formData, "selectedUnit").trim();
   const authScope = textFrom(formData, "authScope").trim();
   const returnPath = safeReturnPath(formData);
-  const success = await login(password);
+  const success = await login(
+    password,
+    authScope === "unit" ? { unitSlug: selectedUnit } : undefined
+  );
   const loginParams = new URLSearchParams();
   if (selectedUnit) loginParams.set("unit", selectedUnit);
 

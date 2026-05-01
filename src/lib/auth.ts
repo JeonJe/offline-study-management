@@ -1,8 +1,14 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import {
+  createOperatingUnitAccessToken,
+  normalizeOperatingUnitSlug,
+  verifyOperatingUnitAccessToken,
+} from "@/lib/operating-unit-store";
 
 const AUTH_COOKIE_NAME = "meetup_auth";
 const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const UNIT_AUTH_TOKEN_PREFIX = "unit";
 
 function requireAppPassword(): string {
   const appPassword = process.env.APP_PASSWORD;
@@ -34,12 +40,46 @@ export async function isAuthenticated(): Promise<boolean> {
   if (!currentToken) return false;
 
   const expectedToken = makeAuthToken(requireAppPassword());
-  return safeEquals(currentToken, expectedToken);
+  if (safeEquals(currentToken, expectedToken)) {
+    return true;
+  }
+
+  const unitToken = parseUnitAuthToken(currentToken);
+  if (!unitToken) {
+    return false;
+  }
+  return verifyOperatingUnitAccessToken(unitToken.slug, unitToken.token);
 }
 
-export async function login(password: string): Promise<boolean> {
+export async function login(
+  password: string,
+  options: { unitSlug?: string } = {}
+): Promise<boolean> {
   const normalizedPassword = password.trim();
   if (!normalizedPassword) return false;
+
+  const unitSlug = normalizeOperatingUnitSlug(options.unitSlug ?? "");
+  if (unitSlug) {
+    const unitToken = await createOperatingUnitAccessToken(
+      unitSlug,
+      normalizedPassword
+    );
+    if (!unitToken) {
+      return false;
+    }
+
+    const cookieStore = await cookies();
+    cookieStore.set({
+      name: AUTH_COOKIE_NAME,
+      value: formatUnitAuthToken(unitSlug, unitToken),
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: AUTH_COOKIE_MAX_AGE,
+      path: "/",
+    });
+    return true;
+  }
 
   const expectedToken = makeAuthToken(requireAppPassword());
   const inputToken = makeAuthToken(normalizedPassword);
@@ -61,4 +101,23 @@ export async function login(password: string): Promise<boolean> {
 export async function logout(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(AUTH_COOKIE_NAME);
+}
+
+function formatUnitAuthToken(slug: string, token: string): string {
+  return `${UNIT_AUTH_TOKEN_PREFIX}:${encodeURIComponent(slug)}:${token}`;
+}
+
+function parseUnitAuthToken(
+  cookieValue: string
+): { slug: string; token: string } | null {
+  const [prefix, encodedSlug, token] = cookieValue.split(":");
+  if (prefix !== UNIT_AUTH_TOKEN_PREFIX || !encodedSlug || !token) {
+    return null;
+  }
+
+  try {
+    return { slug: decodeURIComponent(encodedSlug), token };
+  } catch {
+    return null;
+  }
 }

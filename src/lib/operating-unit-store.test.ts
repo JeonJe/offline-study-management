@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   getCurrentRolePageRoleMock,
@@ -46,6 +47,7 @@ import {
 import {
   _resetSchemaStateForTesting,
   assertOperatingUnitAcceptsNewData,
+  createOperatingUnitAccessToken,
   createOperatingUnit,
   getOperatingUnit,
   ensureOperatingUnitColumn,
@@ -53,7 +55,10 @@ import {
   isProtectedOperatingUnitSlug,
   listOperatingUnits,
   normalizeOperatingUnitSlug,
+  setOperatingUnitAccessCode,
   updateOperatingUnit,
+  verifyOperatingUnitAccessCode,
+  verifyOperatingUnitAccessToken,
 } from "@/lib/operating-unit-store";
 
 async function withSkipSchemaCheck(run: () => Promise<void>): Promise<void> {
@@ -71,7 +76,10 @@ async function withSkipSchemaCheck(run: () => Promise<void>): Promise<void> {
 }
 
 describe("operating-unit-store", () => {
+  const prevAppPassword = process.env.APP_PASSWORD;
+
   beforeEach(() => {
+    process.env.APP_PASSWORD = "shared-entry-code";
     getCurrentRolePageRoleMock.mockReset();
     isAuthenticatedMock.mockReset();
     queryMock.mockReset();
@@ -80,6 +88,14 @@ describe("operating-unit-store", () => {
     revalidatePathMock.mockClear();
     verifyRolePagePasswordMock.mockReset();
     _resetSchemaStateForTesting();
+  });
+
+  afterEach(() => {
+    if (prevAppPassword === undefined) {
+      delete process.env.APP_PASSWORD;
+    } else {
+      process.env.APP_PASSWORD = prevAppPassword;
+    }
   });
 
   it("normalizes labels into ascii-only stable slugs", () => {
@@ -99,6 +115,7 @@ describe("operating-unit-store", () => {
 
     const sql = queryMock.mock.calls.map(([text]) => String(text));
     expect(sql.some((text) => text.includes("create table if not exists public.operating_units"))).toBe(true);
+    expect(sql.some((text) => text.includes("add column if not exists access_password_hash text"))).toBe(true);
     expect(sql.some((text) => text.includes("idx_operating_units_single_default"))).toBe(true);
     expect(sql.some((text) => text.includes("insert into public.operating_units"))).toBe(true);
   });
@@ -299,6 +316,72 @@ describe("operating-unit-store", () => {
     });
   });
 
+  it("creates a unit access token from the stored hash without exposing plaintext", async () => {
+    await withSkipSchemaCheck(async () => {
+      const expectedToken = tokenFor("cohort-4", "unit-secret");
+      queryMock.mockResolvedValueOnce([
+        {
+          accessPasswordHash: expectedToken,
+          isActive: true,
+        },
+      ]);
+
+      const token = await createOperatingUnitAccessToken("cohort-4", "unit-secret");
+
+      expect(token).toBe(expectedToken);
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("access_password_hash");
+      expect(sql).not.toContain("unit-secret");
+      expect(params).toEqual(["cohort-4"]);
+    });
+  });
+
+  it("rejects a unit access token when the operating unit is inactive", async () => {
+    await withSkipSchemaCheck(async () => {
+      const token = tokenFor("cohort-4", "unit-secret");
+      queryMock.mockResolvedValueOnce([
+        {
+          accessPasswordHash: token,
+          isActive: false,
+        },
+      ]);
+
+      await expect(verifyOperatingUnitAccessToken("cohort-4", token)).resolves.toBe(false);
+    });
+  });
+
+  it("falls back to APP_PASSWORD while a unit-specific access code is not set", async () => {
+    await withSkipSchemaCheck(async () => {
+      queryMock.mockResolvedValueOnce([
+        {
+          accessPasswordHash: null,
+          isActive: true,
+        },
+      ]);
+
+      await expect(
+        verifyOperatingUnitAccessCode("cohort-4", "shared-entry-code")
+      ).resolves.toBe(true);
+    });
+  });
+
+  it("stores a hashed unit access code", async () => {
+    await withSkipSchemaCheck(async () => {
+      queryMock.mockResolvedValueOnce([{ slug: "cohort-4" }]);
+
+      await setOperatingUnitAccessCode({
+        slug: "cohort-4",
+        password: "new-unit-code",
+      });
+
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("set access_password_hash = $2");
+      expect(params[0]).toBe("cohort-4");
+      expect(params[1]).not.toBe("new-unit-code");
+      expect(String(params[1])).toHaveLength(64);
+    });
+  });
+
   it("blocks new data for inactive operating units", async () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
@@ -366,3 +449,9 @@ describe("operating-unit-store", () => {
     });
   });
 });
+
+function tokenFor(slug: string, password: string): string {
+  return createHash("sha256")
+    .update(`saturday-meetup:operating-unit:${slug}:${password}`)
+    .digest("hex");
+}

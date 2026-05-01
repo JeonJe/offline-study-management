@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
 
 export const LEGACY_OPERATING_UNIT_SLUG = "default";
@@ -10,6 +11,7 @@ export type OperatingUnit = {
   description: string | null;
   isDefault: boolean;
   isActive: boolean;
+  hasAccessPassword: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -42,6 +44,11 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
     await query(
       `alter table public.operating_units
        add column if not exists is_active boolean not null default true`
+    );
+
+    await query(
+      `alter table public.operating_units
+       add column if not exists access_password_hash text`
     );
 
     await query(
@@ -134,6 +141,7 @@ export async function listOperatingUnits(): Promise<OperatingUnit[]> {
        description,
        is_default as "isDefault",
        is_active as "isActive",
+       (access_password_hash is not null) as "hasAccessPassword",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"
      from public.operating_units
@@ -158,6 +166,7 @@ export async function getOperatingUnit(
        description,
        is_default as "isDefault",
        is_active as "isActive",
+       (access_password_hash is not null) as "hasAccessPassword",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"
      from public.operating_units
@@ -192,6 +201,7 @@ export async function createOperatingUnit(input: {
        description,
        is_default as "isDefault",
        is_active as "isActive",
+       (access_password_hash is not null) as "hasAccessPassword",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"`,
     [slug, name, input.description?.trim() ?? ""]
@@ -233,6 +243,7 @@ export async function updateOperatingUnit(input: {
        description,
        is_default as "isDefault",
        is_active as "isActive",
+       (access_password_hash is not null) as "hasAccessPassword",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"`,
     [slug, name, input.description?.trim() ?? "", nextIsActive]
@@ -251,6 +262,91 @@ export async function assertOperatingUnitAcceptsNewData(slug: string): Promise<v
   }
   if (!unit.isActive) {
     throw new Error("비활성 운영 단위에는 새 데이터를 등록할 수 없습니다.");
+  }
+}
+
+export async function createOperatingUnitAccessToken(
+  slug: string,
+  password: string
+): Promise<string | null> {
+  const normalizedSlug = normalizeOperatingUnitSlug(slug);
+  const normalizedPassword = normalizeAccessPassword(password);
+  if (!normalizedSlug || !normalizedPassword) {
+    return null;
+  }
+
+  const token = makeOperatingUnitAccessHash(normalizedSlug, normalizedPassword);
+  if (await verifyOperatingUnitAccessToken(normalizedSlug, token)) {
+    return token;
+  }
+  return null;
+}
+
+export async function verifyOperatingUnitAccessCode(
+  slug: string,
+  password: string
+): Promise<boolean> {
+  return (await createOperatingUnitAccessToken(slug, password)) !== null;
+}
+
+export async function verifyOperatingUnitAccessToken(
+  slug: string,
+  token: string
+): Promise<boolean> {
+  await ensureOperatingUnitSchema();
+
+  const normalizedSlug = normalizeOperatingUnitSlug(slug);
+  const normalizedToken = token.trim();
+  if (!normalizedSlug || !normalizedToken) {
+    return false;
+  }
+
+  const [row] = await query<{ accessPasswordHash: string | null; isActive: boolean }>(
+    `select
+       access_password_hash as "accessPasswordHash",
+       is_active as "isActive"
+     from public.operating_units
+     where slug = $1
+     limit 1`,
+    [normalizedSlug]
+  );
+
+  if (!row?.isActive) {
+    return false;
+  }
+
+  const expectedToken =
+    row.accessPasswordHash ?? fallbackOperatingUnitAccessHash(normalizedSlug);
+  if (!expectedToken) {
+    return false;
+  }
+
+  return safeEquals(normalizedToken, expectedToken);
+}
+
+export async function setOperatingUnitAccessCode(input: {
+  slug: string;
+  password: string;
+}): Promise<void> {
+  await ensureOperatingUnitSchema();
+
+  const slug = normalizeOperatingUnitSlug(input.slug);
+  const password = normalizeAccessPassword(input.password);
+  if (!slug || !password) {
+    throw new Error("운영 단위 입장 코드가 필요합니다.");
+  }
+
+  const updated = await query<{ slug: string }>(
+    `update public.operating_units
+     set access_password_hash = $2,
+         updated_at = now()
+     where slug = $1
+     returning slug`,
+    [slug, makeOperatingUnitAccessHash(slug, password)]
+  );
+
+  if (!updated[0]) {
+    throw new Error("운영 단위 입장 코드를 변경하지 못했습니다.");
   }
 }
 
@@ -275,4 +371,30 @@ export function normalizeOperatingUnitSlug(raw: string): string {
 function assertSqlIdentifier(value: string): void {
   if (/^[a-z_][a-z0-9_]*$/i.test(value)) return;
   throw new Error(`Invalid SQL identifier: ${value}`);
+}
+
+function normalizeAccessPassword(password: string): string {
+  return password.trim();
+}
+
+function makeOperatingUnitAccessHash(slug: string, password: string): string {
+  return createHash("sha256")
+    .update(`saturday-meetup:operating-unit:${slug}:${password}`)
+    .digest("hex");
+}
+
+function fallbackOperatingUnitAccessHash(slug: string): string | null {
+  const appPassword = process.env.APP_PASSWORD?.trim();
+  if (!appPassword) {
+    return null;
+  }
+  return makeOperatingUnitAccessHash(slug, appPassword);
+}
+
+function safeEquals(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
 }

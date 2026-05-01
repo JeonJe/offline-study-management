@@ -1,28 +1,32 @@
-# LFP-3C 상세 화면 cohort returnPath 유지 계획
+# LFP-4A 운영 단위별 입장 코드 저장/검증
 
-## 목표
-- cohort URL로 상세 화면에 들어온 뒤 뒤로가기, 검색, 필터, form returnPath가 전역 URL로 빠지지 않게 한다.
-- 모임/뒷풀이 상세와 엔젤 팀 보고 상세의 주요 이동 경로를 cohort-aware로 맞춘다.
-- 전역 URL 진입은 기존 동작을 유지한다.
+## 범위
 
-## 변경 파일
 | 파일 | 변경 |
 |------|------|
-| `src/lib/cohort-routes.ts` | `/meetings/{id}` cohort 변환/rewrite 지원 추가 |
-| `src/lib/cohort-routes.test.ts` | 모임 상세 URL 변환 테스트 추가 |
-| `src/app/meetup-dashboard.tsx` | 모임 카드 상세 링크를 cohort-aware로 변경 |
-| `src/app/meetings/[meetingId]/page.tsx` | 모임 상세 back/action/pathname/returnPath를 cohort-aware로 변경 |
-| `src/app/afterparty/[afterpartyId]/page.tsx` | 뒷풀이 상세 back/action/pathname/returnPath를 cohort-aware로 변경 |
-| `src/app/angel/reports/[cycleId]/teams/[teamName]/page.tsx` | 엔젤 팀 보고 목록 링크와 returnPath를 cohort-aware로 변경 |
+| `docs/db/01_init_schema.sql` | `operating_units.access_password_hash` 컬럼 추가 |
+| `src/lib/operating-unit-store.ts` | 기수별 입장 코드 hash 저장/검증 함수 추가 |
+| `src/lib/auth.ts` | 전체 관리자 토큰과 기수 입장 토큰을 구분 |
+| `src/app/actions.ts` | 기수 로그인은 선택한 운영 단위 기준으로 검증 |
+| `src/lib/*.test.ts` | hash 저장, fallback, 쿠키 토큰 회귀 테스트 |
 
-## 비범위
-- 데이터 스코프와 권한 경계는 LFP-4/LFP-5에서 처리한다.
-- 관리자 하위 상세 화면의 모든 링크는 별도 권한 정리 단계에서 처리한다.
+## 결정
 
-## 검증
-- `npm run typecheck`
-- `npm run lint`
-- `npm test`
-- `npx next build --webpack`
-- 인증 curl로 `/cohorts/3%EA%B8%B0/study` 모임 상세 링크와 상세 화면 action/back href 확인
-- 인증 curl로 `/cohorts/3%EA%B8%B0/afterparty` 뒷풀이 상세 링크와 상세 화면 action/back href 확인
+- 입장 코드는 평문 저장하지 않고 `sha256(saturday-meetup:operating-unit:{slug}:{password})`로 저장한다.
+- `access_password_hash`가 아직 없는 운영 단위는 기존 `APP_PASSWORD`를 fallback으로 허용해 배포 직후 잠김을 막는다.
+- 전체 관리자 로그인은 기존 `APP_PASSWORD` 기반 쿠키를 유지하고, 기수 로그인은 `unit:{slug}:{token}` 형식 쿠키를 사용한다.
+
+## 검증 계획
+
+| 검증 | 기준 |
+|------|------|
+| 단위 테스트 | auth + operating-unit-store 신규/회귀 케이스 통과 |
+| 타입체크 | `npm run typecheck` 통과 |
+| Lint | `npm run lint` 통과 |
+| 전체 테스트 | `npm test` 통과 |
+| 빌드 | `npx next build --webpack` 통과 |
+
+## 위험
+
+- 이번 PR은 변경 UI까지 포함하지 않는다. 관리자 화면에서 기수별 코드를 변경하는 폼은 LFP-4B로 분리한다.
+- 기존 페이지 대부분은 아직 `isAuthenticated()`를 전역으로 호출하므로, URL별 강한 권한 격리는 LFP-5에서 별도 적용한다.
