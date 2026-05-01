@@ -5,11 +5,7 @@ import {
   RoleNotConfigured,
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
-import {
-  isAuthenticatedForUnit,
-  isGlobalAuthenticated,
-} from "@/lib/auth";
-import { cohortAwarePath } from "@/lib/cohort-routes";
+import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   canOpenRolePage,
   getRolePage,
@@ -18,7 +14,6 @@ import {
   getConfiguredRolePages,
   getCurrentRolePageRole,
 } from "@/lib/role-session";
-import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
 
 type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -30,34 +25,6 @@ type AdminCard = {
   href: string;
   status?: string;
 };
-
-const COHORT_ADMIN_CARDS: AdminCard[] = [
-  {
-    title: "엔젤 주간 보고",
-    description: "보고 주차 생성, 제출 현황 확인",
-    href: "/admin/reports",
-  },
-  {
-    title: "멤버/팀/엔젤 배정",
-    description: "팀 구성과 엔젤 배정 관리",
-    href: "/members",
-  },
-  {
-    title: "팀/멤버 히스토리",
-    description: "기간별 참여 흐름 확인",
-    href: "/admin/history",
-  },
-  {
-    title: "오프라인 모임",
-    description: "모임 생성과 참석 현황",
-    href: "/",
-  },
-  {
-    title: "뒷풀이",
-    description: "뒷풀이 생성과 정산",
-    href: "/afterparty",
-  },
-];
 
 const GLOBAL_ADMIN_CARDS: AdminCard[] = [
   {
@@ -76,22 +43,13 @@ function singleParam(value: string | string[] | undefined): string {
 }
 
 function AdminHome({
-  unitSlug,
-  scope,
+  cards,
 }: {
-  unitSlug: string;
-  scope: "global" | "cohort";
+  cards: AdminCard[];
 }) {
-  const visibleCards =
-    scope === "global"
-      ? isOperatingUnitsEnabled()
-        ? GLOBAL_ADMIN_CARDS
-        : []
-      : COHORT_ADMIN_CARDS;
-
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {visibleCards.map((card) => {
+      {cards.map((card) => {
         const body = (
           <>
             <div className="flex items-start justify-between gap-3">
@@ -129,7 +87,7 @@ function AdminHome({
             {body}
           </div>
         ) : (
-          <Link key={card.title} href={cohortAwarePath(unitSlug, card.href)} className="card p-5">
+          <Link key={card.title} href={card.href} className="card p-5">
             {body}
           </Link>
         );
@@ -139,22 +97,16 @@ function AdminHome({
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const authenticated = await isGlobalAuthenticated();
+  if (!authenticated) {
+    redirect("/?auth=required");
+  }
+
   const [currentRole, query] = await Promise.all([
     getCurrentRolePageRole(),
     searchParams,
   ]);
   const page = getRolePage("admin");
-  const unitSlug = singleParam(query.unit);
-  const scope = unitSlug ? "cohort" : "global";
-  const authenticated =
-    scope === "cohort"
-      ? await isAuthenticatedForUnit(unitSlug)
-      : await isGlobalAuthenticated();
-  if (!authenticated) {
-    redirect(unitSlug ? `/?auth=required&unit=${encodeURIComponent(unitSlug)}` : "/?auth=required");
-  }
-
-  const rolePath = cohortAwarePath(unitSlug, page.path);
   const access = canOpenRolePage("admin", currentRole, getConfiguredRolePages());
 
   let content;
@@ -166,25 +118,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         role="admin"
         label={page.label}
         invalid={singleParam(query.access) === "invalid"}
-        returnPath={rolePath}
+        returnPath="/admin"
       />
     );
   } else {
-    content = <AdminHome unitSlug={unitSlug} scope={scope} />;
+    content = <AdminHome cards={GLOBAL_ADMIN_CARDS} />;
   }
 
   return (
     <RoleShell
       activeRole="admin"
-      title={scope === "global" ? "전체 관리자" : page.title}
-      summary={
-        scope === "global"
-          ? "기수 생성과 전체 설정을 관리합니다."
-          : "선택한 기수의 팀, 보고, 모임을 관리합니다."
-      }
-      unitSlug={unitSlug}
-      scopeLabel={scope === "global" ? "전체 관리자" : unitSlug}
-      showRoleNav={scope === "cohort"}
+      title="전체 관리자"
+      summary="기수 생성과 전체 설정을 관리합니다."
+      scopeLabel="전체 관리자"
+      showRoleNav={false}
     >
       {content}
     </RoleShell>

@@ -10,7 +10,6 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { isGlobalAuthenticated } from "@/lib/auth";
-import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
 import {
   type OperatingUnit,
   getOperatingUnit,
@@ -256,10 +255,6 @@ export default async function EditOperatingUnitPage({
     redirect("/?auth=required");
   }
 
-  if (!isOperatingUnitsEnabled()) {
-    redirect("/admin");
-  }
-
   const [currentRole, routeParams] = await Promise.all([
     getCurrentRolePageRole(),
     params,
@@ -303,6 +298,8 @@ export default async function EditOperatingUnitPage({
       activeRole="admin"
       title="운영 단위 편집"
       summary="기수 이름, 설명, 입장 코드를 수정합니다."
+      scopeLabel="전체 관리자"
+      showRoleNav={false}
     >
       {content}
     </RoleShell>
