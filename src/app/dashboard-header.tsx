@@ -50,7 +50,7 @@ export function DashboardHeader({
 
   return (
     <header
-      className="sticky top-0 z-30 mb-5 w-screen border-b px-4 py-4 sm:px-6 lg:px-8 fade-in"
+      className="sticky top-0 z-30 mb-4 w-screen border-b px-4 py-2.5 sm:px-6 lg:px-8 fade-in"
       style={{
         backdropFilter: "blur(12px)",
         backgroundColor: "rgba(255, 255, 255, 0.94)",
@@ -59,26 +59,26 @@ export function DashboardHeader({
       }}
     >
       <div className="mx-auto w-full max-w-6xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border shadow-sm"
+              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border shadow-sm"
               style={{ borderColor: "rgba(17, 24, 39, 0.18)", backgroundColor: "#050506" }}
             >
               <Image
                 src="/loopers-meetup-icon.svg"
                 alt="LOOPERS MEETUP"
-                width={44}
-                height={44}
+                width={36}
+                height={36}
                 priority
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ color: "var(--ink-muted)" }}>
+              <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.14em]" style={{ color: "var(--ink-muted)" }}>
                 LOOPERS MEETUP
               </p>
               <h1
-                className="truncate text-2xl font-extrabold tracking-tight sm:text-[2rem]"
+                className="truncate text-xl font-extrabold tracking-tight sm:text-2xl"
                 style={{ fontFamily: "var(--font-heading), sans-serif", color: "var(--ink)" }}
               >
                 {title}
@@ -88,7 +88,7 @@ export function DashboardHeader({
 
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className="rounded-full border px-3.5 py-2 text-sm font-bold"
+              className="rounded-full border px-3 py-1.5 text-xs font-bold"
               style={{
                 borderColor: "rgba(13, 127, 242, 0.25)",
                 backgroundColor: "var(--accent-weak)",
@@ -103,7 +103,7 @@ export function DashboardHeader({
                   key={tab.key}
                   href={tabHref(tab)}
                   aria-current={activeTab === tab.key ? "page" : undefined}
-                  className="btn-press rounded-full border px-3.5 py-2 text-sm font-semibold transition hover:opacity-85"
+                  className="btn-press rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:opacity-85"
                   style={activeTab === tab.key ? ACTIVE_TAB_STYLE : INACTIVE_TAB_STYLE}
                 >
                   {tab.label}
@@ -116,7 +116,7 @@ export function DashboardHeader({
             <form action={logoutAction}>
               <button
                 type="submit"
-                className="btn-press rounded-full border px-3.5 py-2 text-sm font-semibold transition hover:opacity-90"
+                className="btn-press rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:opacity-90"
                 style={{
                   borderColor: "#fecaca",
                   color: "var(--danger)",
@@ -129,7 +129,7 @@ export function DashboardHeader({
           </div>
         </div>
         {currentDate ? (
-          <p className="mt-3 text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-1.5 text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
             모임일 {currentDate}
           </p>
         ) : null}
