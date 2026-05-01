@@ -62,6 +62,23 @@ function formatStartTime(timeText: string): string {
   return `${period} ${hour12}:${String(minute).padStart(2, "0")}`;
 }
 
+function timeOrderValue(timeText: string): number {
+  const [hourText, minuteText] = timeText.split(":");
+  const hour = Number.parseInt(hourText ?? "", 10);
+  const minute = Number.parseInt(minuteText ?? "", 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return Number.POSITIVE_INFINITY;
+  if (hour === 0 && minute === 0) return 24 * 60;
+  return hour * 60 + minute;
+}
+
+function sortAfterpartiesByStartTime(rows: AfterpartySummary[]): AfterpartySummary[] {
+  return [...rows].sort((a, b) => {
+    const timeDiff = timeOrderValue(a.startTime) - timeOrderValue(b.startTime);
+    if (timeDiff !== 0) return timeDiff;
+    return a.title.localeCompare(b.title, "ko");
+  });
+}
+
 function LocationValue({ location }: { location: string }) {
   const placeLink = extractHttpUrl(location);
   if (!placeLink) {
@@ -434,14 +451,18 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     }
     if (isIsoDate(requestDate)) {
       selectedDate = requestDate;
-      afterpartiesOnDate = await cachedListAfterpartiesByDate(selectedDate);
+      afterpartiesOnDate = sortAfterpartiesByStartTime(
+        await cachedListAfterpartiesByDate(selectedDate)
+      );
     } else {
       const allAfterparties = await cachedListAfterparties();
       selectedDate = pickNearestUpcomingIsoDate(
         allAfterparties.map((item) => item.eventDate),
         todayIsoDate
       );
-      afterpartiesOnDate = await cachedListAfterpartiesByDate(selectedDate);
+      afterpartiesOnDate = sortAfterpartiesByStartTime(
+        await cachedListAfterpartiesByDate(selectedDate)
+      );
     }
     participantsByAfterparty = await cachedListParticipantsForAfterparties(
       afterpartiesOnDate.map((item) => item.id),
