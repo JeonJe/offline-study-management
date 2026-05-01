@@ -54,6 +54,7 @@ describe("operating-unit-store", () => {
   });
 
   it("listOperatingUnits를 호출하면 DB 쿼리가 실행된다", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
     process.env.SKIP_SCHEMA_CHECK = "1";
     try {
       queryMock.mockResolvedValueOnce([
@@ -75,22 +76,32 @@ describe("operating-unit-store", () => {
       const lastCall = queryMock.mock.calls.at(-1) as [string];
       expect(lastCall[0]).toContain("from public.operating_units");
     } finally {
-      delete process.env.SKIP_SCHEMA_CHECK;
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
     }
   });
 
   it("listOperatingUnits가 빈 결과를 반환하면 빈 배열을 돌려준다", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
     process.env.SKIP_SCHEMA_CHECK = "1";
     try {
       queryMock.mockResolvedValueOnce([]);
       const units = await listOperatingUnits();
       expect(units).toEqual([]);
     } finally {
-      delete process.env.SKIP_SCHEMA_CHECK;
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
     }
   });
 
   it("listOperatingUnits 쿼리에 is_default desc 정렬이 포함된다", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
     process.env.SKIP_SCHEMA_CHECK = "1";
     try {
       queryMock.mockResolvedValueOnce([]);
@@ -98,11 +109,16 @@ describe("operating-unit-store", () => {
       const lastCall = queryMock.mock.calls.at(-1) as [string];
       expect(lastCall[0]).toContain("order by is_default desc");
     } finally {
-      delete process.env.SKIP_SCHEMA_CHECK;
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
     }
   });
 
   it("upserts a named operating unit", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
     process.env.SKIP_SCHEMA_CHECK = "1";
     try {
       queryMock.mockResolvedValueOnce([
@@ -127,7 +143,11 @@ describe("operating-unit-store", () => {
       expect(params[0]).toBe("4기");
       expect(params[1]).toBe("4기");
     } finally {
-      delete process.env.SKIP_SCHEMA_CHECK;
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
     }
   });
 });

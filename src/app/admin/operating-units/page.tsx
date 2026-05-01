@@ -5,6 +5,7 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { isAuthenticated } from "@/lib/auth";
+import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
 import {
   canOpenRolePage,
   getRolePage,
@@ -114,6 +115,11 @@ export default async function OperatingUnitsPage() {
   const authenticated = await isAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
+  }
+
+  // feature flag OFF 상태에서는 라우트 자체를 닫는다 (admin 카드 게이트와 일관)
+  if (!isOperatingUnitsEnabled()) {
+    redirect("/admin");
   }
 
   const currentRole = await getCurrentRolePageRole();
