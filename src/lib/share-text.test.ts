@@ -13,6 +13,7 @@ describe("share text builders", () => {
         {
           id: "meeting-1",
           operatingUnitSlug: "default",
+          meetingKind: "study",
           title: "강남 스터디",
           meetingDate: "2026-04-27",
           startTime: "14:00",

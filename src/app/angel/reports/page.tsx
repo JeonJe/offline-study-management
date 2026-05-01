@@ -124,9 +124,6 @@ function ReportCycleList({
 export default async function AngelReportsPage({ searchParams }: AngelReportsPageProps) {
   const query = await searchParams;
   const unitSlug = singleParam(query.unit);
-  if (!unitSlug) {
-    redirect("/admin");
-  }
 
   const authenticated = await isAuthenticated();
   if (!authenticated) {

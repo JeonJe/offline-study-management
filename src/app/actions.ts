@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAuthenticated, login, logout } from "@/lib/auth";
 import { cohortScopedPath } from "@/lib/cohort-routes";
+import { normalizeMeetingKind } from "@/lib/meeting-kind";
 import { withSettlementInPath } from "@/lib/navigation-utils";
 import {
   isAfterpartyPasswordError,
@@ -337,6 +338,7 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
   const description = textFrom(formData, "description").trim();
   const leaders = parseDelimitedPeople(textFrom(formData, "leaders"));
   const password = textFrom(formData, "meetingPassword").trim();
+  const meetingKind = normalizeMeetingKind(textFrom(formData, "meetingKind").trim());
 
   if (!title || !meetingDate || !location) {
     redirect(returnPath ?? dashboardPath(state));
@@ -357,6 +359,7 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
     leaders,
     password,
     capacity: capacityValue,
+    meetingKind,
   });
 
   revalidateTag("meetup-data", { expire: 300 });

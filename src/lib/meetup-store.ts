@@ -1,5 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
+import { MEETING_KIND, normalizeMeetingKind, type MeetingKind } from "@/lib/meeting-kind";
 import { isMasterOverridePassword } from "@/lib/master-password";
 import {
   DEFAULT_OPERATING_UNIT_SLUG,
@@ -54,6 +55,7 @@ export function parseCapacityInput(raw: string): ParsedCapacity {
 export type MeetingSummary = {
   id: string;
   operatingUnitSlug: string;
+  meetingKind: MeetingKind;
   title: string;
   meetingDate: string;
   startTime: string;
@@ -81,6 +83,7 @@ export type RsvpStatus = "confirmed" | "waitlist";
 
 type CreateMeetingInput = {
   operatingUnitSlug?: string;
+  meetingKind?: MeetingKind;
   title: string;
   meetingDate: string;
   startTime: string;
@@ -233,6 +236,28 @@ async function ensureMeetingOperatingUnitColumn(): Promise<void> {
   await ensureOperatingUnitColumn("meetings", "idx_meetings_operating_unit");
 }
 
+async function ensureMeetingKindColumn(): Promise<void> {
+  const hasColumn = await hasMeetingColumn("meeting_kind");
+  if (!hasColumn) {
+    await query(
+      `alter table public.meetings
+       add column if not exists meeting_kind text not null default 'study'`
+    );
+  }
+
+  await query(
+    `update public.meetings
+     set meeting_kind = 'study'
+     where meeting_kind is null
+        or meeting_kind not in ('study', 'loop-pak')`
+  );
+
+  await query(
+    `create index if not exists idx_meetings_kind_date
+     on public.meetings (meeting_kind, meeting_date desc, start_time desc)`
+  );
+}
+
 /**
  * meetings 테이블에 capacity 컬럼이 없으면 추가한다.
  * NULL = 정원 없음, 0 이상의 정수 = 최대 참여 인원.
@@ -301,6 +326,7 @@ export async function ensureSchema(): Promise<void> {
       await ensureMeetingPasswordHashColumn();
       await ensureMeetingsCapacityColumn();
       await ensureMeetingOperatingUnitColumn();
+      await ensureMeetingKindColumn();
       await ensureRsvpStatusColumn();
       if (!runtimeMigrationsEnabled) {
         schemaReady = true;
@@ -321,6 +347,7 @@ export async function ensureSchema(): Promise<void> {
         capacity integer,
         constraint chk_meetings_capacity check (capacity is null or capacity >= 0),
         operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
+        meeting_kind text not null default 'study' check (meeting_kind in ('study', 'loop-pak')),
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       )`
@@ -337,6 +364,7 @@ export async function ensureSchema(): Promise<void> {
     );
 
     await ensureMeetingOperatingUnitColumn();
+    await ensureMeetingKindColumn();
 
     await query(
       `create index if not exists idx_meetings_meeting_date
@@ -406,6 +434,7 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
     `select
        m.id,
        coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
        to_char(m.start_time, 'HH24:MI') as "startTime",
@@ -426,6 +455,36 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
   );
 }
 
+export async function listMeetingsByKind(meetingKind: MeetingKind): Promise<MeetingSummary[]> {
+  await ensureSchema();
+  const normalizedKind = normalizeMeetingKind(meetingKind);
+
+  return query<MeetingSummary>(
+    `select
+       m.id,
+       coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
+       m.title,
+       m.meeting_date::text as "meetingDate",
+       to_char(m.start_time, 'HH24:MI') as "startTime",
+       m.location,
+       m.description,
+       coalesce(m.leaders, '{}'::text[]) as leaders,
+       (m.password_hash is not null) as "hasPassword",
+       m.capacity,
+       count(r.id) filter (where r.status = 'confirmed' and r.role = 'student')::int as "studentCount",
+       count(r.id) filter (where r.status = 'confirmed' and r.role <> 'student')::int as "operationCount",
+       count(r.id) filter (where r.status = 'confirmed')::int as "totalCount"
+     from public.meetings m
+     left join public.rsvps r on r.meeting_id = m.id
+     where coalesce(m.operating_unit_slug, $1) = $1
+       and coalesce(m.meeting_kind, '${MEETING_KIND.study}') = $2
+     group by m.id
+     order by m.meeting_date desc, m.start_time desc, m.created_at desc`,
+    [DEFAULT_OPERATING_UNIT_SLUG, normalizedKind]
+  );
+}
+
 export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSummary[]> {
   await ensureSchema();
 
@@ -433,6 +492,7 @@ export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSu
     `select
        m.id,
        coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
        to_char(m.start_time, 'HH24:MI') as "startTime",
@@ -461,6 +521,7 @@ export async function getMeetingById(meetingId: string): Promise<MeetingSummary 
     `select
        m.id,
        coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
        to_char(m.start_time, 'HH24:MI') as "startTime",
@@ -504,14 +565,16 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
   const password = normalizeMeetingPassword(input.password);
   const passwordHash = password ? hashMeetingPassword(password) : null;
   const operatingUnitSlug = input.operatingUnitSlug?.trim() || DEFAULT_OPERATING_UNIT_SLUG;
+  const meetingKind = normalizeMeetingKind(input.meetingKind);
   await assertOperatingUnitAcceptsNewData(operatingUnitSlug);
 
   const [created] = await query<MeetingSummary>(
-    `insert into public.meetings (id, title, meeting_date, start_time, location, description, leaders, password_hash, capacity, operating_unit_slug)
-     values ($1, $2, $3, $4, $5, nullif($6, ''), $7::text[], $8, $9, $10)
+    `insert into public.meetings (id, title, meeting_date, start_time, location, description, leaders, password_hash, capacity, operating_unit_slug, meeting_kind)
+     values ($1, $2, $3, $4, $5, nullif($6, ''), $7::text[], $8, $9, $10, $11)
      returning
        id,
        coalesce(operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        title,
        meeting_date::text as "meetingDate",
        to_char(start_time, 'HH24:MI') as "startTime",
@@ -534,6 +597,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
       passwordHash,
       input.capacity ?? null,
       operatingUnitSlug,
+      meetingKind,
     ]
   );
 

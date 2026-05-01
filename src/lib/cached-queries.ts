@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import {
   listMeetings,
+  listMeetingsByKind,
   listMeetingsByDate,
   getMeetingById,
   listRsvpsForMeetings,
@@ -19,6 +20,7 @@ import {
   getTeamAttendanceByPeriod,
   getMemberAttendanceByPeriod,
 } from "@/lib/history-store";
+import type { MeetingKind } from "@/lib/meeting-kind";
 
 // --- meetup-data ---
 
@@ -27,6 +29,13 @@ export const cachedListMeetings = unstable_cache(
   ["listMeetings"],
   { tags: ["meetup-data"], revalidate: 300 }
 );
+
+export const cachedListMeetingsByKind = (meetingKind: MeetingKind) =>
+  unstable_cache(
+    () => listMeetingsByKind(meetingKind),
+    ["listMeetingsByKind", meetingKind],
+    { tags: ["meetup-data"], revalidate: 300 }
+  )();
 
 export const cachedListMeetingsByDate = (meetingDate: string) =>
   unstable_cache(

@@ -487,7 +487,7 @@ export default async function AngelTeamReportPage({
     <RoleShell
       activeRole="angel"
       title={`${teamName} 주간 보고`}
-      summary="선택한 팀의 보고를 작성하거나 수정합니다."
+      summary="보고 내용을 작성합니다."
       unitSlug={unitSlug}
     >
       {content}

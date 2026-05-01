@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { query, withTransaction } from "@/lib/db";
 import {
   DEFAULT_OPERATING_UNIT_SLUG,
@@ -5,9 +6,16 @@ import {
   ensureOperatingUnitSchema,
 } from "@/lib/operating-unit-store";
 
+export type TeamMemberEntry = {
+  id: string;
+  name: string;
+  order: number;
+};
+
 export type TeamMemberGroup = {
   teamName: string;
   members: string[];
+  memberEntries?: TeamMemberEntry[];
   angels: string[];
 };
 
@@ -36,7 +44,9 @@ export type MemberPreset = {
 type DbTeamRow = {
   teamName: string;
   angelNames: string[] | null;
+  memberId: string | null;
   memberName: string | null;
+  memberOrder: number | null;
 };
 
 type DbAngelRow = {
@@ -74,16 +84,32 @@ function normalizeTeamGroups(groups: TeamMemberGroup[]): TeamMemberGroup[] {
 
     seenTeams.add(teamName);
 
-    const seenMembers = new Set<string>();
-    const members: string[] = [];
-    for (const memberName of group.members) {
-      const member = memberName.trim();
-      if (!member || seenMembers.has(member)) continue;
-      seenMembers.add(member);
-      members.push(member);
+    const seenMemberIds = new Set<string>();
+    const memberEntries: TeamMemberEntry[] = [];
+    const rawEntries =
+      group.memberEntries && group.memberEntries.length > 0
+        ? group.memberEntries
+        : group.members.map((name, order) => ({ id: randomUUID(), name, order }));
+
+    for (const [fallbackOrder, entry] of rawEntries.entries()) {
+      const member = entry.name.trim();
+      const memberId = entry.id.trim() || randomUUID();
+      if (!member || seenMemberIds.has(memberId)) continue;
+      seenMemberIds.add(memberId);
+      memberEntries.push({
+        id: memberId,
+        name: member,
+        order: Number.isFinite(entry.order) ? entry.order : fallbackOrder,
+      });
     }
 
-    normalized.push({ teamName, angels, members });
+    memberEntries.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "ko"));
+    normalized.push({
+      teamName,
+      angels,
+      memberEntries,
+      members: memberEntries.map((member) => member.name),
+    });
   }
 
   return normalized;
@@ -153,6 +179,7 @@ async function ensureMemberSchema(): Promise<void> {
     const schemaExists = await hasMemberSchema();
     if (schemaExists && !runtimeMigrationsEnabled) {
       await ensureMemberOperatingUnitColumns();
+      await ensureMemberIdentityColumns();
       schemaReady = true;
       return;
     }
@@ -192,12 +219,15 @@ async function ensureMemberSchema(): Promise<void> {
       `create table if not exists public.member_team_members (
          team_name text not null references public.member_teams(team_name) on delete cascade,
          member_name text not null,
+         member_id text not null,
          member_order integer not null default 0,
          operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
          created_at timestamptz not null default now(),
-         primary key (team_name, member_name)
+         primary key (member_id)
        )`
     );
+
+    await ensureMemberIdentityColumns();
 
     await query(
       `create index if not exists idx_member_team_members_order
@@ -249,6 +279,47 @@ async function ensureMemberOperatingUnitColumns(): Promise<void> {
   await ensureOperatingUnitColumn("member_team_members", "idx_member_team_members_operating_unit");
   await ensureOperatingUnitColumn("member_angels", "idx_member_angels_operating_unit");
   await ensureOperatingUnitColumn("member_special_roles", "idx_member_special_roles_operating_unit");
+}
+
+async function ensureMemberIdentityColumns(): Promise<void> {
+  await query(
+    `alter table public.member_team_members
+     add column if not exists member_id text`
+  );
+
+  await query(
+    `update public.member_team_members
+     set member_id = 'legacy-' || md5(coalesce(operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') || ':' || team_name || ':' || member_name)
+     where member_id is null
+        or trim(member_id) = ''`
+  );
+
+  await query(
+    `alter table public.member_team_members
+     alter column member_id set not null`
+  );
+
+  await query(
+    `do $$
+     declare
+       item record;
+     begin
+       for item in
+         select conname
+         from pg_constraint
+         where conrelid = 'public.member_team_members'::regclass
+           and contype in ('p', 'u')
+       loop
+         execute format('alter table public.member_team_members drop constraint if exists %I', item.conname);
+       end loop;
+     end
+     $$`
+  );
+
+  await query(
+    `create unique index if not exists idx_member_team_members_member_id
+     on public.member_team_members (member_id)`
+  );
 }
 
 async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
@@ -322,7 +393,9 @@ export async function loadMemberPreset(): Promise<MemberPreset> {
          when nullif(trim(t.angel_name), '') is not null then array[t.angel_name]
          else '{}'::text[]
        end as "angelNames",
-       m.member_name as "memberName"
+       m.member_id as "memberId",
+       m.member_name as "memberName",
+       m.member_order as "memberOrder"
      from public.member_teams t
      left join public.member_team_members m
        on m.team_name = t.team_name
@@ -340,12 +413,18 @@ export async function loadMemberPreset(): Promise<MemberPreset> {
       group = {
         teamName: row.teamName,
         angels: normalizeAngels(row.angelNames ?? []).slice(0, 2),
+        memberEntries: [],
         members: [],
       };
       groupMap.set(row.teamName, group);
       groups.push(group);
     }
     if (row.memberName) {
+      group.memberEntries?.push({
+        id: row.memberId ?? randomUUID(),
+        name: row.memberName,
+        order: row.memberOrder ?? group.members.length,
+      });
       group.members.push(row.memberName);
     }
   }
@@ -428,20 +507,15 @@ export async function saveMemberPresetToDb(
       await tq(
         `delete from public.member_team_members
          where team_name = $1
-           and coalesce(operating_unit_slug, $3) = $3
-           and not (member_name = any($2::text[]))`,
-        [group.teamName, group.members, DEFAULT_OPERATING_UNIT_SLUG]
+           and coalesce(operating_unit_slug, $2) = $2`,
+        [group.teamName, DEFAULT_OPERATING_UNIT_SLUG]
       );
 
-      for (const [memberOrder, memberName] of group.members.entries()) {
+      for (const [memberOrder, member] of (group.memberEntries ?? []).entries()) {
         await tq(
-          `insert into public.member_team_members (team_name, member_name, member_order, operating_unit_slug)
-           values ($1, $2, $3, $4)
-           on conflict (team_name, member_name)
-           do update set
-             member_order = excluded.member_order,
-             operating_unit_slug = excluded.operating_unit_slug`,
-          [group.teamName, memberName, memberOrder, DEFAULT_OPERATING_UNIT_SLUG]
+          `insert into public.member_team_members (team_name, member_id, member_name, member_order, operating_unit_slug)
+           values ($1, $2, $3, $4, $5)`,
+          [group.teamName, member.id, member.name, memberOrder, DEFAULT_OPERATING_UNIT_SLUG]
         );
       }
     }

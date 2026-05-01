@@ -23,12 +23,14 @@ import {
   type ParticipantRole,
   type RsvpRecord,
 } from "@/lib/meetup-store";
+import type { MeetingKind } from "@/lib/meeting-kind";
 import {
-  cachedListMeetings,
+  cachedListMeetingsByKind,
   cachedListRsvpsForMeetings,
   cachedLoadMemberPreset,
 } from "@/lib/cached-queries";
 import { cohortAwarePath } from "@/lib/cohort-routes";
+import { dataLoadErrorMessage } from "@/lib/ui-error-messages";
 import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
@@ -43,6 +45,7 @@ type MeetupDashboardProps = {
   title: string;
   basePath: "/" | "/loop-pak";
   captureTargetId: string;
+  meetingKind: MeetingKind;
 };
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -418,12 +421,77 @@ function LoginScreen({
   );
 }
 
+function UnitSelectionScreen({
+  units,
+  basePath,
+}: {
+  units: EntryOperatingUnit[];
+  basePath: "/" | "/loop-pak";
+}) {
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center px-4 py-10 sm:px-6 lg:px-8">
+      <section className="w-full rounded-[1.5rem] border bg-white p-4 shadow-sm sm:p-6" style={{ borderColor: "var(--line)" }}>
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--line)" }}>
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em]" style={{ color: "var(--ink-muted)" }}>
+              LOOPERS MEETUP
+            </p>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: "var(--ink)" }}>
+              들어갈 목록을 선택하세요
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
+              선택한 목록의 루프팩, 스터디, 뒷풀이, 멤버, 엔젤, 관리자 화면으로 이동합니다.
+            </p>
+          </div>
+          <Link
+            href="/admin"
+            className="inline-flex h-10 shrink-0 items-center rounded-xl border px-3 text-sm font-bold"
+            style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)", color: "var(--ink-soft)" }}
+          >
+            전체 관리자
+          </Link>
+        </div>
+
+        <div className="mt-4 max-h-[62vh] overflow-y-auto pr-1">
+          <div className="grid gap-2">
+            {units.map((unit) => (
+              <Link
+                key={unit.slug}
+                href={cohortAwarePath(unit.slug, basePath)}
+                className="group flex items-center justify-between gap-3 rounded-2xl border bg-white px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <div className="min-w-0">
+                  <h2 className="truncate text-base font-extrabold" style={{ color: "var(--ink)" }}>
+                    {unit.name}
+                  </h2>
+                  <p className="mt-1 truncate text-sm" style={{ color: "var(--ink-muted)" }}>
+                    {unit.description || "루프팩, 스터디, 뒷풀이 관리"}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 rounded-full border px-3 py-1 text-xs font-bold transition group-hover:border-transparent"
+                  style={{ borderColor: "rgba(13, 127, 242, 0.24)", backgroundColor: "var(--accent-weak)", color: "var(--accent-strong)" }}
+                >
+                  입장
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function CreateMeetingModal({
   selectedDate,
   returnPath,
+  meetingKind,
 }: {
   selectedDate: string;
   returnPath: string;
+  meetingKind: MeetingKind;
 }) {
   return (
     <details className="fixed bottom-6 right-6 z-40">
@@ -442,6 +510,7 @@ function CreateMeetingModal({
         <form action={createMeetingAction} className="grid gap-3 md:grid-cols-12">
           <input type="hidden" name="returnDate" value={selectedDate} />
           <input type="hidden" name="returnPath" value={returnPath} />
+          <input type="hidden" name="meetingKind" value={meetingKind} />
 
           <section
             className="grid gap-3 rounded-[1.25rem] border p-3 md:col-span-12 md:grid-cols-12"
@@ -857,6 +926,7 @@ export async function MeetupDashboard({
   title,
   basePath,
   captureTargetId,
+  meetingKind,
 }: MeetupDashboardProps) {
   const params = await searchParams;
   const authStatus = singleParam(params.auth);
@@ -877,11 +947,14 @@ export async function MeetupDashboard({
     );
   }
 
+  if (!selectedUnitSlug) {
+    const units = await safeListEntryOperatingUnits();
+    return <UnitSelectionScreen units={units} basePath={basePath} />;
+  }
+
   let meetings: MeetingSummary[] = [];
   let meetingsOnDate: MeetingSummary[] = [];
   let rsvpsByMeeting: Record<string, RsvpRecord[]> = {};
-  let knownMemberCount = 0;
-  let assignedKnownMemberCount = 0;
   const teamLabelByMemberName = new Map<string, string>();
   let loadError = "";
 
@@ -890,7 +963,7 @@ export async function MeetupDashboard({
 
   try {
     const [fetchedMeetings, memberPreset] = await Promise.all([
-      cachedListMeetings(),
+      cachedListMeetingsByKind(meetingKind),
       cachedLoadMemberPreset(),
     ]);
     meetings = fetchedMeetings;
@@ -904,61 +977,33 @@ export async function MeetupDashboard({
     meetingsOnDate = meetings.filter((meeting) => meeting.meetingDate === selectedDate);
     rsvpsByMeeting = await cachedListRsvpsForMeetings(meetingsOnDate.map((meeting) => meeting.id), "");
 
-    const knownMemberNames = new Set<string>();
     for (const group of memberPreset.teamGroups) {
       const teamLabel = toTeamLabel(group.teamName);
       for (const angel of group.angels) {
         const normalizedAngelName = normalizeMemberName(angel);
-        knownMemberNames.add(normalizedAngelName);
         if (teamLabel && !teamLabelByMemberName.has(normalizedAngelName)) {
           teamLabelByMemberName.set(normalizedAngelName, teamLabel);
         }
       }
       for (const member of group.members) {
         const normalizedMemberName = normalizeMemberName(member);
-        knownMemberNames.add(normalizedMemberName);
         if (teamLabel && !teamLabelByMemberName.has(normalizedMemberName)) {
           teamLabelByMemberName.set(normalizedMemberName, teamLabel);
         }
       }
     }
-    for (const angel of memberPreset.fixedAngels) {
-      knownMemberNames.add(normalizeMemberName(angel));
-    }
-    for (const role of ["supporter", "buddy", "mentor", "manager"] as const) {
-      for (const member of memberPreset.specialRoles[role]) {
-        knownMemberNames.add(normalizeMemberName(member));
-      }
-    }
-
-    const assignedNames = new Set<string>();
-    for (const rows of Object.values(rsvpsByMeeting)) {
-      for (const row of rows) {
-        assignedNames.add(normalizeMemberName(row.name));
-      }
-    }
-
-    knownMemberCount = knownMemberNames.size;
-    for (const name of knownMemberNames) {
-      if (assignedNames.has(name)) {
-        assignedKnownMemberCount += 1;
-      }
-    }
   } catch (error) {
-    loadError =
-      error instanceof Error
-        ? error.message
-        : "데이터를 불러오지 못했습니다. DATABASE_URL 설정을 확인해 주세요.";
+    console.error("Failed to load meetup dashboard", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      uiMessage: dataLoadErrorMessage(error),
+    });
+    loadError = dataLoadErrorMessage(error);
   }
 
   const dayTotalCount = meetingsOnDate.reduce((sum, meeting) => sum + meeting.totalCount, 0);
   const dayStudentCount = meetingsOnDate.reduce((sum, meeting) => sum + meeting.studentCount, 0);
   const dayOperationCount = meetingsOnDate.reduce((sum, meeting) => sum + meeting.operationCount, 0);
   const statValues = [meetingsOnDate.length, dayTotalCount, dayStudentCount, dayOperationCount];
-  const memberCoverageRate =
-    knownMemberCount > 0
-      ? Math.round((assignedKnownMemberCount / knownMemberCount) * 100)
-      : 0;
   const shareText =
     !loadError && meetingsOnDate.length > 0
       ? buildOfflineStudyShareText({
@@ -1001,27 +1046,6 @@ export async function MeetupDashboard({
           <>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
               <h2 className="text-lg font-semibold" style={{ color: "var(--ink)" }}>요약</h2>
-              <span
-                className="rounded-full border px-2 py-1 text-xs font-semibold"
-                style={{ borderColor: "var(--line)", color: "var(--accent)", backgroundColor: "var(--accent-weak)" }}
-              >
-                참여율 {memberCoverageRate}%
-              </span>
-            </div>
-
-            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
-              <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-                등록 멤버 {knownMemberCount}명 중 {assignedKnownMemberCount}명이 참여했습니다.
-              </p>
-              <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: "var(--surface)" }}>
-                <div
-                  className="h-full rounded-full transition-[width] duration-500"
-                  style={{
-                    width: `${Math.max(0, Math.min(memberCoverageRate, 100))}%`,
-                    backgroundColor: "var(--accent)",
-                  }}
-                />
-              </div>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 stagger-children">
@@ -1078,7 +1102,11 @@ export async function MeetupDashboard({
       ) : null}
 
       <UsageGuideModal />
-      <CreateMeetingModal selectedDate={selectedDate} returnPath={`${resolvedBasePath}?date=${encodeURIComponent(selectedDate)}`} />
+      <CreateMeetingModal
+        selectedDate={selectedDate}
+        returnPath={`${resolvedBasePath}?date=${encodeURIComponent(selectedDate)}`}
+        meetingKind={meetingKind}
+      />
     </main>
   );
 }

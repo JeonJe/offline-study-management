@@ -111,7 +111,10 @@ function TeamReportCard({
   );
 
   return (
-    <Link href={teamReportPath} className="card group block cursor-pointer p-5 sm:p-6">
+    <Link
+      href={teamReportPath}
+      className="card group block cursor-pointer p-5 transition hover:-translate-y-0.5 hover:shadow-lg sm:p-6"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-extrabold" style={{ color: "var(--ink)" }}>
@@ -130,16 +133,8 @@ function TeamReportCard({
             />
             {submitted ? "제출됨" : "미작성"}
           </span>
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold transition group-hover:translate-x-0.5"
-            style={{
-              borderColor: "var(--line)",
-              backgroundColor: "var(--surface)",
-              color: "var(--ink-muted)",
-            }}
-            aria-hidden="true"
-          >
-            &gt;
+          <span className="rounded-full border px-3 py-1 text-xs font-bold transition group-hover:border-transparent" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}>
+            {submitted ? "수정하기" : "작성하기"}
           </span>
         </div>
       </div>
@@ -190,9 +185,6 @@ function WeeklyReportAngelPanel({
           <h2 className="text-2xl font-extrabold" style={{ color: "var(--ink)" }}>
             주간 보고
           </h2>
-          <p className="mt-2 text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
-            팀별 카드를 확인하고 담당 팀 보고를 작성합니다.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {submitted ? (

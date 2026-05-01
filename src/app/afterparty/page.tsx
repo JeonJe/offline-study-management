@@ -27,6 +27,7 @@ import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
+import { dataLoadErrorMessage } from "@/lib/ui-error-messages";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -472,10 +473,8 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
       afterpartiesOnDate.map((item) => item.id)
     );
   } catch (error) {
-    loadError =
-      error instanceof Error
-        ? error.message
-        : "데이터를 불러오지 못했습니다. DATABASE_URL 설정을 확인해 주세요.";
+    console.error("Failed to load afterparty dashboard", error);
+    loadError = dataLoadErrorMessage(error);
   }
 
   const totalSettlementCount = afterpartiesOnDate.reduce(
@@ -538,15 +537,6 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
               <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
                 참여자 {totalParticipantCount}명 중 {settledParticipantCount}명이 정산 완료되었습니다.
               </p>
-              <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: "var(--surface)" }}>
-                <div
-                  className="h-full rounded-full transition-[width] duration-500"
-                  style={{
-                    width: `${Math.max(0, Math.min(settlementRate, 100))}%`,
-                    backgroundColor: "var(--accent)",
-                  }}
-                />
-              </div>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 stagger-children">

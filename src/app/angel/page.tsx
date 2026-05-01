@@ -82,9 +82,6 @@ function AngelHome({ unitSlug }: { unitSlug: string }) {
 export default async function AngelPage({ searchParams }: AngelPageProps) {
   const query = await searchParams;
   const unitSlug = singleParam(query.unit);
-  if (!unitSlug) {
-    redirect("/admin");
-  }
 
   const authenticated = await isAuthenticated();
   if (!authenticated) {
