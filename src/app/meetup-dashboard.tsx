@@ -28,6 +28,7 @@ import {
   cachedListRsvpsForMeetings,
   cachedLoadMemberPreset,
 } from "@/lib/cached-queries";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
@@ -967,10 +968,11 @@ export async function MeetupDashboard({
           teamLabelByMemberName,
         })
       : "";
+  const resolvedBasePath = cohortAwarePath(selectedUnitSlug, basePath);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-6 sm:px-6 lg:px-8 lg:pb-10">
-      <DashboardHeader title={title} activeTab={activeTab} currentDate={selectedDate} />
+      <DashboardHeader title={title} activeTab={activeTab} currentDate={selectedDate} unitSlug={selectedUnitSlug} />
 
       <section className="card-static mb-5 p-4 sm:p-5 fade-in">
         <div className="rounded-xl border px-3 py-3 sm:px-4" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
@@ -978,7 +980,7 @@ export async function MeetupDashboard({
             <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm" style={{ color: "var(--ink-soft)" }}>
               <span className="font-medium">날짜</span>
               <div className="min-w-44">
-                <DatePicker selectedDate={selectedDate} />
+                <DatePicker selectedDate={selectedDate} basePath={resolvedBasePath} />
               </div>
             </label>
             <span className="text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
@@ -1054,7 +1056,7 @@ export async function MeetupDashboard({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-semibold" style={{ color: "var(--ink)" }}>참여 현황</h3>
             <div className="flex flex-wrap items-center gap-2">
-              <OfflineStudyCopyTextButton textToCopy={shareText} linkPath={`${basePath}?date=${encodeURIComponent(selectedDate)}`} />
+              <OfflineStudyCopyTextButton textToCopy={shareText} linkPath={`${resolvedBasePath}?date=${encodeURIComponent(selectedDate)}`} />
               <OfflineStudyCaptureButton targetId={captureTargetId} />
             </div>
           </div>
@@ -1075,7 +1077,7 @@ export async function MeetupDashboard({
       ) : null}
 
       <UsageGuideModal />
-      <CreateMeetingModal selectedDate={selectedDate} returnPath={`${basePath}?date=${encodeURIComponent(selectedDate)}`} />
+      <CreateMeetingModal selectedDate={selectedDate} returnPath={`${resolvedBasePath}?date=${encodeURIComponent(selectedDate)}`} />
     </main>
   );
 }

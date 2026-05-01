@@ -6,6 +6,7 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { isAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -68,7 +69,7 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-function AdminHome() {
+function AdminHome({ unitSlug }: { unitSlug: string }) {
   const visibleCards = isOperatingUnitsEnabled()
     ? ADMIN_CARDS
     : ADMIN_CARDS.filter((card) => card.href !== "/admin/operating-units");
@@ -113,7 +114,7 @@ function AdminHome() {
             {body}
           </div>
         ) : (
-          <Link key={card.title} href={card.href} className="card p-5">
+          <Link key={card.title} href={cohortAwarePath(unitSlug, card.href)} className="card p-5">
             {body}
           </Link>
         );
@@ -133,6 +134,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     searchParams,
   ]);
   const page = getRolePage("admin");
+  const unitSlug = singleParam(query.unit);
+  const rolePath = cohortAwarePath(unitSlug, page.path);
   const access = canOpenRolePage("admin", currentRole, getConfiguredRolePages());
 
   let content;
@@ -144,10 +147,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         role="admin"
         label={page.label}
         invalid={singleParam(query.access) === "invalid"}
+        returnPath={rolePath}
       />
     );
   } else {
-    content = <AdminHome />;
+    content = <AdminHome unitSlug={unitSlug} />;
   }
 
   return (
@@ -155,6 +159,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       activeRole="admin"
       title={page.title}
       summary={page.summary}
+      unitSlug={unitSlug}
     >
       {content}
     </RoleShell>

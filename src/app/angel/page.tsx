@@ -6,6 +6,7 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { isAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -58,13 +59,13 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-function AngelHome() {
+function AngelHome({ unitSlug }: { unitSlug: string }) {
   return (
     <section className="grid gap-4 md:grid-cols-2">
       {ANGEL_CARDS.map((card) => (
         <Link
           key={card.title}
-          href={card.href}
+          href={cohortAwarePath(unitSlug, card.href)}
           className="card p-5"
           aria-disabled={card.status ? "true" : undefined}
         >
@@ -105,6 +106,8 @@ export default async function AngelPage({ searchParams }: AngelPageProps) {
     searchParams,
   ]);
   const page = getRolePage("angel");
+  const unitSlug = singleParam(query.unit);
+  const rolePath = cohortAwarePath(unitSlug, page.path);
   const access = canOpenRolePage("angel", currentRole, getConfiguredRolePages());
 
   let content;
@@ -116,10 +119,11 @@ export default async function AngelPage({ searchParams }: AngelPageProps) {
         role="angel"
         label={page.label}
         invalid={singleParam(query.access) === "invalid"}
+        returnPath={rolePath}
       />
     );
   } else {
-    content = <AngelHome />;
+    content = <AngelHome unitSlug={unitSlug} />;
   }
 
   return (
@@ -127,6 +131,7 @@ export default async function AngelPage({ searchParams }: AngelPageProps) {
       activeRole="angel"
       title={page.title}
       summary={page.summary}
+      unitSlug={unitSlug}
     >
       {content}
     </RoleShell>

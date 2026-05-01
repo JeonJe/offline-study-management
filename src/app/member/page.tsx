@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { RoleShell } from "@/app/role-shell";
 import { isAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import { getRolePage } from "@/lib/role-page";
 
 type MemberCard = {
@@ -24,13 +25,25 @@ const MEMBER_CARDS: MemberCard[] = [
   },
 ];
 
-function MemberHome() {
+type MemberPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function singleParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function MemberHome({ unitSlug }: { unitSlug: string }) {
   return (
     <section className="grid gap-4 md:grid-cols-2">
       {MEMBER_CARDS.map((card) => (
         <Link
           key={card.title}
-          href={card.href}
+          href={cohortAwarePath(unitSlug, card.href)}
           className="card p-5"
           aria-disabled={card.status ? "true" : undefined}
         >
@@ -60,7 +73,9 @@ function MemberHome() {
   );
 }
 
-export default async function MemberPage() {
+export default async function MemberPage({ searchParams }: MemberPageProps) {
+  const params = await searchParams;
+  const unitSlug = singleParam(params.unit);
   const authenticated = await isAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
@@ -73,8 +88,9 @@ export default async function MemberPage() {
       activeRole="member"
       title={page.title}
       summary={page.summary}
+      unitSlug={unitSlug}
     >
-      <MemberHome />
+      <MemberHome unitSlug={unitSlug} />
     </RoleShell>
   );
 }

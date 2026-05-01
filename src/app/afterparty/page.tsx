@@ -22,6 +22,7 @@ import {
   cachedListSettlementsForAfterparties,
   cachedLoadMemberPreset,
 } from "@/lib/cached-queries";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
@@ -244,15 +245,17 @@ function AfterpartyCard({
   settlements,
   participants,
   selectedDate,
+  unitSlug,
   teamLabelByMemberName,
 }: {
   afterparty: AfterpartySummary;
   settlements: AfterpartySettlement[];
   participants: AfterpartyParticipant[];
   selectedDate: string;
+  unitSlug: string;
   teamLabelByMemberName: Map<string, string>;
 }) {
-  const detailPath = `/afterparty/${afterparty.id}?date=${selectedDate}`;
+  const detailPath = cohortAwarePath(unitSlug, `/afterparty/${afterparty.id}?date=${selectedDate}`);
   const sortedParticipants: DecoratedAfterpartyParticipant[] = [...participants]
     .map((participant) => {
       const normalizedName = normalizeMemberName(participant.name);
@@ -397,6 +400,8 @@ function AfterpartyCard({
 export default async function AfterpartyPage({ searchParams }: AfterpartyPageProps) {
   const params = await searchParams;
   const requestDate = singleParam(params.date);
+  const unitSlug = singleParam(params.unit);
+  const afterpartyBasePath = cohortAwarePath(unitSlug, "/afterparty");
 
   const authenticated = await isAuthenticated();
   if (!authenticated) {
@@ -473,7 +478,7 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-      <DashboardHeader title="뒷풀이" activeTab="afterparty" currentDate={selectedDate} />
+      <DashboardHeader title="뒷풀이" activeTab="afterparty" currentDate={selectedDate} unitSlug={unitSlug} />
 
       <section className="card-static mb-5 p-4 sm:p-5 fade-in">
         <div className="rounded-xl border px-3 py-3 sm:px-4" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}>
@@ -481,7 +486,7 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
             <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm" style={{ color: "var(--ink-soft)" }}>
               <span className="font-medium">날짜</span>
               <div className="min-w-44">
-                <DatePicker selectedDate={selectedDate} basePath="/afterparty" />
+                <DatePicker selectedDate={selectedDate} basePath={afterpartyBasePath} />
               </div>
             </label>
             <span className="text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
@@ -566,6 +571,7 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
                 settlements={settlementsByAfterparty[afterparty.id] ?? []}
                 participants={participantsByAfterparty[afterparty.id] ?? []}
                 selectedDate={selectedDate}
+                unitSlug={unitSlug}
                 teamLabelByMemberName={teamLabelByMemberName}
               />
             ))}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cohortAwarePath,
   cohortScopedPath,
   resolveCohortRewrite,
 } from "@/lib/cohort-routes";
@@ -29,5 +30,19 @@ describe("cohort-routes", () => {
 
   it("resolveCohortRewrite는 지원하지 않는 section을 거부한다", () => {
     expect(resolveCohortRewrite("/cohorts/3%EA%B8%B0/unknown")).toBeNull();
+  });
+
+  it("cohortAwarePath는 기존 route href를 cohort URL로 변환한다", () => {
+    expect(cohortAwarePath("3기", "/afterparty/a-1?date=2026-05-01#settlement")).toBe(
+      "/cohorts/3%EA%B8%B0/afterparty/a-1?date=2026-05-01#settlement"
+    );
+  });
+
+  it("cohortAwarePath는 unit이 없으면 기존 href를 유지한다", () => {
+    expect(cohortAwarePath("", "/afterparty")).toBe("/afterparty");
+  });
+
+  it("cohortAwarePath는 이미 cohort URL이면 다시 감싸지 않는다", () => {
+    expect(cohortAwarePath("3기", "/cohorts/3%EA%B8%B0/angel")).toBe("/cohorts/3%EA%B8%B0/angel");
   });
 });

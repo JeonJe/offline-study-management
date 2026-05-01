@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { logoutAction } from "@/app/actions";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   type RolePageRole,
   listRolePages,
@@ -11,6 +12,7 @@ type RoleShellProps = {
   activeRole: RolePageRole;
   title: string;
   summary: string;
+  unitSlug?: string;
   children: ReactNode;
 };
 
@@ -30,6 +32,7 @@ export function RoleShell({
   activeRole,
   title,
   summary,
+  unitSlug = "",
   children,
 }: RoleShellProps) {
   return (
@@ -69,7 +72,7 @@ export function RoleShell({
                 {listRolePages().map((page) => (
                   <Link
                     key={page.role}
-                    href={page.path}
+                    href={cohortAwarePath(unitSlug, page.path)}
                     aria-current={activeRole === page.role ? "page" : undefined}
                     className="btn-press rounded-full border px-3.5 py-2 text-sm font-semibold transition hover:opacity-85"
                     style={activeRole === page.role ? activeNavStyle : navStyle}

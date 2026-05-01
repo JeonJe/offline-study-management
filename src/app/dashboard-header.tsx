@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { logoutAction } from "@/app/actions";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import { DEFAULT_OPERATING_UNIT_NAME } from "@/lib/operating-unit-store";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -10,6 +11,7 @@ type DashboardHeaderProps = {
   title: string;
   activeTab: DashboardTab;
   currentDate?: string;
+  unitSlug?: string;
   extraActions?: ReactNode;
 };
 
@@ -36,12 +38,14 @@ export function DashboardHeader({
   title,
   activeTab,
   currentDate,
+  unitSlug = "",
   extraActions,
 }: DashboardHeaderProps) {
   function tabHref(tab: { key: DashboardTab; href: string }): string {
-    if (!currentDate) return tab.href;
-    if (tab.key !== "loopPak" && tab.key !== "study" && tab.key !== "afterparty") return tab.href;
-    return `${tab.href}?date=${encodeURIComponent(currentDate)}`;
+    const href = cohortAwarePath(unitSlug, tab.href);
+    if (!currentDate) return href;
+    if (tab.key !== "loopPak" && tab.key !== "study" && tab.key !== "afterparty") return href;
+    return `${href}?date=${encodeURIComponent(currentDate)}`;
   }
 
   return (
