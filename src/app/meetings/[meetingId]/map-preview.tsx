@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { MapProvider } from "@/lib/location-utils";
+
+// X-Frame-Options 차단 시 onError가 발동하지 않으므로 폴백 전환까지 대기하는 시간(ms)
+const IFRAME_LOAD_TIMEOUT_MS = 5000;
 
 type MapPreviewProps = {
   embedUrl: string;
-  provider: MapProvider;
   locationText: string;
   placeLink: string;
 };
@@ -15,10 +16,9 @@ export function MapPreview({ embedUrl, locationText, placeLink }: MapPreviewProp
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // X-Frame-Options 차단 시 onError가 발동하지 않으므로 5초 타임아웃으로 폴백
     timerRef.current = setTimeout(() => {
       setStatus((prev) => (prev === "loading" ? "error" : prev));
-    }, 5000);
+    }, IFRAME_LOAD_TIMEOUT_MS);
 
     return () => {
       if (timerRef.current !== null) {
@@ -65,6 +65,8 @@ export function MapPreview({ embedUrl, locationText, placeLink }: MapPreviewProp
         {/* 로딩 중 placeholder */}
         {status === "loading" && (
           <div
+            role="status"
+            aria-live="polite"
             className="absolute inset-0 flex items-center justify-center text-sm"
             style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-soft)" }}
           >
