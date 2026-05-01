@@ -5,6 +5,9 @@ import path from "node:path";
 const TEST_DATE = "2026-09-01";
 const AFTERPARTY_PAGE = `/afterparty?date=${TEST_DATE}`;
 const AUTH_STATE = path.join(__dirname, ".auth", "state.json");
+// 수동 chromium.launch() context는 playwright.config의 use.baseURL을 상속받지 않으므로
+// beforeAll cleanup용 context 생성 시 명시적으로 전달한다
+const BASE_URL = "https://offline-study-management.vercel.app";
 
 // 회귀 테스트 전용 라벨 prefix — 다른 spec의 E2E 데이터와 구분
 const TEST_LABEL = "R회귀뒷풀이";
@@ -45,11 +48,9 @@ async function cleanupByLabel(
     await link.click();
     await page.waitForLoadState("domcontentloaded");
 
-    try {
-      await deleteAfterpartyFromDetail(page);
-    } catch {
-      break; // 삭제 실패 시 루프 종료
-    }
+    // 삭제 실패는 silent break 금지 — 오염된 테스트 데이터를 그대로 둔 채
+    // 본 시나리오를 진행하면 false positive 회귀 통과를 만든다 (fail-fast)
+    await deleteAfterpartyFromDetail(page);
   }
 }
 
@@ -75,7 +76,12 @@ test.describe.serial("회귀: 뒷풀이 생성 → 참여 → 정산 → 삭제"
   // 이전 실행에서 남은 테스트 데이터 정리
   test.beforeAll(async () => {
     const browser = await chromium.launch();
-    const context = await browser.newContext({ storageState: AUTH_STATE });
+    // 수동 context는 config.use.baseURL을 상속받지 않으므로 명시적으로 전달
+    // (page.goto의 상대 경로가 정상 해석되어야 cleanup이 실제로 동작)
+    const context = await browser.newContext({
+      storageState: AUTH_STATE,
+      baseURL: BASE_URL,
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(10_000);
 
