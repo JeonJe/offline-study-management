@@ -44,12 +44,11 @@ export function RoleShell({
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-6 sm:px-6 lg:px-8 lg:pb-10">
       <header
-        className="sticky top-0 z-30 mb-4 w-screen border-b px-4 py-2.5 sm:px-6 lg:px-8 fade-in"
+        className="fixed inset-x-0 top-0 z-40 border-b px-4 py-2.5 sm:px-6 lg:px-8"
         style={{
           backdropFilter: "blur(12px)",
-          backgroundColor: "rgba(255, 255, 255, 0.94)",
+          backgroundColor: "rgba(255, 255, 255, 0.96)",
           borderColor: "var(--line)",
-          marginLeft: "calc(50% - 50vw)",
         }}
       >
         <div className="mx-auto w-full max-w-6xl">
@@ -65,14 +64,12 @@ export function RoleShell({
 
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className="rounded-full border px-3 py-1.5 text-xs font-bold"
-                style={{
-                  borderColor: "rgba(13, 127, 242, 0.25)",
-                  backgroundColor: "var(--accent-weak)",
-                  color: "var(--accent-strong)",
-                }}
+                className="text-[11px] font-semibold"
+                style={{ color: "var(--ink-muted)" }}
+                aria-label={`선택한 범위 ${displayScope}`}
               >
-                {displayScope}
+                <span className="font-medium">범위</span>{" "}
+                <span style={{ color: "var(--ink-soft)" }}>{displayScope}</span>
               </span>
               {showRoleNav ? (
                 <nav className="flex flex-wrap items-center gap-2" aria-label="역할별 페이지 이동">
@@ -111,6 +108,7 @@ export function RoleShell({
           </p>
         </div>
       </header>
+      <div className="h-[118px] sm:h-[76px]" aria-hidden="true" />
 
       {children}
     </main>
