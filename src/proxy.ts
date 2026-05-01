@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { resolveCohortRewrite } from "@/lib/cohort-routes";
 
 export function proxy(request: NextRequest) {
+  if (isCohortAdminHubPath(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const rewrite = resolveCohortRewrite(request.nextUrl.pathname);
   if (!rewrite) return NextResponse.next();
 
@@ -18,3 +22,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/cohorts/:path*"],
 };
+
+function isCohortAdminHubPath(pathname: string): boolean {
+  const [prefix, unit, section, ...rest] = pathname.split("/").filter(Boolean);
+  return prefix === "cohorts" && Boolean(unit) && section === "admin" && rest.length === 0;
+}
