@@ -69,6 +69,26 @@ function decodeTeamName(value: string): string {
   }
 }
 
+function formatCommentDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+
+function commentAuthorRoleLabel(comment: WeeklyReportComment): string {
+  if (comment.authorRole === "admin") return "관리자";
+  if (comment.authorRole === "leader") return "방장";
+  return "엔젤";
+}
+
 async function loadAngelTeamReportPageData(
   cycleId: string,
   teamName: string
@@ -221,16 +241,119 @@ function TeamReportForm({
               엔젤 {team.angels.length > 0 ? team.angels.join(", ") : "미지정"} · 멤버 {team.members.length}명
             </p>
           </div>
-          <span
-            className="rounded-full border px-3 py-1 text-sm font-bold"
-            style={{
-              borderColor: report ? "var(--success)" : "rgba(13, 127, 242, 0.25)",
-              backgroundColor: report ? "var(--success-bg)" : "var(--accent-weak)",
-              color: report ? "var(--success)" : "var(--accent-strong)",
-            }}
-          >
-            {report ? "수정" : "새 작성"}
-          </span>
+          <details>
+            <summary
+              className="btn-press cursor-pointer list-none rounded-full border px-3 py-1 text-sm font-bold"
+              style={{
+                borderColor: report ? "var(--success)" : "rgba(13, 127, 242, 0.25)",
+                backgroundColor: report ? "var(--success-bg)" : "var(--accent-weak)",
+                color: report ? "var(--success)" : "var(--accent-strong)",
+              }}
+            >
+              {report ? "수정" : "작성"}
+            </summary>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="weekly-report-edit-title"
+                className="modal-surface max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto p-5"
+              >
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 id="weekly-report-edit-title" className="text-lg font-extrabold" style={{ color: "var(--ink)" }}>
+                      {team.teamName} 보고 {report ? "수정" : "작성"}
+                    </h3>
+                    <p className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
+                      저장하면 상세 화면의 보고 내용이 갱신됩니다.
+                    </p>
+                  </div>
+                  <span className="rounded-md border px-2 py-1 text-xs font-semibold" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                    {team.teamName}
+                  </span>
+                </div>
+
+                <form action={submitAngelWeeklyReportAction} className="grid gap-4">
+                  <input type="hidden" name="cycleId" value={cycle.id} />
+                  <input type="hidden" name="teamName" value={team.teamName} />
+                  <input type="hidden" name="returnPath" value={returnPath} />
+
+                  <label className="grid gap-2 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>
+                    작성자
+                    {team.angels.length > 0 ? (
+                      <select
+                        name="angelName"
+                        required
+                        className="h-12 rounded-xl border px-3 text-sm"
+                        style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+                        defaultValue={defaultAngelName}
+                      >
+                        {team.angels.map((angel) => (
+                          <option key={`${team.teamName}-${angel}`} value={angel}>
+                            {angel}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        name="angelName"
+                        required
+                        placeholder="작성자 이름"
+                        defaultValue={report?.angelName ?? ""}
+                        className="h-12 rounded-xl border px-3 text-sm"
+                        style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+                      />
+                    )}
+                  </label>
+
+                  <section className="grid gap-3 md:grid-cols-2">
+                    {templateSections.map((section, index) => {
+                      const field = fieldByKey[section.key];
+                      return (
+                        <label
+                          key={`edit-${section.key}-${index}`}
+                          className={`grid gap-2 text-sm font-semibold ${
+                            index === 0 || templateSections.length % 2 === 1 && index === templateSections.length - 1
+                              ? "md:col-span-2"
+                              : ""
+                          }`}
+                          style={{ color: "var(--ink-soft)" }}
+                        >
+                          {section.title}
+                          <textarea
+                            name={field.name}
+                            required={section.required}
+                            rows={field.rows}
+                            placeholder={section.prompt}
+                            defaultValue={field.value}
+                            className="rounded-xl border px-3 py-3 text-sm"
+                            style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+                          />
+                        </label>
+                      );
+                    })}
+                  </section>
+
+                  <div className="flex justify-end gap-2">
+                    <Link
+                      href={returnPath}
+                      className="btn-press inline-flex h-12 items-center rounded-full border px-4 text-sm font-bold"
+                      style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}
+                    >
+                      닫기
+                    </Link>
+                    <button
+                      type="submit"
+                      className="btn-press h-12 rounded-full px-5 text-sm font-bold text-white"
+                      style={{ backgroundColor: "var(--accent)" }}
+                    >
+                      저장
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </details>
         </div>
 
         <div
@@ -242,86 +365,45 @@ function TeamReportForm({
           </span>
           <span className="ml-2">{templateText}</span>
         </div>
-      </article>
 
-      <form action={submitAngelWeeklyReportAction} className="card-static grid gap-4 p-5 sm:p-6">
-        <input type="hidden" name="cycleId" value={cycle.id} />
-        <input type="hidden" name="teamName" value={team.teamName} />
-        <input type="hidden" name="returnPath" value={returnPath} />
-
-        <label className="grid gap-2 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>
-          작성자
-          {team.angels.length > 0 ? (
-            <select
-              name="angelName"
-              required
-              className="h-12 rounded-xl border px-3 text-sm"
-              style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-              defaultValue={defaultAngelName}
-            >
-              {team.angels.map((angel) => (
-                <option key={`${team.teamName}-${angel}`} value={angel}>
-                  {angel}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              name="angelName"
-              required
-              placeholder="작성자 이름"
-              defaultValue={report?.angelName ?? ""}
-              className="h-12 rounded-xl border px-3 text-sm"
-              style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-            />
-          )}
-        </label>
-
-        <section className="grid gap-3 md:grid-cols-2">
+        <section className="mt-4 grid gap-3 md:grid-cols-2">
           {templateSections.map((section, index) => {
             const field = fieldByKey[section.key];
             return (
-              <label
-                key={`${section.key}-${index}`}
-                className={`grid gap-2 text-sm font-semibold ${
+              <div
+                key={`readonly-${section.key}-${index}`}
+                className={`rounded-xl border bg-white p-4 ${
                   index === 0 || templateSections.length % 2 === 1 && index === templateSections.length - 1
                     ? "md:col-span-2"
                     : ""
                 }`}
-                style={{ color: "var(--ink-soft)" }}
+                style={{ borderColor: "var(--line)" }}
               >
-                {section.title}
-                <textarea
-                  name={field.name}
-                  required={section.required}
-                  rows={field.rows}
-                  placeholder={section.prompt}
-                  defaultValue={field.value}
-                  className="rounded-xl border px-3 py-3 text-sm"
-                  style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                />
-              </label>
+                <p className="text-xs font-bold" style={{ color: "var(--ink-soft)" }}>
+                  {section.title}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: field.value ? "var(--ink)" : "var(--ink-muted)" }}>
+                  {field.value || "아직 작성된 내용이 없습니다."}
+                </p>
+              </div>
             );
           })}
         </section>
-
-        <button
-          type="submit"
-          className="btn-press h-12 rounded-full px-4 text-sm font-bold text-white"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          저장
-        </button>
-      </form>
+      </article>
 
       <section className="card-static grid gap-4 p-5 sm:p-6">
-        <div>
-          <h2 className="text-lg font-extrabold" style={{ color: "var(--ink)" }}>
-            댓글
-          </h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
-            보고 내용을 확인하며 필요한 피드백을 남깁니다.
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--line)" }}>
+          <div>
+            <h2 className="text-lg font-extrabold" style={{ color: "var(--ink)" }}>
+              댓글
+            </h2>
+            <p className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
+              보고 내용에 대한 확인 사항을 남깁니다.
+            </p>
+          </div>
+          <span className="text-xs font-semibold" style={{ color: "var(--ink-muted)" }}>
+            {comments.length}개
+          </span>
         </div>
 
         {!report ? (
@@ -330,9 +412,9 @@ function TeamReportForm({
           </p>
         ) : (
           <>
-            <div className="grid gap-3">
+            <div className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: "var(--line)" }}>
               {comments.length === 0 ? (
-                <p className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                <p className="px-4 py-5 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
                   아직 댓글이 없습니다.
                 </p>
               ) : (
@@ -343,39 +425,51 @@ function TeamReportForm({
                       comment.authorRole === "angel" &&
                       comment.authorLabel === defaultAngelName);
                   return (
-                    <article key={comment.id} className="rounded-xl border p-4" style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}>
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
-                          {comment.authorLabel}
-                        </p>
+                    <article key={comment.id} className="border-b px-4 py-3 last:border-b-0" style={{ borderColor: "var(--line)" }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
+                              {comment.authorLabel}
+                            </p>
+                            <span className="rounded-md border px-1.5 py-0.5 text-[11px] font-semibold" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                              {commentAuthorRoleLabel(comment)}
+                            </span>
+                            {formatCommentDate(comment.createdAt) ? (
+                              <time className="text-xs" style={{ color: "var(--ink-muted)" }} dateTime={comment.createdAt}>
+                                {formatCommentDate(comment.createdAt)}
+                              </time>
+                            ) : null}
+                          </div>
+                        </div>
                         {canDelete ? (
-	                          <form action={deleteWeeklyReportCommentAction}>
-	                            <input type="hidden" name="commentId" value={comment.id} />
-	                            <input type="hidden" name="reportId" value={report.id} />
-	                            <input type="hidden" name="authorLabel" value={defaultAngelName} />
-	                            <input
-	                              type="hidden"
-	                              name="ownershipToken"
-	                              value={
-	                                createRoleScopedToken(
-	                                  "angel",
-	                                  "weekly-report-comment-delete",
-	                                  `${report.id}:${comment.id}:${defaultAngelName}`
-	                                ) ?? ""
-	                              }
-	                            />
-	                            <input type="hidden" name="returnPath" value={returnPath} />
+                          <form action={deleteWeeklyReportCommentAction}>
+                            <input type="hidden" name="commentId" value={comment.id} />
+                            <input type="hidden" name="reportId" value={report.id} />
+                            <input type="hidden" name="authorLabel" value={defaultAngelName} />
+                            <input
+                              type="hidden"
+                              name="ownershipToken"
+                              value={
+                                createRoleScopedToken(
+                                  "angel",
+                                  "weekly-report-comment-delete",
+                                  `${report.id}:${comment.id}:${defaultAngelName}`
+                                ) ?? ""
+                              }
+                            />
+                            <input type="hidden" name="returnPath" value={returnPath} />
                             <button
                               type="submit"
-                              className="btn-press rounded-full border px-2.5 py-1 text-xs font-bold"
-                              style={{ borderColor: "#fecaca", color: "var(--danger)", backgroundColor: "var(--danger-bg)" }}
+                              className="btn-press rounded-md border px-2 py-1 text-xs font-semibold"
+                              style={{ borderColor: "var(--line)", color: "var(--ink-muted)", backgroundColor: "var(--surface)" }}
                             >
                               삭제
                             </button>
                           </form>
                         ) : null}
                       </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
                         {comment.body}
                       </p>
                     </article>
@@ -384,23 +478,41 @@ function TeamReportForm({
               )}
             </div>
 
-            <form action={addWeeklyReportCommentAction} className="grid gap-3">
-	              <input type="hidden" name="reportId" value={report.id} />
-	              <input type="hidden" name="authorLabel" value={defaultAngelName} />
-	              <input type="hidden" name="authorToken" value={commentAuthorToken ?? ""} />
-	              <input type="hidden" name="returnPath" value={returnPath} />
-              <textarea
-                name="body"
-                required
-                rows={4}
-                maxLength={4000}
-                placeholder="댓글을 입력하세요."
-                className="rounded-xl border px-3 py-3 text-sm"
-                style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-              />
+            <form action={addWeeklyReportCommentAction} className="grid gap-2 rounded-xl border bg-white p-3" style={{ borderColor: "var(--line)" }}>
+              <input type="hidden" name="reportId" value={report.id} />
+              <input type="hidden" name="authorToken" value={commentAuthorToken ?? ""} />
+              <input type="hidden" name="returnPath" value={returnPath} />
+              <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+                <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }} htmlFor="weekly-report-comment-author">
+                  이름
+                  <input
+                    id="weekly-report-comment-author"
+                    name="authorLabel"
+                    required
+                    maxLength={80}
+                    defaultValue={currentRole === "admin" ? "관리자" : defaultAngelName}
+                    className="h-10 rounded-lg border px-3 text-sm"
+                    style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+                    placeholder="이름"
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }} htmlFor="weekly-report-comment-body">
+                  내용
+                  <textarea
+                    id="weekly-report-comment-body"
+                    name="body"
+                    required
+                    rows={4}
+                    maxLength={4000}
+                    placeholder="댓글 내용을 입력하세요."
+                    className="rounded-lg border px-3 py-3 text-sm"
+                    style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+                  />
+                </label>
+              </div>
               <button
                 type="submit"
-                className="btn-press h-11 rounded-full px-4 text-sm font-bold text-white"
+                className="btn-press justify-self-end rounded-lg px-4 py-2 text-sm font-bold text-white"
                 style={{ backgroundColor: "var(--accent)" }}
               >
                 댓글 등록

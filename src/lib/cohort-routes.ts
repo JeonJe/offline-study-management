@@ -39,6 +39,10 @@ function cleanSegments(pathname: string): string[] {
   return pathname.split("/").filter(Boolean);
 }
 
+function encodePathSegmentOnce(segment: string): string {
+  return encodeURIComponent(safeDecode(segment));
+}
+
 export function cohortScopedPath(unitSlug: string, section: string = "loop-pak"): string {
   const unit = unitSlug.trim();
   const normalizedSection = section.trim() || "loop-pak";
@@ -59,7 +63,7 @@ export function cohortAwarePath(unitSlug: string, href: string): string {
   const restPath =
     match.path === "/"
       ? ""
-      : parsed.pathname.slice(match.path.length).split("/").filter(Boolean).map(encodeURIComponent).join("/");
+      : parsed.pathname.slice(match.path.length).split("/").filter(Boolean).map(encodePathSegmentOnce).join("/");
   const base = cohortScopedPath(unit, match.section);
   const path = restPath ? `${base}/${restPath}` : base;
 

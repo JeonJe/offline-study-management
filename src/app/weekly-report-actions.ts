@@ -195,10 +195,7 @@ export async function addWeeklyReportCommentAction(formData: FormData): Promise<
   const reportId = textFrom(formData, "reportId");
   const returnPath = safeReturnPath(formData);
   const authorRole = commentAuthorRoleFromPageRole(currentRole);
-  const authorLabel =
-    authorRole === "admin"
-      ? "관리자"
-      : textFrom(formData, "authorLabel");
+  const authorLabel = textFrom(formData, "authorLabel") || (authorRole === "admin" ? "관리자" : "");
   if (
     authorRole === "angel" &&
     !verifyRoleScopedToken(

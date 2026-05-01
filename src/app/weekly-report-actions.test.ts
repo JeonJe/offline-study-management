@@ -144,4 +144,29 @@ describe("weekly report comment server actions", () => {
 
     expect(softDeleteCommentMock).toHaveBeenCalledWith("comment-1");
   });
+
+  it("admin 댓글 작성은 입력한 이름을 작성자로 저장한다", async () => {
+    isAuthenticatedMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("admin");
+    addCommentMock.mockResolvedValue({
+      id: "comment-1",
+      reportId: "report-1",
+      authorRole: "admin",
+      authorLabel: "전제",
+      body: "확인했습니다.",
+      createdAt: "2026-05-01T14:00:00.000Z",
+    });
+
+    await expect(
+      addWeeklyReportCommentAction(commentForm({ authorLabel: "전제" }))
+    ).rejects.toThrow("redirect:/angel/reports/cycle-1/teams/1%ED%8C%80?comment=created");
+
+    expect(addCommentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authorRole: "admin",
+        authorLabel: "전제",
+        body: "확인했습니다.",
+      })
+    );
+  });
 });

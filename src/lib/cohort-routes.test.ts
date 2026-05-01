@@ -44,6 +44,18 @@ describe("cohort-routes", () => {
     );
   });
 
+  it("cohortAwarePath는 한글 path segment를 이중 인코딩하지 않는다", () => {
+    expect(cohortAwarePath("loop-pak-3", "/angel/reports/cycle-1/teams/1팀")).toBe(
+      "/cohorts/loop-pak-3/angel/reports/cycle-1/teams/1%ED%8C%80"
+    );
+  });
+
+  it("cohortAwarePath는 이미 인코딩된 path segment도 한 번만 인코딩된 상태로 유지한다", () => {
+    expect(cohortAwarePath("loop-pak-3", "/angel/reports/cycle-1/teams/1%ED%8C%80")).toBe(
+      "/cohorts/loop-pak-3/angel/reports/cycle-1/teams/1%ED%8C%80"
+    );
+  });
+
   it("cohortAwarePath는 unit이 없으면 기존 href를 유지한다", () => {
     expect(cohortAwarePath("", "/afterparty")).toBe("/afterparty");
   });
