@@ -106,6 +106,13 @@ type UpdateWeeklyReportTemplateInput = CreateWeeklyReportTemplateInput & {
 
 export type WeeklyReportCommentAuthorRole = 'admin' | 'angel' | 'leader';
 
+// 댓글 작성자 역할 화이트리스트. SM-3B server action에서 동일 검증에 재사용한다.
+export const VALID_AUTHOR_ROLES: readonly WeeklyReportCommentAuthorRole[] = [
+  'admin',
+  'angel',
+  'leader',
+] as const;
+
 export type WeeklyReportComment = {
   id: string;
   reportId: string;
@@ -863,7 +870,6 @@ export async function addComment(
 ): Promise<WeeklyReportComment> {
   await ensureWeeklyReportSchema();
 
-  const VALID_AUTHOR_ROLES: WeeklyReportCommentAuthorRole[] = ['admin', 'angel', 'leader'];
   if (!VALID_AUTHOR_ROLES.includes(input.authorRole)) {
     throw new Error("유효하지 않은 작성자 역할입니다.");
   }
