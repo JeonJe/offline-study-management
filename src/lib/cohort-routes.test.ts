@@ -38,6 +38,12 @@ describe("cohort-routes", () => {
     );
   });
 
+  it("cohortAwarePath는 모임 상세 URL도 cohort URL로 변환한다", () => {
+    expect(cohortAwarePath("3기", "/meetings/m-1?date=2026-05-01")).toBe(
+      "/cohorts/3%EA%B8%B0/meetings/m-1?date=2026-05-01"
+    );
+  });
+
   it("cohortAwarePath는 unit이 없으면 기존 href를 유지한다", () => {
     expect(cohortAwarePath("", "/afterparty")).toBe("/afterparty");
   });

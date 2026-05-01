@@ -702,11 +702,13 @@ function MeetingCard({
   meeting,
   rsvps,
   selectedDate,
+  unitSlug,
   teamLabelByMemberName,
 }: {
   meeting: MeetingSummary;
   rsvps: RsvpRecord[];
   selectedDate: string;
+  unitSlug: string;
   teamLabelByMemberName: Map<string, string>;
 }) {
   const displayParticipantName = (row: RsvpRecord): string => withTeamLabel(row.name, teamLabelByMemberName);
@@ -729,7 +731,7 @@ function MeetingCard({
     role,
     rows: groupedByRole.get(role) ?? [],
   })).filter((group) => group.rows.length > 0);
-  const detailPath = `/meetings/${meeting.id}?date=${selectedDate}`;
+  const detailPath = cohortAwarePath(unitSlug, `/meetings/${meeting.id}?date=${selectedDate}`);
 
   return (
     <article className="card study-card relative p-4 sm:p-5">
@@ -1068,6 +1070,7 @@ export async function MeetupDashboard({
                   meeting={meeting}
                   rsvps={rsvpsByMeeting[meeting.id] ?? []}
                   selectedDate={selectedDate}
+                  unitSlug={selectedUnitSlug}
                   teamLabelByMemberName={teamLabelByMemberName}
                 />
               ))}

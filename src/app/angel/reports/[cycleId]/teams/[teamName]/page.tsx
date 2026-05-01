@@ -24,6 +24,7 @@ import {
   getCurrentRolePageRole,
   createRoleScopedToken,
 } from "@/lib/role-session";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   type AngelWeeklyReport,
   type WeeklyReportComment,
@@ -135,6 +136,7 @@ function TeamReportForm({
   comments,
   currentRole,
   submitted,
+  unitSlug,
 }: {
   cycle: WeeklyReportCycle;
   template: WeeklyReportTemplate | null;
@@ -143,11 +145,13 @@ function TeamReportForm({
   comments: WeeklyReportComment[];
   currentRole: RolePageRole | null;
   submitted: boolean;
+  unitSlug: string;
 }) {
   const templateText =
     template?.prompt || cycle.prompt || "팀 분위기, 참여 상황, 도움이 필요한 부분을 자유롭게 적어주세요.";
   const templateSections = template?.sections ?? DEFAULT_WEEKLY_REPORT_TEMPLATE_SECTIONS;
-  const returnPath = `/angel/reports/${cycle.id}/teams/${encodeURIComponent(team.teamName)}`;
+  const reportListPath = cohortAwarePath(unitSlug, `/angel/reports/${cycle.id}`);
+  const returnPath = cohortAwarePath(unitSlug, `/angel/reports/${cycle.id}/teams/${encodeURIComponent(team.teamName)}`);
   const defaultAngelName =
     report?.angelName && team.angels.includes(report.angelName)
       ? report.angelName
@@ -186,7 +190,7 @@ function TeamReportForm({
     <section className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          href={`/angel/reports/${cycle.id}`}
+          href={reportListPath}
           className="rounded-full border px-3 py-1 text-sm font-bold"
           style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
         >
@@ -423,6 +427,7 @@ export default async function AngelTeamReportPage({
     searchParams,
   ]);
   const page = getRolePage("angel");
+  const unitSlug = singleParam(query.unit);
   const access = canOpenRolePage("angel", currentRole, getConfiguredRolePages());
   const teamName = decodeTeamName(routeParams.teamName);
 
@@ -471,6 +476,7 @@ export default async function AngelTeamReportPage({
           comments={data.comments}
           currentRole={currentRole}
           submitted={singleParam(query.report) === "submitted"}
+          unitSlug={unitSlug}
         />
       );
     }
@@ -481,6 +487,7 @@ export default async function AngelTeamReportPage({
       activeRole="angel"
       title={`${teamName} 주간 보고`}
       summary="선택한 팀의 보고를 작성하거나 수정합니다."
+      unitSlug={unitSlug}
     >
       {content}
     </RoleShell>

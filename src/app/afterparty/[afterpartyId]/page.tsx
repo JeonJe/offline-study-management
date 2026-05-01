@@ -28,6 +28,7 @@ import {
   cachedListSettlementsForAfterparty,
   cachedLoadMemberPreset,
 } from "@/lib/cached-queries";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import { SettlementToggle } from "@/app/afterparty/[afterpartyId]/settlement-toggle";
 import {
   normalizeParticipantName,
@@ -293,6 +294,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   const { afterpartyId } = await params;
   const query = await searchParams;
   const date = singleParam(query.date);
+  const unitSlug = singleParam(query.unit);
   const teamFilter = singleParam(query.team);
   const participantSearch = singleParam(query.participantSearch).trim();
   const requestedSettlementId = singleParam(query.settlement);
@@ -313,7 +315,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   ]);
 
   if (!afterparty) {
-    redirect(date ? `/afterparty?date=${date}` : "/afterparty");
+    redirect(cohortAwarePath(unitSlug, date ? `/afterparty?date=${date}` : "/afterparty"));
   }
 
   const manageErrorMessage =
@@ -510,10 +512,11 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   if (participantSearch) returnParams.set("participantSearch", participantSearch);
   returnParams.set("settlement", selectedSettlement.id);
   const returnQuery = returnParams.toString();
-  const returnPath = `/afterparty/${afterpartyId}${returnQuery ? `?${returnQuery}` : ""}`;
+  const afterpartyBasePath = cohortAwarePath(unitSlug, `/afterparty/${afterpartyId}`);
+  const returnPath = `${afterpartyBasePath}${returnQuery ? `?${returnQuery}` : ""}`;
   const manualReturnPath = `${returnPath}#participant-manual-add`;
   const quickAddReturnPath = `${returnPath}#participant-quick-add`;
-  const backPath = date ? `/afterparty?date=${date}` : "/afterparty";
+  const backPath = cohortAwarePath(unitSlug, date ? `/afterparty?date=${date}` : "/afterparty");
   const managePasswordTargets = afterparty.hasPassword
     ? [
         { formId: "afterparty-update-form", name: "afterpartyPassword" },
@@ -777,7 +780,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
                       <p className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
                         {settlement.title} · {settlementProgressText(settlement)}
                       </p>
-                      <form action={`/afterparty/${afterpartyId}`} method="get">
+                      <form action={afterpartyBasePath} method="get">
                         {date ? <input type="hidden" name="date" value={date} /> : null}
                         {teamFilter ? <input type="hidden" name="team" value={teamFilter} /> : null}
                         {participantSearch ? <input type="hidden" name="participantSearch" value={participantSearch} /> : null}
@@ -1031,7 +1034,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
         </div>
 
         <form
-          action={`/afterparty/${afterpartyId}`}
+          action={afterpartyBasePath}
           method="get"
           className="mt-3"
         >
@@ -1059,7 +1062,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
 
         <div className="mt-3">
           <QuerySelectFilter
-            pathname={`/afterparty/${afterpartyId}`}
+            pathname={afterpartyBasePath}
             paramName="team"
             selectedValue={teamFilter}
             params={{

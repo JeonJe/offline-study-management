@@ -4,6 +4,7 @@ const ROUTE_MAP: Record<string, string> = {
   "loop-pak": "/loop-pak",
   study: "/",
   afterparty: "/afterparty",
+  meetings: "/meetings",
   members: "/members",
   member: "/member",
   angel: "/angel",
@@ -13,6 +14,7 @@ const ROUTE_MAP: Record<string, string> = {
 const PATH_SECTION_MAP: { path: string; section: string }[] = [
   { path: "/loop-pak", section: "loop-pak" },
   { path: "/afterparty", section: "afterparty" },
+  { path: "/meetings", section: "meetings" },
   { path: "/members", section: "members" },
   { path: "/member", section: "member" },
   { path: "/angel", section: "angel" },

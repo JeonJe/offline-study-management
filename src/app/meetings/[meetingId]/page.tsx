@@ -17,6 +17,7 @@ import {
   cachedListRsvpsForMeetings,
   cachedLoadMemberPreset,
 } from "@/lib/cached-queries";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import { redirect } from "next/navigation";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
 import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-button";
@@ -350,6 +351,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
   const { meetingId } = await params;
   const query = await searchParams;
   const date = singleParam(query.date);
+  const unitSlug = singleParam(query.unit);
   const teamFilter = singleParam(query.team);
   const participantSearch = singleParam(query.participantSearch).trim();
   const manageStatus = singleParam(query.manage);
@@ -367,7 +369,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     cachedLoadMemberPreset(),
   ]);
   if (!meeting) {
-    redirect(date ? `/?date=${date}` : "/");
+    redirect(cohortAwarePath(unitSlug, date ? `/?date=${date}` : "/"));
   }
 
   const manageErrorMessage =
@@ -583,10 +585,11 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
   if (teamFilter) returnParams.set("team", teamFilter);
   if (participantSearch) returnParams.set("participantSearch", participantSearch);
   const returnQuery = returnParams.toString();
-  const returnPath = `/meetings/${meetingId}${returnQuery ? `?${returnQuery}` : ""}`;
+  const meetingBasePath = cohortAwarePath(unitSlug, `/meetings/${meetingId}`);
+  const returnPath = `${meetingBasePath}${returnQuery ? `?${returnQuery}` : ""}`;
   const manualReturnPath = `${returnPath}#participant-manual-add`;
   const assignmentReturnPath = `${returnPath}#team-assignment`;
-  const backPath = date ? `/?date=${date}` : "/";
+  const backPath = cohortAwarePath(unitSlug, date ? `/?date=${date}` : "/");
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -955,7 +958,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
           <ProgressBar assigned={assignedCount} total={totalMemberCount} />
 
           <form
-            action={`/meetings/${meetingId}`}
+            action={meetingBasePath}
             method="get"
             className="mt-1"
           >
@@ -982,7 +985,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
 
           <div className="mt-3">
             <QuerySelectFilter
-              pathname={`/meetings/${meetingId}`}
+              pathname={meetingBasePath}
               paramName="team"
               selectedValue={teamFilter}
               params={{
