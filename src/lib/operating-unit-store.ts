@@ -9,6 +9,7 @@ export type OperatingUnit = {
   name: string;
   description: string | null;
   isDefault: boolean;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -32,9 +33,15 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
          name text not null,
          description text,
          is_default boolean not null default false,
+         is_active boolean not null default true,
          created_at timestamptz not null default now(),
          updated_at timestamptz not null default now()
        )`
+    );
+
+    await query(
+      `alter table public.operating_units
+       add column if not exists is_active boolean not null default true`
     );
 
     await query(
@@ -48,6 +55,7 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
        values ($1, $2, false)
        on conflict (slug)
        do update set
+         is_active = true,
          is_default = false,
          updated_at = now()`,
       [LEGACY_OPERATING_UNIT_SLUG, "기존 데이터"]
@@ -59,6 +67,7 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
        on conflict (slug)
        do update set
          name = coalesce(nullif(public.operating_units.name, ''), excluded.name),
+         is_active = true,
          is_default = true,
          updated_at = now()`,
       [DEFAULT_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_NAME]
@@ -67,10 +76,11 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
     await query(
       `update public.operating_units
        set is_default = false,
+           is_active = true,
            updated_at = now()
-       where slug <> $1
-         and is_default`,
-      [DEFAULT_OPERATING_UNIT_SLUG]
+       where slug = $1
+          or (slug <> $2 and is_default)`,
+      [LEGACY_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_SLUG]
     );
 
     schemaReady = true;
@@ -123,10 +133,11 @@ export async function listOperatingUnits(): Promise<OperatingUnit[]> {
        name,
        description,
        is_default as "isDefault",
+       is_active as "isActive",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"
      from public.operating_units
-     order by is_default desc, created_at asc, slug asc`
+     order by is_default desc, is_active desc, created_at asc, slug asc`
   );
 }
 
@@ -146,6 +157,7 @@ export async function getOperatingUnit(
        name,
        description,
        is_default as "isDefault",
+       is_active as "isActive",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"
      from public.operating_units
@@ -179,6 +191,7 @@ export async function createOperatingUnit(input: {
        name,
        description,
        is_default as "isDefault",
+       is_active as "isActive",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"`,
     [slug, name, input.description?.trim() ?? ""]
@@ -194,6 +207,7 @@ export async function updateOperatingUnit(input: {
   slug: string;
   name: string;
   description?: string;
+  isActive: boolean;
 }): Promise<OperatingUnit> {
   await ensureOperatingUnitSchema();
 
@@ -203,10 +217,14 @@ export async function updateOperatingUnit(input: {
     throw new Error("운영 단위 이름과 식별자가 필요합니다.");
   }
 
+  const isProtectedDefault = isProtectedOperatingUnitSlug(slug);
+  const nextIsActive = isProtectedDefault ? true : input.isActive;
+
   const [updated] = await query<OperatingUnit>(
     `update public.operating_units
      set name = $2,
          description = nullif($3, ''),
+         is_active = $4,
          updated_at = now()
      where slug = $1
      returning
@@ -214,9 +232,10 @@ export async function updateOperatingUnit(input: {
        name,
        description,
        is_default as "isDefault",
+       is_active as "isActive",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"`,
-    [slug, name, input.description?.trim() ?? ""]
+    [slug, name, input.description?.trim() ?? "", nextIsActive]
   );
 
   if (!updated) {
@@ -225,9 +244,28 @@ export async function updateOperatingUnit(input: {
   return updated;
 }
 
+export async function assertOperatingUnitAcceptsNewData(slug: string): Promise<void> {
+  const unit = await getOperatingUnit(slug || DEFAULT_OPERATING_UNIT_SLUG);
+  if (!unit) {
+    throw new Error("운영 단위를 찾을 수 없습니다.");
+  }
+  if (!unit.isActive) {
+    throw new Error("비활성 운영 단위에는 새 데이터를 등록할 수 없습니다.");
+  }
+}
+
+export function isProtectedOperatingUnitSlug(slug: string): boolean {
+  const normalizedSlug = normalizeOperatingUnitSlug(slug);
+  return normalizedSlug === LEGACY_OPERATING_UNIT_SLUG || normalizedSlug === DEFAULT_OPERATING_UNIT_SLUG;
+}
+
 export function normalizeOperatingUnitSlug(raw: string): string {
-  return raw
-    .trim()
+  const trimmed = raw.trim();
+  if (trimmed === DEFAULT_OPERATING_UNIT_SLUG) {
+    return DEFAULT_OPERATING_UNIT_SLUG;
+  }
+
+  return trimmed
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, "-")
     .replace(/-+/g, "-")

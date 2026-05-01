@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { isMasterOverridePassword } from "@/lib/master-password";
 import {
   DEFAULT_OPERATING_UNIT_SLUG,
+  assertOperatingUnitAcceptsNewData,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
 } from "@/lib/operating-unit-store";
@@ -502,6 +503,8 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
   const leaders = normalizeLeaders(input.leaders);
   const password = normalizeMeetingPassword(input.password);
   const passwordHash = password ? hashMeetingPassword(password) : null;
+  const operatingUnitSlug = input.operatingUnitSlug?.trim() || DEFAULT_OPERATING_UNIT_SLUG;
+  await assertOperatingUnitAcceptsNewData(operatingUnitSlug);
 
   const [created] = await query<MeetingSummary>(
     `insert into public.meetings (id, title, meeting_date, start_time, location, description, leaders, password_hash, capacity, operating_unit_slug)
@@ -530,7 +533,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
       leaders,
       passwordHash,
       input.capacity ?? null,
-      input.operatingUnitSlug?.trim() || DEFAULT_OPERATING_UNIT_SLUG,
+      operatingUnitSlug,
     ]
   );
 

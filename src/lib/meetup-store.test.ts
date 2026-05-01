@@ -26,6 +26,18 @@ function hashMeetingPassword(password: string): string {
     .digest("hex");
 }
 
+function activeOperatingUnit(slug = "3기") {
+  return [{
+    slug,
+    name: slug,
+    description: null,
+    isDefault: slug === "3기",
+    isActive: true,
+    createdAt: "2026-05-01",
+    updatedAt: "2026-05-01",
+  }];
+}
+
 describe("meetup-store meeting password flows", () => {
   beforeAll(async () => {
     queryMock.mockImplementation(async (text: string) => {
@@ -49,21 +61,23 @@ describe("meetup-store meeting password flows", () => {
   });
 
   it("stores a hashed password when creating a protected meeting", async () => {
-    queryMock.mockResolvedValueOnce([
-      {
-        id: "meeting-1",
-        title: "토요 스터디",
-        meetingDate: "2026-03-12",
-        startTime: "14:00",
-        location: "강남역",
-        description: null,
-        leaders: ["유진"],
-        hasPassword: true,
-        studentCount: 0,
-        operationCount: 0,
-        totalCount: 0,
-      },
-    ]);
+    queryMock
+      .mockResolvedValueOnce(activeOperatingUnit())
+      .mockResolvedValueOnce([
+        {
+          id: "meeting-1",
+          title: "토요 스터디",
+          meetingDate: "2026-03-12",
+          startTime: "14:00",
+          location: "강남역",
+          description: null,
+          leaders: ["유진"],
+          hasPassword: true,
+          studentCount: 0,
+          operationCount: 0,
+          totalCount: 0,
+        },
+      ]);
 
     const created = await createMeeting({
       title: "토요 스터디",
@@ -76,7 +90,7 @@ describe("meetup-store meeting password flows", () => {
 
     expect(created.hasPassword).toBe(true);
 
-    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = queryMock.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain("password_hash");
     expect(params[6]).toEqual(["유진"]);
     expect(params[7]).toBe(hashMeetingPassword("room-secret"));
@@ -246,22 +260,24 @@ describe("meetup-store capacity flows", () => {
   });
 
   it("stores capacity when creating a meeting with a capacity limit", async () => {
-    queryMock.mockResolvedValueOnce([
-      {
-        id: "meeting-cap",
-        title: "정원 있는 모임",
-        meetingDate: "2026-04-05",
-        startTime: "14:00",
-        location: "홍대",
-        description: null,
-        leaders: [],
-        hasPassword: false,
-        capacity: 30,
-        studentCount: 0,
-        operationCount: 0,
-        totalCount: 0,
-      },
-    ]);
+    queryMock
+      .mockResolvedValueOnce(activeOperatingUnit())
+      .mockResolvedValueOnce([
+        {
+          id: "meeting-cap",
+          title: "정원 있는 모임",
+          meetingDate: "2026-04-05",
+          startTime: "14:00",
+          location: "홍대",
+          description: null,
+          leaders: [],
+          hasPassword: false,
+          capacity: 30,
+          studentCount: 0,
+          operationCount: 0,
+          totalCount: 0,
+        },
+      ]);
 
     const created = await createMeeting({
       title: "정원 있는 모임",
@@ -273,29 +289,31 @@ describe("meetup-store capacity flows", () => {
 
     expect(created.capacity).toBe(30);
 
-    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = queryMock.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain("capacity");
     expect(params[8]).toBe(30);
   });
 
   it("stores capacity of 0 as a valid boundary value", async () => {
-    queryMock.mockResolvedValueOnce([
-      {
-        id: "meeting-zero",
-        operatingUnitSlug: "default",
-        title: "정원 마감 모임",
-        meetingDate: "2026-04-05",
-        startTime: "14:00",
-        location: "홍대",
-        description: "",
-        leaders: [],
-        hasPassword: false,
-        capacity: 0,
-        studentCount: 0,
-        operationCount: 0,
-        totalCount: 0,
-      },
-    ]);
+    queryMock
+      .mockResolvedValueOnce(activeOperatingUnit())
+      .mockResolvedValueOnce([
+        {
+          id: "meeting-zero",
+          operatingUnitSlug: "default",
+          title: "정원 마감 모임",
+          meetingDate: "2026-04-05",
+          startTime: "14:00",
+          location: "홍대",
+          description: "",
+          leaders: [],
+          hasPassword: false,
+          capacity: 0,
+          studentCount: 0,
+          operationCount: 0,
+          totalCount: 0,
+        },
+      ]);
 
     const created = await createMeeting({
       title: "정원 마감 모임",
@@ -306,27 +324,29 @@ describe("meetup-store capacity flows", () => {
     });
 
     expect(created.capacity).toBe(0);
-    const [, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    const [, params] = queryMock.mock.calls[1] as [string, unknown[]];
     expect(params[8]).toBe(0);
   });
 
   it("stores null capacity when creating a meeting without capacity", async () => {
-    queryMock.mockResolvedValueOnce([
-      {
-        id: "meeting-nocap",
-        title: "정원 없는 모임",
-        meetingDate: "2026-04-05",
-        startTime: "14:00",
-        location: "홍대",
-        description: null,
-        leaders: [],
-        hasPassword: false,
-        capacity: null,
-        studentCount: 0,
-        operationCount: 0,
-        totalCount: 0,
-      },
-    ]);
+    queryMock
+      .mockResolvedValueOnce(activeOperatingUnit())
+      .mockResolvedValueOnce([
+        {
+          id: "meeting-nocap",
+          title: "정원 없는 모임",
+          meetingDate: "2026-04-05",
+          startTime: "14:00",
+          location: "홍대",
+          description: null,
+          leaders: [],
+          hasPassword: false,
+          capacity: null,
+          studentCount: 0,
+          operationCount: 0,
+          totalCount: 0,
+        },
+      ]);
 
     const created = await createMeeting({
       title: "정원 없는 모임",
@@ -337,7 +357,7 @@ describe("meetup-store capacity flows", () => {
 
     expect(created.capacity).toBeNull();
 
-    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = queryMock.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain("capacity");
     expect(params[8]).toBeNull();
   });

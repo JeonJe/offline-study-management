@@ -3,6 +3,7 @@ import { query, withTransaction } from "@/lib/db";
 import { isMasterOverridePassword } from "@/lib/master-password";
 import {
   DEFAULT_OPERATING_UNIT_SLUG,
+  assertOperatingUnitAcceptsNewData,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
 } from "@/lib/operating-unit-store";
@@ -829,6 +830,8 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
     const settlementAccount = input.settlementAccount?.trim() ?? "";
     const password = normalizeAfterpartyPassword(input.password);
     const passwordHash = password ? hashAfterpartyPassword(password) : null;
+    const operatingUnitSlug = input.operatingUnitSlug?.trim() || DEFAULT_OPERATING_UNIT_SLUG;
+    await assertOperatingUnitAcceptsNewData(operatingUnitSlug);
 
     const [created] = await tq<AfterpartySummary>(
       `insert into public.afterparties (
@@ -867,7 +870,7 @@ export async function createAfterparty(input: CreateAfterpartyInput): Promise<Af
         settlementManager,
         settlementAccount,
         passwordHash,
-        input.operatingUnitSlug?.trim() || DEFAULT_OPERATING_UNIT_SLUG,
+        operatingUnitSlug,
       ]
     );
 

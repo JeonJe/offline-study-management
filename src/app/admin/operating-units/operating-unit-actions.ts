@@ -55,6 +55,7 @@ export async function updateOperatingUnitAction(formData: FormData): Promise<voi
     slug,
     name: textFrom(formData, "name"),
     description: textFrom(formData, "description"),
+    isActive: textFrom(formData, "isActive") === "true",
   });
 
   revalidatePath("/admin");

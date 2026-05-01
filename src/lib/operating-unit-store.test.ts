@@ -45,10 +45,12 @@ import {
 } from "@/app/admin/operating-units/operating-unit-actions";
 import {
   _resetSchemaStateForTesting,
+  assertOperatingUnitAcceptsNewData,
   createOperatingUnit,
   getOperatingUnit,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
+  isProtectedOperatingUnitSlug,
   listOperatingUnits,
   normalizeOperatingUnitSlug,
   updateOperatingUnit,
@@ -70,6 +72,12 @@ describe("operating-unit-store", () => {
     expect(normalizeOperatingUnitSlug(" 4기 루퍼스 ")).toBe("4");
     expect(normalizeOperatingUnitSlug("Career Framework")).toBe("career-framework");
     expect(normalizeOperatingUnitSlug("4기 루퍼스")).not.toContain("기");
+  });
+
+  it("protects legacy and current default operating unit slugs", () => {
+    expect(isProtectedOperatingUnitSlug("default")).toBe(true);
+    expect(isProtectedOperatingUnitSlug("3기")).toBe(true);
+    expect(isProtectedOperatingUnitSlug("cohort-4")).toBe(false);
   });
 
   it("creates the default operating unit schema and default row", async () => {
@@ -106,6 +114,7 @@ describe("operating-unit-store", () => {
           name: "3기",
           description: null,
           isDefault: true,
+          isActive: true,
           createdAt: "2026-01-01",
           updatedAt: "2026-01-01",
         },
@@ -170,6 +179,7 @@ describe("operating-unit-store", () => {
           name: "4기",
           description: null,
           isDefault: false,
+          isActive: true,
           createdAt: "2026-04-27",
           updatedAt: "2026-04-27",
         },
@@ -227,6 +237,7 @@ describe("operating-unit-store", () => {
           name: "4기",
           description: "신규 기수",
           isDefault: false,
+          isActive: true,
           createdAt: "2026-05-01",
           updatedAt: "2026-05-01",
         },
@@ -257,6 +268,7 @@ describe("operating-unit-store", () => {
           name: "4기",
           description: "수정됨",
           isDefault: false,
+          isActive: true,
           createdAt: "2026-05-01",
           updatedAt: "2026-05-01",
         },
@@ -266,12 +278,104 @@ describe("operating-unit-store", () => {
         slug: "cohort-4",
         name: " 4기 ",
         description: " 수정됨 ",
+        isActive: true,
       });
 
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("update public.operating_units");
       expect(sql).not.toContain("set is_default");
-      expect(params).toEqual(["cohort-4", "4기", "수정됨"]);
+      expect(sql).toContain("is_active = $4");
+      expect(params).toEqual(["cohort-4", "4기", "수정됨", true]);
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+  });
+
+  it.each(["default", "3기"])(
+    "keeps protected operating unit %s active even when update asks to disable it",
+    async (slug) => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      queryMock.mockResolvedValueOnce([
+        {
+          slug,
+          name: slug,
+          description: null,
+          isDefault: slug === "3기",
+          isActive: true,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+
+      await updateOperatingUnit({
+        slug,
+        name: slug,
+        isActive: false,
+      });
+
+      const [, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(params).toEqual([slug, slug, "", true]);
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+    }
+  );
+
+  it("allows new data only for active operating units", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: null,
+          isDefault: false,
+          isActive: true,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+
+      await expect(assertOperatingUnitAcceptsNewData("cohort-4")).resolves.toBeUndefined();
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+  });
+
+  it("blocks new data for inactive operating units", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: null,
+          isDefault: false,
+          isActive: false,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+
+      await expect(assertOperatingUnitAcceptsNewData("cohort-4")).rejects.toThrow(
+        "비활성 운영 단위에는 새 데이터를 등록할 수 없습니다."
+      );
     } finally {
       if (prevSkipSchemaCheck === undefined) {
         delete process.env.SKIP_SCHEMA_CHECK;
@@ -313,6 +417,7 @@ describe("operating-unit-store", () => {
           name: "4기",
           description: null,
           isDefault: false,
+          isActive: true,
           createdAt: "2026-05-01",
           updatedAt: "2026-05-01",
         },

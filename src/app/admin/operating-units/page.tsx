@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
   RoleAccessRequired,
   RoleNotConfigured,
@@ -72,6 +73,15 @@ function OperatingUnitsPanel({
             >
               기본
             </th>
+            <th
+              className="px-5 py-3 text-left font-bold"
+              style={{ color: "var(--ink-muted)" }}
+            >
+              상태
+            </th>
+            <th className="px-5 py-3 text-right font-bold" style={{ color: "var(--ink-muted)" }}>
+              관리
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -102,6 +112,27 @@ function OperatingUnitsPanel({
                     기본
                   </span>
                 ) : null}
+              </td>
+              <td className="px-5 py-3">
+                <span
+                  className="rounded-full border px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    borderColor: unit.isActive ? "rgba(21, 128, 61, 0.25)" : "#fecaca",
+                    backgroundColor: unit.isActive ? "rgba(21, 128, 61, 0.08)" : "var(--danger-bg)",
+                    color: unit.isActive ? "var(--success)" : "var(--danger)",
+                  }}
+                >
+                  {unit.isActive ? "활성" : "비활성"}
+                </span>
+              </td>
+              <td className="px-5 py-3 text-right">
+                <Link
+                  href={`/admin/operating-units/${encodeURIComponent(unit.slug)}/edit`}
+                  className="rounded-full border px-3 py-1.5 text-xs font-bold"
+                  style={{ borderColor: "var(--line)", color: "var(--accent)" }}
+                >
+                  편집
+                </Link>
               </td>
             </tr>
           ))}

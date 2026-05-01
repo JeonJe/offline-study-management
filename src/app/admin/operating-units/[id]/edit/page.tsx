@@ -8,7 +8,11 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { isAuthenticated } from "@/lib/auth";
 import { isOperatingUnitsEnabled } from "@/lib/feature-flags";
-import { type OperatingUnit, getOperatingUnit } from "@/lib/operating-unit-store";
+import {
+  type OperatingUnit,
+  getOperatingUnit,
+  isProtectedOperatingUnitSlug,
+} from "@/lib/operating-unit-store";
 import {
   canOpenRolePage,
   getRolePage,
@@ -35,6 +39,8 @@ async function safeGetOperatingUnit(slug: string): Promise<{
 }
 
 function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
+  const protectsActive = isProtectedOperatingUnitSlug(unit.slug);
+
   return (
     <form action={updateOperatingUnitAction} className="card-static grid gap-4 p-5 sm:p-6">
       <input type="hidden" name="slug" value={unit.slug} />
@@ -77,6 +83,30 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
+      </div>
+
+      <div
+        className="rounded-xl border px-3 py-3"
+        style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
+      >
+        <label className="flex items-start gap-3 text-sm font-bold" style={{ color: "var(--ink)" }}>
+          <input
+            type="checkbox"
+            name="isActive"
+            value="true"
+            defaultChecked={unit.isActive || protectsActive}
+            disabled={protectsActive}
+            className="mt-1"
+          />
+          <span>
+            활성 운영 단위
+            <span className="mt-1 block text-xs font-medium leading-5" style={{ color: "var(--ink-muted)" }}>
+              비활성 단위는 기존 데이터 조회만 유지하고 신규 등록 대상에서 제외합니다.
+              {protectsActive ? " 기본 운영 단위는 비활성화할 수 없습니다." : ""}
+            </span>
+          </span>
+        </label>
+        {protectsActive ? <input type="hidden" name="isActive" value="true" /> : null}
       </div>
 
       <div className="grid gap-2">

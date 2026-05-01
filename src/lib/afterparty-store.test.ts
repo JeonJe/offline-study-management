@@ -27,6 +27,18 @@ function hashAfterpartyPassword(password: string): string {
     .digest("hex");
 }
 
+function activeOperatingUnit(slug = "3기") {
+  return [{
+    slug,
+    name: slug,
+    description: null,
+    isDefault: slug === "3기",
+    isActive: true,
+    createdAt: "2026-05-01",
+    updatedAt: "2026-05-01",
+  }];
+}
+
 describe("afterparty-store settlement flows", () => {
   beforeAll(async () => {
     queryMock.mockResolvedValue([]);
@@ -167,6 +179,7 @@ describe("afterparty-store settlement flows", () => {
 
   it("stores a hashed password when creating a protected afterparty", async () => {
     const txCalls: Array<{ text: string; params?: unknown[] }> = [];
+    queryMock.mockResolvedValueOnce(activeOperatingUnit());
 
     withTransactionMock.mockImplementation(async (callback: (tq: (text: string, params?: unknown[]) => Promise<unknown[]>) => Promise<unknown>) => {
       const tq = async (text: string, params?: unknown[]): Promise<unknown[]> => {
