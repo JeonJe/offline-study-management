@@ -238,3 +238,17 @@ create table if not exists public.angel_weekly_reports (
 
 create index if not exists idx_angel_weekly_reports_cycle
   on public.angel_weekly_reports (cycle_id, updated_at desc);
+
+create table if not exists public.weekly_report_comments (
+  id            uuid primary key default gen_random_uuid(),
+  report_id     uuid not null references public.angel_weekly_reports(id) on delete cascade,
+  author_role   text not null check (author_role in ('admin', 'angel', 'leader')),
+  author_label  text not null,
+  body          text not null,
+  created_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+create index if not exists idx_weekly_report_comments_report
+  on public.weekly_report_comments (report_id, created_at asc)
+  where deleted_at is null;
