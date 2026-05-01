@@ -16,6 +16,11 @@ export type OperatingUnit = {
 let schemaReady = false;
 let schemaPromise: Promise<void> | null = null;
 
+export function _resetSchemaStateForTesting(): void {
+  schemaReady = false;
+  schemaPromise = null;
+}
+
 export async function ensureOperatingUnitSchema(): Promise<void> {
   if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
