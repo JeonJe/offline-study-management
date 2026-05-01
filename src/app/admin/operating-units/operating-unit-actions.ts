@@ -10,7 +10,6 @@ import {
 } from "@/lib/operating-unit-store";
 import {
   getCurrentRolePageRole,
-  verifyRolePagePassword,
 } from "@/lib/role-session";
 
 function textFrom(formData: FormData, key: string): string {
@@ -18,10 +17,7 @@ function textFrom(formData: FormData, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-async function requireAdminMutation(
-  formData: FormData,
-  invalidPasswordRedirect = "/admin/operating-units?unit=password-invalid"
-): Promise<void> {
+async function requireAdminMutation(): Promise<void> {
   const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");
@@ -31,14 +27,10 @@ async function requireAdminMutation(
   if (currentRole !== "admin") {
     redirect("/admin?access=required");
   }
-
-  if (!verifyRolePagePassword("admin", textFrom(formData, "adminPassword"))) {
-    redirect(invalidPasswordRedirect);
-  }
 }
 
 export async function createOperatingUnitAction(formData: FormData): Promise<void> {
-  await requireAdminMutation(formData);
+  await requireAdminMutation();
 
   const accessPassword = textFrom(formData, "accessPassword").trim();
   if (!accessPassword) {
@@ -58,14 +50,13 @@ export async function createOperatingUnitAction(formData: FormData): Promise<voi
 }
 
 export async function updateOperatingUnitAction(formData: FormData): Promise<void> {
-  await requireAdminMutation(formData);
+  await requireAdminMutation();
 
   const slug = textFrom(formData, "slug");
   await updateOperatingUnit({
     slug,
     name: textFrom(formData, "name"),
     description: textFrom(formData, "description"),
-    isActive: textFrom(formData, "isActive") === "true",
   });
 
   revalidatePath("/admin");
@@ -80,7 +71,7 @@ export async function updateOperatingUnitAccessCodeAction(
   const slug = textFrom(formData, "slug");
   const editPath = `/admin/operating-units/${encodeURIComponent(slug)}/edit`;
 
-  await requireAdminMutation(formData, `${editPath}?unit=password-invalid`);
+  await requireAdminMutation();
 
   const password = textFrom(formData, "accessPassword").trim();
   if (!password) {

@@ -163,7 +163,7 @@ async function ensureMemberSchema(): Promise<void> {
          angel_name text not null,
          angel_names text[] not null default '{}'::text[],
          team_order integer not null default 0,
-         operating_unit_slug text not null default '3기',
+         operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
          created_at timestamptz not null default now(),
          updated_at timestamptz not null default now()
        )`
@@ -193,7 +193,7 @@ async function ensureMemberSchema(): Promise<void> {
          team_name text not null references public.member_teams(team_name) on delete cascade,
          member_name text not null,
          member_order integer not null default 0,
-         operating_unit_slug text not null default '3기',
+         operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
          created_at timestamptz not null default now(),
          primary key (team_name, member_name)
        )`
@@ -208,7 +208,7 @@ async function ensureMemberSchema(): Promise<void> {
       `create table if not exists public.member_angels (
          angel_name text primary key,
          angel_order integer not null default 0,
-         operating_unit_slug text not null default '3기',
+         operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
          created_at timestamptz not null default now()
        )`
     );
@@ -223,7 +223,7 @@ async function ensureMemberSchema(): Promise<void> {
          role text not null check (role in ('supporter', 'buddy', 'mentor', 'manager')),
          member_name text not null,
          member_order integer not null default 0,
-         operating_unit_slug text not null default '3기',
+         operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
          created_at timestamptz not null default now(),
          primary key (role, member_name)
        )`

@@ -13,7 +13,6 @@ import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   type OperatingUnit,
   getOperatingUnit,
-  isProtectedOperatingUnitSlug,
 } from "@/lib/operating-unit-store";
 import {
   canOpenRolePage,
@@ -50,8 +49,6 @@ async function safeGetOperatingUnit(slug: string): Promise<{
 }
 
 function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
-  const protectsActive = isProtectedOperatingUnitSlug(unit.slug);
-
   return (
     <form action={updateOperatingUnitAction} className="card-static grid gap-4 p-5 sm:p-6">
       <input type="hidden" name="slug" value={unit.slug} />
@@ -67,13 +64,13 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
           {unit.slug}
         </code>
         <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
-          이 기수의 URL에 쓰이는 값입니다. 예: /cohorts/{unit.slug}/admin
+          URL에 쓰이는 값입니다. 예: /cohorts/{unit.slug}/admin
         </p>
       </div>
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="name" style={{ color: "var(--ink)" }}>
-          기수 이름
+          이름
         </label>
         <input
           id="name"
@@ -98,49 +95,6 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
-      </div>
-
-      <div
-        className="rounded-xl border px-3 py-3"
-        style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
-      >
-        <label className="flex items-start gap-3 text-sm font-bold" style={{ color: "var(--ink)" }}>
-          <input
-            type="checkbox"
-            name="isActive"
-            value="true"
-            defaultChecked={unit.isActive || protectsActive}
-            disabled={protectsActive}
-            className="mt-1"
-          />
-          <span>
-            활성 운영 단위
-            <span className="mt-1 block text-xs font-medium leading-5" style={{ color: "var(--ink-muted)" }}>
-              비활성 단위는 기존 데이터 조회만 유지하고 신규 등록 대상에서 제외합니다.
-              {protectsActive ? " 기본 운영 단위는 비활성화할 수 없습니다." : ""}
-            </span>
-          </span>
-        </label>
-        {protectsActive ? <input type="hidden" name="isActive" value="true" /> : null}
-      </div>
-
-      <div className="grid gap-2">
-        <label className="text-sm font-bold" htmlFor="adminPassword" style={{ color: "var(--ink)" }}>
-          전체 관리자 확인 코드
-        </label>
-        <input
-          id="adminPassword"
-          name="adminPassword"
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="기수 정보 수정 권한 확인"
-          className="h-11 rounded-xl border px-3 text-sm outline-none"
-          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
-        />
-        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
-          전체 관리자만 기수 이름, 설명, 활성 상태를 바꿀 수 있어 한 번 더 확인합니다.
-        </p>
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
@@ -175,9 +129,7 @@ function AccessCodeForm({
       ? "입장 코드가 변경됐습니다."
       : status === "access-code-required"
         ? "새 입장 코드를 입력하세요."
-        : status === "password-invalid"
-          ? "관리자 비밀번호가 맞지 않습니다."
-          : "";
+        : "";
 
   return (
     <form
@@ -192,14 +144,14 @@ function AccessCodeForm({
         </h2>
         <p className="text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
           {unit.hasAccessPassword
-            ? "이 기수로 입장할 때 쓰는 전용 코드가 설정돼 있습니다."
-            : "아직 이 기수 전용 입장 코드가 없어 공용 코드로 입장합니다."}
+            ? "이 항목으로 입장할 때 쓰는 전용 코드가 설정돼 있습니다."
+            : "아직 전용 입장 코드가 없어 공용 코드로 입장합니다."}
         </p>
       </div>
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="accessPassword" style={{ color: "var(--ink)" }}>
-          새 기수 입장 코드
+          새 입장 코드
         </label>
         <input
           id="accessPassword"
@@ -208,29 +160,10 @@ function AccessCodeForm({
           required
           minLength={1}
           autoComplete="new-password"
-          placeholder="이 기수 참가자가 첫 화면에서 입력할 코드"
+          placeholder="참가자가 첫 화면에서 입력할 코드"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
-      </div>
-
-      <div className="grid gap-2">
-        <label className="text-sm font-bold" htmlFor="accessCodeAdminPassword" style={{ color: "var(--ink)" }}>
-          전체 관리자 확인 코드
-        </label>
-        <input
-          id="accessCodeAdminPassword"
-          name="adminPassword"
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="입장 코드 변경 권한 확인"
-          className="h-11 rounded-xl border px-3 text-sm outline-none"
-          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
-        />
-        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
-          전체 관리자만 기수 입장 코드를 바꿀 수 있어 한 번 더 확인합니다.
-        </p>
       </div>
 
       {statusMessage ? (
@@ -293,7 +226,7 @@ export default async function EditOperatingUnitPage({
     } else if (!unit) {
       content = (
         <section className="card-static p-5 text-sm" style={{ color: "var(--ink-muted)" }}>
-          운영 단위를 찾을 수 없습니다.
+          항목을 찾을 수 없습니다.
         </section>
       );
     } else {
@@ -309,8 +242,8 @@ export default async function EditOperatingUnitPage({
   return (
     <RoleShell
       activeRole="admin"
-      title="운영 단위 편집"
-      summary="기수 이름, 설명, 입장 코드를 수정합니다."
+      title="항목 편집"
+      summary="이름, 설명, 입장 코드를 수정합니다."
       scopeLabel="전체 관리자"
       showRoleNav={false}
     >

@@ -35,12 +35,12 @@ export type MemberAttendanceRow = {
  * - meetings 테이블에서 meeting_date BETWEEN start AND end 로 기간 필터
  * - member_teams + member_team_members JOIN으로 팀-멤버 매핑 확보
  * - rsvps LEFT JOIN으로 각 모임에 팀원 참석 여부 판정
- * - operatingUnitSlug 미전달 시 DEFAULT_OPERATING_UNIT_SLUG('3기')만 조회
+ * - operatingUnitSlug 미전달 시 DEFAULT_OPERATING_UNIT_SLUG만 조회
  * - meetings가 0건이면 빈 배열 반환 (division by zero 방지)
  *
  * @param start 시작일 (ISO date string, 포함)
  * @param end 종료일 (ISO date string, 포함)
- * @param operatingUnitSlug 운영 단위 슬러그 (기본값: '3기')
+ * @param operatingUnitSlug 주소 식별자
  */
 export async function getTeamAttendanceByPeriod(
   start: string,
@@ -99,11 +99,11 @@ export async function getTeamAttendanceByPeriod(
  * - afterparty_participants + afterparties JOIN으로 기간 내 뒷풀이 참석 집계
  * - 두 결과를 애플리케이션 레벨 Map<name, row>으로 merge (FULL OUTER JOIN 대체)
  * - lower(name) 매칭으로 대소문자 차이 흡수
- * - operatingUnitSlug 미전달 시 DEFAULT_OPERATING_UNIT_SLUG('3기')만 조회
+ * - operatingUnitSlug 미전달 시 DEFAULT_OPERATING_UNIT_SLUG만 조회
  *
  * @param start 시작일 (ISO date string, 포함)
  * @param end 종료일 (ISO date string, 포함)
- * @param operatingUnitSlug 운영 단위 슬러그 (기본값: '3기')
+ * @param operatingUnitSlug 주소 식별자
  */
 export async function getMemberAttendanceByPeriod(
   start: string,

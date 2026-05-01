@@ -2,7 +2,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
 
 export const LEGACY_OPERATING_UNIT_SLUG = "default";
-export const DEFAULT_OPERATING_UNIT_SLUG = "3기";
+export const OLD_DEFAULT_OPERATING_UNIT_SLUG = "3기";
+export const DEFAULT_OPERATING_UNIT_SLUG = "loop-pak-3";
 export const DEFAULT_OPERATING_UNIT_NAME = "3기";
 
 export type OperatingUnit = {
@@ -58,6 +59,20 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
     );
 
     await query(
+      `update public.operating_units
+       set slug = $1,
+           name = coalesce(nullif(name, ''), $2),
+           is_default = true,
+           is_active = true,
+           updated_at = now()
+       where slug = $3
+         and not exists (
+           select 1 from public.operating_units where slug = $1
+         )`,
+      [DEFAULT_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_NAME, OLD_DEFAULT_OPERATING_UNIT_SLUG]
+    );
+
+    await query(
       `insert into public.operating_units (slug, name, is_default)
        values ($1, $2, false)
        on conflict (slug)
@@ -86,8 +101,9 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
            is_active = true,
            updated_at = now()
        where slug = $1
-          or (slug <> $2 and is_default)`,
-      [LEGACY_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_SLUG]
+          or slug = $2
+          or (slug <> $3 and is_default)`,
+      [LEGACY_OPERATING_UNIT_SLUG, OLD_DEFAULT_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_SLUG]
     );
 
     schemaReady = true;
@@ -121,8 +137,9 @@ export async function ensureOperatingUnitColumn(
      set operating_unit_slug = $1
      where operating_unit_slug is null
         or btrim(operating_unit_slug) = ''
-        or operating_unit_slug = $2`,
-    [DEFAULT_OPERATING_UNIT_SLUG, LEGACY_OPERATING_UNIT_SLUG]
+        or operating_unit_slug = $2
+        or operating_unit_slug = $3`,
+    [DEFAULT_OPERATING_UNIT_SLUG, LEGACY_OPERATING_UNIT_SLUG, OLD_DEFAULT_OPERATING_UNIT_SLUG]
   );
 
   await query(
@@ -191,7 +208,7 @@ export async function createOperatingUnit(input: {
   const slug = normalizeOperatingUnitSlug(input.slug);
   const name = input.name.trim();
   if (!slug || !name) {
-    throw new Error("운영 단위 이름과 식별자가 필요합니다.");
+    throw new Error("이름과 주소 식별자가 필요합니다.");
   }
   const accessPassword = input.accessPassword
     ? normalizeAccessPassword(input.accessPassword)
@@ -219,7 +236,7 @@ export async function createOperatingUnit(input: {
   );
 
   if (!created) {
-    throw new Error("이미 존재하는 운영 단위 식별자입니다.");
+    throw new Error("이미 존재하는 주소 식별자입니다.");
   }
   return created;
 }
@@ -228,24 +245,19 @@ export async function updateOperatingUnit(input: {
   slug: string;
   name: string;
   description?: string;
-  isActive: boolean;
 }): Promise<OperatingUnit> {
   await ensureOperatingUnitSchema();
 
   const slug = normalizeOperatingUnitSlug(input.slug);
   const name = input.name.trim();
   if (!slug || !name) {
-    throw new Error("운영 단위 이름과 식별자가 필요합니다.");
+    throw new Error("이름과 주소 식별자가 필요합니다.");
   }
-
-  const isProtectedDefault = isProtectedOperatingUnitSlug(slug);
-  const nextIsActive = isProtectedDefault ? true : input.isActive;
 
   const [updated] = await query<OperatingUnit>(
     `update public.operating_units
      set name = $2,
          description = nullif($3, ''),
-         is_active = $4,
          updated_at = now()
      where slug = $1
      returning
@@ -257,11 +269,11 @@ export async function updateOperatingUnit(input: {
        (access_password_hash is not null) as "hasAccessPassword",
        created_at::text as "createdAt",
        updated_at::text as "updatedAt"`,
-    [slug, name, input.description?.trim() ?? "", nextIsActive]
+    [slug, name, input.description?.trim() ?? ""]
   );
 
   if (!updated) {
-    throw new Error("운영 단위를 수정하지 못했습니다.");
+    throw new Error("항목을 수정하지 못했습니다.");
   }
   return updated;
 }
@@ -269,10 +281,10 @@ export async function updateOperatingUnit(input: {
 export async function assertOperatingUnitAcceptsNewData(slug: string): Promise<void> {
   const unit = await getOperatingUnit(slug || DEFAULT_OPERATING_UNIT_SLUG);
   if (!unit) {
-    throw new Error("운영 단위를 찾을 수 없습니다.");
+    throw new Error("항목을 찾을 수 없습니다.");
   }
   if (!unit.isActive) {
-    throw new Error("비활성 운영 단위에는 새 데이터를 등록할 수 없습니다.");
+    throw new Error("비활성 항목에는 새 데이터를 등록할 수 없습니다.");
   }
 }
 
@@ -344,7 +356,7 @@ export async function setOperatingUnitAccessCode(input: {
   const slug = normalizeOperatingUnitSlug(input.slug);
   const password = normalizeAccessPassword(input.password);
   if (!slug || !password) {
-    throw new Error("운영 단위 입장 코드가 필요합니다.");
+    throw new Error("입장 코드가 필요합니다.");
   }
 
   const updated = await query<{ slug: string }>(
@@ -357,7 +369,7 @@ export async function setOperatingUnitAccessCode(input: {
   );
 
   if (!updated[0]) {
-    throw new Error("운영 단위 입장 코드를 변경하지 못했습니다.");
+    throw new Error("입장 코드를 변경하지 못했습니다.");
   }
 }
 
@@ -368,6 +380,9 @@ export function isProtectedOperatingUnitSlug(slug: string): boolean {
 
 export function normalizeOperatingUnitSlug(raw: string): string {
   const trimmed = safeDecode(raw.trim());
+  if (trimmed === OLD_DEFAULT_OPERATING_UNIT_SLUG || trimmed === encodeURIComponent(OLD_DEFAULT_OPERATING_UNIT_SLUG)) {
+    return DEFAULT_OPERATING_UNIT_SLUG;
+  }
   if (trimmed === DEFAULT_OPERATING_UNIT_SLUG) {
     return DEFAULT_OPERATING_UNIT_SLUG;
   }

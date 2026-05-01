@@ -120,8 +120,8 @@ export default async function CohortAdminPage({
   return (
     <RoleShell
       activeRole="admin"
-      title="기수 관리자"
-      summary="선택한 기수의 팀, 보고, 모임을 관리합니다."
+      title="관리자"
+      summary="선택한 이름의 팀, 보고, 모임을 관리합니다."
       unitSlug={unit}
       scopeLabel={unit}
     >

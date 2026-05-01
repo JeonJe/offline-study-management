@@ -12,7 +12,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/operating-unit-store", () => ({
-  DEFAULT_OPERATING_UNIT_SLUG: "3기",
+  DEFAULT_OPERATING_UNIT_SLUG: "loop-pak-3",
   ensureOperatingUnitSchema: vi.fn().mockResolvedValue(undefined),
   ensureOperatingUnitColumn: vi.fn().mockResolvedValue(undefined),
 }));
