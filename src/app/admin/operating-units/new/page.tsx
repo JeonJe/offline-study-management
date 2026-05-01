@@ -18,7 +18,7 @@ import {
 
 function OperatingUnitForm({ unitStatus }: { unitStatus?: string }) {
   const message =
-    unitStatus === "access-code-required" ? "기수 입장 코드를 입력하세요." : "";
+    unitStatus === "access-code-required" ? "입장 코드를 입력하세요." : "";
 
   return (
     <form action={createOperatingUnitAction} className="card-static grid gap-4 p-5 sm:p-6">
@@ -51,7 +51,7 @@ function OperatingUnitForm({ unitStatus }: { unitStatus?: string }) {
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="name" style={{ color: "var(--ink)" }}>
-          기수 이름
+          이름
         </label>
         <input
           id="name"
@@ -79,7 +79,7 @@ function OperatingUnitForm({ unitStatus }: { unitStatus?: string }) {
 
       <div className="grid gap-2">
         <label className="text-sm font-bold" htmlFor="accessPassword" style={{ color: "var(--ink)" }}>
-          기수 입장 코드
+          입장 코드
         </label>
         <input
           id="accessPassword"
@@ -87,31 +87,12 @@ function OperatingUnitForm({ unitStatus }: { unitStatus?: string }) {
           type="password"
           required
           autoComplete="new-password"
-          placeholder="이 기수 참가자가 첫 화면에서 입력할 코드"
+          placeholder="참가자가 첫 화면에서 입력할 코드"
           className="h-11 rounded-xl border px-3 text-sm outline-none"
           style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
         />
         <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
-          참가자는 첫 화면에서 기수를 고른 뒤 이 코드로 입장합니다.
-        </p>
-      </div>
-
-      <div className="grid gap-2">
-        <label className="text-sm font-bold" htmlFor="adminPassword" style={{ color: "var(--ink)" }}>
-          전체 관리자 확인 코드
-        </label>
-        <input
-          id="adminPassword"
-          name="adminPassword"
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="기수 생성 권한 확인"
-          className="h-11 rounded-xl border px-3 text-sm outline-none"
-          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
-        />
-        <p className="text-xs" style={{ color: "var(--ink-muted)" }}>
-          전체 관리자만 기수를 만들 수 있어 한 번 더 확인합니다.
+          참가자는 첫 화면에서 이름을 고른 뒤 이 코드로 입장합니다.
         </p>
       </div>
 
@@ -162,8 +143,8 @@ export default async function NewOperatingUnitPage({
   return (
     <RoleShell
       activeRole="admin"
-      title="운영 단위 생성"
-      summary="새 기수의 주소, 이름, 입장 코드를 등록합니다."
+      title="새 항목 만들기"
+      summary="주소, 이름, 입장 코드를 등록합니다."
       scopeLabel="전체 관리자"
       showRoleNav={false}
     >

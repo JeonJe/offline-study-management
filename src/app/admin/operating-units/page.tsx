@@ -44,7 +44,7 @@ function OperatingUnitsPanel({
   if (units.length === 0) {
     return (
       <div className="card-static p-5 text-sm" style={{ color: "var(--ink-muted)" }}>
-        운영 단위가 없습니다.
+        항목이 없습니다.
       </div>
     );
   }
@@ -54,10 +54,10 @@ function OperatingUnitsPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-extrabold" style={{ color: "var(--ink)" }}>
-            전체 기수
+            전체 목록
           </h2>
           <p className="mt-1 text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
-            생성, 비활성화, 입장 코드 변경은 각 기수의 편집 화면에서 관리합니다.
+            이름, 주소, 입장 코드는 각 항목의 편집 화면에서 관리합니다.
           </p>
         </div>
         <Link
@@ -65,7 +65,7 @@ function OperatingUnitsPanel({
           className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white"
           style={{ backgroundColor: "var(--accent)" }}
         >
-          새 기수 만들기
+          새 항목 만들기
         </Link>
       </div>
 
@@ -90,12 +90,6 @@ function OperatingUnitsPanel({
                 style={{ color: "var(--ink-muted)" }}
               >
                 입장 코드
-              </th>
-              <th
-                className="px-5 py-3 text-left font-bold"
-                style={{ color: "var(--ink-muted)" }}
-              >
-                상태
               </th>
               <th className="px-5 py-3 text-right font-bold" style={{ color: "var(--ink-muted)" }}>
                 관리
@@ -139,18 +133,6 @@ function OperatingUnitsPanel({
                     }}
                   >
                     {unit.hasAccessPassword ? "설정됨" : "공용 코드"}
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className="rounded-full border px-2.5 py-1 text-xs font-bold"
-                    style={{
-                      borderColor: unit.isActive ? "rgba(21, 128, 61, 0.25)" : "#fecaca",
-                      backgroundColor: unit.isActive ? "rgba(21, 128, 61, 0.08)" : "var(--danger-bg)",
-                      color: unit.isActive ? "var(--success)" : "var(--danger)",
-                    }}
-                  >
-                    {unit.isActive ? "활성" : "비활성"}
                   </span>
                 </td>
                 <td className="px-5 py-3 text-right">
@@ -200,8 +182,8 @@ export default async function OperatingUnitsPage() {
   return (
     <RoleShell
       activeRole="admin"
-      title="기수 관리"
-      summary="전체 기수의 생성, 상태, 입장 코드를 관리합니다."
+      title="목록 관리"
+      summary="이름, 주소, 입장 코드를 관리합니다."
       scopeLabel="전체 관리자"
       showRoleNav={false}
     >

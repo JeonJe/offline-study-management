@@ -119,7 +119,7 @@ async function safeListEntryOperatingUnits(): Promise<EntryOperatingUnit[]> {
       return activeUnits.map(({ slug, name, description }) => ({ slug, name, description }));
     }
   } catch (error) {
-    console.error("[entry] 운영 단위 목록 로드 실패:", error);
+    console.error("[entry] 목록 로드 실패:", error);
   }
 
   return [
@@ -290,7 +290,7 @@ function LoginScreen({
           LOOPERS MEETUP
         </h1>
         <p className="li li-d1" style={{ margin: "0 0 1.8rem", color: "var(--ink-muted)", fontSize: "13px" }}>
-          기수를 선택하고 입장하세요.
+          이름을 선택하고 입장하세요.
         </p>
 
         {/* 폼 */}
@@ -305,7 +305,7 @@ function LoginScreen({
               color: "var(--ink-muted)",
               margin: 0,
             }}>
-              기수
+              이름
             </label>
             <select
               id="selectedUnit"
@@ -384,7 +384,7 @@ function LoginScreen({
             전체 관리자
           </h2>
           <p style={{ margin: "0 0 1rem", color: "var(--ink-muted)", fontSize: "13px" }}>
-            기수 생성과 전체 설정 관리를 위한 코드입니다.
+            목록 생성과 전체 설정 관리를 위한 코드입니다.
           </p>
           <form action={loginAction} className="grid gap-3">
             <input type="hidden" name="authScope" value="admin" />

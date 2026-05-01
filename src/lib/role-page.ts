@@ -101,7 +101,7 @@ export const ROLE_PAGES: RolePageDefinition[] = [
     label: "관리자",
     path: "/admin",
     title: "관리자 페이지",
-    summary: "기수, 팀, 보고를 관리합니다.",
+    summary: "팀과 보고를 관리합니다.",
     badge: "운영",
     sections: [
       {

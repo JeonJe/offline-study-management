@@ -28,8 +28,8 @@ type AdminCard = {
 
 const GLOBAL_ADMIN_CARDS: AdminCard[] = [
   {
-    title: "기수 관리",
-    description: "기수 생성, 상태, 입장 코드 관리",
+    title: "목록 관리",
+    description: "이름, 주소, 입장 코드 관리",
     href: "/admin/operating-units",
   },
 ];
@@ -129,7 +129,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     <RoleShell
       activeRole="admin"
       title="전체 관리자"
-      summary="기수 생성과 전체 설정을 관리합니다."
+      summary="목록 생성과 전체 설정을 관리합니다."
       scopeLabel="전체 관리자"
       showRoleNav={false}
     >

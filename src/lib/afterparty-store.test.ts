@@ -27,12 +27,12 @@ function hashAfterpartyPassword(password: string): string {
     .digest("hex");
 }
 
-function activeOperatingUnit(slug = "3기") {
+function activeOperatingUnit(slug = "loop-pak-3") {
   return [{
     slug,
     name: slug,
     description: null,
-    isDefault: slug === "3기",
+    isDefault: slug === "loop-pak-3",
     isActive: true,
     createdAt: "2026-05-01",
     updatedAt: "2026-05-01",

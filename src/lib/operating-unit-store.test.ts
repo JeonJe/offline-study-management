@@ -106,14 +106,16 @@ describe("operating-unit-store", () => {
   });
 
   it("keeps the current default operating unit stable even when URL-encoded", () => {
-    expect(normalizeOperatingUnitSlug("3%EA%B8%B0")).toBe("3기");
-    expect(normalizeOperatingUnitSlug("3기")).toBe("3기");
+    expect(normalizeOperatingUnitSlug("3%EA%B8%B0")).toBe("loop-pak-3");
+    expect(normalizeOperatingUnitSlug("3기")).toBe("loop-pak-3");
+    expect(normalizeOperatingUnitSlug("loop-pak-3")).toBe("loop-pak-3");
   });
 
   it("protects legacy migration and current default operating unit slugs", () => {
     expect(isProtectedOperatingUnitSlug("default")).toBe(true);
     expect(isProtectedOperatingUnitSlug("3기")).toBe(true);
-    expect(isProtectedOperatingUnitSlug("cohort-4")).toBe(false);
+    expect(isProtectedOperatingUnitSlug("loop-pak-3")).toBe(true);
+    expect(isProtectedOperatingUnitSlug("loop-pak-4")).toBe(false);
   });
 
   it("creates the default operating unit schema and default row", async () => {
@@ -130,8 +132,9 @@ describe("operating-unit-store", () => {
     await ensureOperatingUnitColumn("meetings", "idx_meetings_operating_unit");
 
     const sql = queryMock.mock.calls.map(([text]) => String(text));
-    expect(sql.some((text) => text.includes("add column if not exists operating_unit_slug text not null default '3기'"))).toBe(true);
+    expect(sql.some((text) => text.includes("add column if not exists operating_unit_slug text not null default 'loop-pak-3'"))).toBe(true);
     expect(sql.some((text) => text.includes("where operating_unit_slug is null"))).toBe(true);
+    expect(sql.some((text) => text.includes("or operating_unit_slug = $3"))).toBe(true);
     expect(sql.some((text) => text.includes("idx_meetings_operating_unit"))).toBe(true);
   });
 
@@ -145,7 +148,7 @@ describe("operating-unit-store", () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
         {
-          slug: "3기",
+          slug: "loop-pak-3",
           name: "3기",
           description: null,
           isDefault: true,
@@ -158,7 +161,7 @@ describe("operating-unit-store", () => {
       const units = await listOperatingUnits();
 
       expect(units).toHaveLength(1);
-      expect(units[0].slug).toBe("3기");
+      expect(units[0].slug).toBe("loop-pak-3");
       expect(units[0].isDefault).toBe(true);
       const lastCall = queryMock.mock.calls.at(-1) as [string];
       expect(lastCall[0]).toContain("from public.operating_units");
@@ -217,7 +220,7 @@ describe("operating-unit-store", () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
           description: null,
           isDefault: false,
@@ -229,7 +232,7 @@ describe("operating-unit-store", () => {
       ]);
 
       await createOperatingUnit({
-        slug: "cohort-4",
+        slug: "loop-pak-4",
         name: "4기",
         accessPassword: "unit-secret",
       });
@@ -238,7 +241,7 @@ describe("operating-unit-store", () => {
       expect(sql).toContain("access_password_hash");
       expect(params[3]).toBe(
         createHash("sha256")
-          .update("saturday-meetup:operating-unit:cohort-4:unit-secret")
+          .update("saturday-meetup:operating-unit:loop-pak-4:unit-secret")
           .digest("hex")
       );
     });
@@ -250,10 +253,10 @@ describe("operating-unit-store", () => {
 
       await expect(
         createOperatingUnit({
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
         })
-      ).rejects.toThrow("이미 존재하는 운영 단위 식별자입니다.");
+      ).rejects.toThrow("이미 존재하는 주소 식별자입니다.");
     });
   });
 
@@ -261,9 +264,9 @@ describe("operating-unit-store", () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
-          description: "신규 기수",
+          description: "신규 과정",
           isDefault: false,
           isActive: true,
           createdAt: "2026-05-01",
@@ -271,12 +274,12 @@ describe("operating-unit-store", () => {
         },
       ]);
 
-      const unit = await getOperatingUnit(" Cohort 4 ");
+      const unit = await getOperatingUnit(" Loop Pak 4 ");
 
-      expect(unit?.slug).toBe("cohort-4");
+      expect(unit?.slug).toBe("loop-pak-4");
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("where slug = $1");
-      expect(params).toEqual(["cohort-4"]);
+      expect(params).toEqual(["loop-pak-4"]);
     });
   });
 
@@ -284,7 +287,7 @@ describe("operating-unit-store", () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
           description: "수정됨",
           isDefault: false,
@@ -295,53 +298,24 @@ describe("operating-unit-store", () => {
       ]);
 
       await updateOperatingUnit({
-        slug: "cohort-4",
+        slug: "loop-pak-4",
         name: " 4기 ",
         description: " 수정됨 ",
-        isActive: true,
       });
 
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("update public.operating_units");
       expect(sql).not.toContain("set is_default");
-      expect(sql).toContain("is_active = $4");
-      expect(params).toEqual(["cohort-4", "4기", "수정됨", true]);
+      expect(sql).not.toContain("is_active =");
+      expect(params).toEqual(["loop-pak-4", "4기", "수정됨"]);
     });
   });
-
-  it.each(["default", "3기"])(
-    "keeps protected operating unit %s active even when update asks to disable it",
-    async (slug) => {
-    await withSkipSchemaCheck(async () => {
-      queryMock.mockResolvedValueOnce([
-        {
-          slug,
-          name: slug,
-          description: null,
-          isDefault: slug === "3기",
-          isActive: true,
-          createdAt: "2026-05-01",
-          updatedAt: "2026-05-01",
-        },
-      ]);
-
-      await updateOperatingUnit({
-        slug,
-        name: slug,
-        isActive: false,
-      });
-
-      const [, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
-      expect(params).toEqual([slug, slug, "", true]);
-    });
-    }
-  );
 
   it("allows new data only for active operating units", async () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
           description: null,
           isDefault: false,
@@ -351,13 +325,13 @@ describe("operating-unit-store", () => {
         },
       ]);
 
-      await expect(assertOperatingUnitAcceptsNewData("cohort-4")).resolves.toBeUndefined();
+      await expect(assertOperatingUnitAcceptsNewData("loop-pak-4")).resolves.toBeUndefined();
     });
   });
 
   it("creates a unit access token from the stored hash without exposing plaintext", async () => {
     await withSkipSchemaCheck(async () => {
-      const expectedToken = tokenFor("cohort-4", "unit-secret");
+      const expectedToken = tokenFor("loop-pak-4", "unit-secret");
       queryMock.mockResolvedValueOnce([
         {
           accessPasswordHash: expectedToken,
@@ -365,19 +339,19 @@ describe("operating-unit-store", () => {
         },
       ]);
 
-      const token = await createOperatingUnitAccessToken("cohort-4", "unit-secret");
+      const token = await createOperatingUnitAccessToken("loop-pak-4", "unit-secret");
 
       expect(token).toBe(expectedToken);
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("access_password_hash");
       expect(sql).not.toContain("unit-secret");
-      expect(params).toEqual(["cohort-4"]);
+      expect(params).toEqual(["loop-pak-4"]);
     });
   });
 
   it("rejects a unit access token when the operating unit is inactive", async () => {
     await withSkipSchemaCheck(async () => {
-      const token = tokenFor("cohort-4", "unit-secret");
+      const token = tokenFor("loop-pak-4", "unit-secret");
       queryMock.mockResolvedValueOnce([
         {
           accessPasswordHash: token,
@@ -385,7 +359,7 @@ describe("operating-unit-store", () => {
         },
       ]);
 
-      await expect(verifyOperatingUnitAccessToken("cohort-4", token)).resolves.toBe(false);
+      await expect(verifyOperatingUnitAccessToken("loop-pak-4", token)).resolves.toBe(false);
     });
   });
 
@@ -399,23 +373,23 @@ describe("operating-unit-store", () => {
       ]);
 
       await expect(
-        verifyOperatingUnitAccessCode("cohort-4", "shared-entry-code")
+        verifyOperatingUnitAccessCode("loop-pak-4", "shared-entry-code")
       ).resolves.toBe(true);
     });
   });
 
   it("stores a hashed unit access code", async () => {
     await withSkipSchemaCheck(async () => {
-      queryMock.mockResolvedValueOnce([{ slug: "cohort-4" }]);
+      queryMock.mockResolvedValueOnce([{ slug: "loop-pak-4" }]);
 
       await setOperatingUnitAccessCode({
-        slug: "cohort-4",
+        slug: "loop-pak-4",
         password: "new-unit-code",
       });
 
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("set access_password_hash = $2");
-      expect(params[0]).toBe("cohort-4");
+      expect(params[0]).toBe("loop-pak-4");
       expect(params[1]).not.toBe("new-unit-code");
       expect(String(params[1])).toHaveLength(64);
     });
@@ -425,7 +399,7 @@ describe("operating-unit-store", () => {
     await withSkipSchemaCheck(async () => {
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
           description: null,
           isDefault: false,
@@ -435,39 +409,18 @@ describe("operating-unit-store", () => {
         },
       ]);
 
-      await expect(assertOperatingUnitAcceptsNewData("cohort-4")).rejects.toThrow(
-        "비활성 운영 단위에는 새 데이터를 등록할 수 없습니다."
+      await expect(assertOperatingUnitAcceptsNewData("loop-pak-4")).rejects.toThrow(
+        "비활성 항목에는 새 데이터를 등록할 수 없습니다."
       );
     });
-  });
-
-  it("createOperatingUnitAction requires the admin role password before mutation", async () => {
-    isAuthenticatedMock.mockResolvedValue(true);
-    getCurrentRolePageRoleMock.mockResolvedValue("admin");
-    verifyRolePagePasswordMock.mockReturnValue(false);
-    const formData = new FormData();
-    formData.set("slug", "cohort-4");
-    formData.set("name", "4기");
-    formData.set("adminPassword", "wrong");
-
-    await expect(createOperatingUnitAction(formData)).rejects.toThrow(
-      "redirect:/admin/operating-units?unit=password-invalid"
-    );
-    expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("insert into public.operating_units")
-      )
-    ).toBe(false);
   });
 
   it("createOperatingUnitAction requires a unit access code before mutation", async () => {
     isAuthenticatedMock.mockResolvedValue(true);
     getCurrentRolePageRoleMock.mockResolvedValue("admin");
-    verifyRolePagePasswordMock.mockReturnValue(true);
     const formData = new FormData();
-    formData.set("slug", "cohort-4");
+    formData.set("slug", "loop-pak-4");
     formData.set("name", "4기");
-    formData.set("adminPassword", "admin-secret");
 
     await expect(createOperatingUnitAction(formData)).rejects.toThrow(
       "redirect:/admin/operating-units/new?unit=access-code-required"
@@ -483,10 +436,9 @@ describe("operating-unit-store", () => {
     await withSkipSchemaCheck(async () => {
       isAuthenticatedMock.mockResolvedValue(true);
       getCurrentRolePageRoleMock.mockResolvedValue("admin");
-      verifyRolePagePasswordMock.mockReturnValue(true);
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
           description: null,
           isDefault: false,
@@ -497,32 +449,30 @@ describe("operating-unit-store", () => {
         },
       ]);
       const formData = new FormData();
-      formData.set("slug", "cohort-4");
+      formData.set("slug", "loop-pak-4");
       formData.set("name", "4기");
-      formData.set("adminPassword", "admin-secret");
       formData.set("accessPassword", "unit-secret");
 
       await expect(createOperatingUnitAction(formData)).rejects.toThrow(
-        "redirect:/admin/operating-units/cohort-4/edit?unit=created"
+        "redirect:/admin/operating-units/loop-pak-4/edit?unit=created"
       );
 
       const [, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(params[3]).toBe(
         createHash("sha256")
-          .update("saturday-meetup:operating-unit:cohort-4:unit-secret")
+          .update("saturday-meetup:operating-unit:loop-pak-4:unit-secret")
           .digest("hex")
       );
     });
   });
 
-  it("updateOperatingUnitAction mutates when admin role password is valid", async () => {
+  it("updateOperatingUnitAction mutates after global admin authentication", async () => {
     await withSkipSchemaCheck(async () => {
       isAuthenticatedMock.mockResolvedValue(true);
       getCurrentRolePageRoleMock.mockResolvedValue("admin");
-      verifyRolePagePasswordMock.mockReturnValue(true);
       queryMock.mockResolvedValueOnce([
         {
-          slug: "cohort-4",
+          slug: "loop-pak-4",
           name: "4기",
           description: null,
           isDefault: false,
@@ -532,59 +482,37 @@ describe("operating-unit-store", () => {
         },
       ]);
       const formData = new FormData();
-      formData.set("slug", "cohort-4");
+      formData.set("slug", "loop-pak-4");
       formData.set("name", "4기");
-      formData.set("adminPassword", "admin-secret");
 
       await expect(updateOperatingUnitAction(formData)).rejects.toThrow(
-        "redirect:/admin/operating-units/cohort-4/edit?unit=updated"
+        "redirect:/admin/operating-units/loop-pak-4/edit?unit=updated"
       );
       expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
     });
   });
 
-  it("updateOperatingUnitAccessCodeAction requires the admin role password", async () => {
-    isAuthenticatedMock.mockResolvedValue(true);
-    getCurrentRolePageRoleMock.mockResolvedValue("admin");
-    verifyRolePagePasswordMock.mockReturnValue(false);
-    const formData = new FormData();
-    formData.set("slug", "cohort-4");
-    formData.set("accessPassword", "new-unit-code");
-    formData.set("adminPassword", "wrong");
-
-    await expect(updateOperatingUnitAccessCodeAction(formData)).rejects.toThrow(
-      "redirect:/admin/operating-units/cohort-4/edit?unit=password-invalid"
-    );
-    expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("access_password_hash")
-      )
-    ).toBe(false);
-  });
-
-  it("updateOperatingUnitAccessCodeAction stores a hashed access code when admin password is valid", async () => {
+  it("updateOperatingUnitAccessCodeAction stores a hashed access code after global admin authentication", async () => {
     await withSkipSchemaCheck(async () => {
       isAuthenticatedMock.mockResolvedValue(true);
       getCurrentRolePageRoleMock.mockResolvedValue("admin");
-      verifyRolePagePasswordMock.mockReturnValue(true);
-      queryMock.mockResolvedValueOnce([{ slug: "cohort-4" }]);
+      queryMock.mockResolvedValueOnce([{ slug: "loop-pak-4" }]);
 
       const formData = new FormData();
-      formData.set("slug", "cohort-4");
+      formData.set("slug", "loop-pak-4");
       formData.set("accessPassword", "new-unit-code");
-      formData.set("adminPassword", "admin-secret");
 
       await expect(updateOperatingUnitAccessCodeAction(formData)).rejects.toThrow(
-        "redirect:/admin/operating-units/cohort-4/edit?unit=access-code-updated"
+        "redirect:/admin/operating-units/loop-pak-4/edit?unit=access-code-updated"
       );
 
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("access_password_hash = $2");
-      expect(params[0]).toBe("cohort-4");
+      expect(params[0]).toBe("loop-pak-4");
       expect(params[1]).not.toBe("new-unit-code");
       expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
       expect(revalidatePathMock).toHaveBeenCalledWith(
-        "/admin/operating-units/cohort-4/edit"
+        "/admin/operating-units/loop-pak-4/edit"
       );
     });
   });

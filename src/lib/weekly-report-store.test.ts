@@ -130,7 +130,7 @@ describe("weekly report store", () => {
       "2026-04-20",
       null,
       "팀 분위기 중심으로 작성",
-      "3기",
+      "loop-pak-3",
     ]);
   });
 
@@ -158,7 +158,7 @@ describe("weekly report store", () => {
           required: true,
         },
       ]),
-      "3기",
+      "loop-pak-3",
     ]);
   });
 
@@ -184,7 +184,7 @@ describe("weekly report store", () => {
       "2026-04-27",
       "2026-05-03",
       "수정된 작성 기준",
-      "3기",
+      "loop-pak-3",
     ]);
   });
 
