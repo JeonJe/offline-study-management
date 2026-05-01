@@ -11,7 +11,7 @@ export default async function Home({ searchParams }: HomePageProps) {
     <MeetupDashboard
       searchParams={searchParams}
       activeTab="study"
-      title="LOOP:PAK"
+      title="스터디"
       basePath="/"
       captureTargetId="offline-study-cards-capture"
     />

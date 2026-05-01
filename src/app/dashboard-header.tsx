@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { logoutAction } from "@/app/actions";
+import { DEFAULT_OPERATING_UNIT_NAME } from "@/lib/operating-unit-store";
 import type { CSSProperties, ReactNode } from "react";
 
 type DashboardTab = "loopPak" | "study" | "afterparty" | "members";
@@ -14,7 +15,7 @@ type DashboardHeaderProps = {
 
 const TAB_ITEMS: { key: DashboardTab; href: string; label: string }[] = [
   { key: "loopPak", href: "/loop-pak", label: "루프팩" },
-  { key: "study", href: "/", label: "LOOP:PAK" },
+  { key: "study", href: "/", label: "스터디" },
   { key: "afterparty", href: "/afterparty", label: "뒷풀이" },
   { key: "members", href: "/members", label: "멤버" },
 ];
@@ -82,6 +83,16 @@ export function DashboardHeader({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="rounded-full border px-3.5 py-2 text-sm font-bold"
+              style={{
+                borderColor: "rgba(13, 127, 242, 0.25)",
+                backgroundColor: "var(--accent-weak)",
+                color: "var(--accent-strong)",
+              }}
+            >
+              {DEFAULT_OPERATING_UNIT_NAME}
+            </span>
             <nav className="flex flex-wrap items-center gap-2" aria-label="대시보드 탭 이동">
               {TAB_ITEMS.map((tab) => (
                 <Link

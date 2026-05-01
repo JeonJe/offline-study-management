@@ -181,10 +181,10 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
           color: "var(--ink)",
           margin: "0 0 0.5rem",
         }}>
-          모임 대시보드
+          LOOPERS MEETUP
         </h1>
         <p className="li li-d1" style={{ margin: "0 0 1.8rem", color: "var(--ink-muted)", fontSize: "13px" }}>
-          스터디와 뒷풀이를 한 화면에서 관리하세요.
+          운영 중인 기수로 입장하세요.
         </p>
 
         {/* 폼 */}
@@ -197,7 +197,7 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
               textTransform: "uppercase",
               color: "var(--ink-muted)",
             }}>
-              비밀번호
+              입장 코드
             </label>
             <input
               id="password"
@@ -205,7 +205,7 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
               type="password"
               required
               autoComplete="current-password"
-              placeholder="공용 비밀번호"
+              placeholder="코드 입력"
               className="login-field"
               style={authMessage ? { borderColor: "var(--danger)" } : undefined}
             />
@@ -217,8 +217,15 @@ function LoginScreen({ authStatus }: { authStatus: string }) {
           </div>
 
           <button type="submit" className="login-submit">
-            입장하기
+            입장
           </button>
+          <Link
+            href="/admin"
+            className="text-center text-sm font-semibold underline decoration-1 underline-offset-4 transition hover:opacity-80"
+            style={{ color: "var(--ink-soft)" }}
+          >
+            전체 관리자
+          </Link>
         </form>
       </div>
     </main>

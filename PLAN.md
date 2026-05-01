@@ -1,30 +1,30 @@
-# LP-1 LOOPERS MEETUP / LOOP:PAK 작업 계획
+# LFP-1 LOOPERS MEETUP 표면 UX 정리 계획
 
 ## 범위
 
-- 상단 헤더에 `LOOPERS MEETUP` 브랜드 문구와 제공 아이콘 기반 브랜드 마크를 표시한다.
-- 기존 `스터디` 탭/타이틀 문구를 `LOOP:PAK`으로 변경한다.
-- `스터디` 탭 좌측에 `루프팩` 항목을 추가한다.
-- `루프팩` 항목은 빈 화면이 아니라 기존 스터디 참석/카드/집계 화면을 재사용하는 `/loop-pak` 라우트로 제공한다.
+- 로그인 첫 화면 문구를 루퍼스 톤으로 담백하게 정리한다.
+- 첫 화면에서 전체 관리자 진입점을 노출하되 기존 인증 보호는 유지한다.
+- 일반 대시보드 헤더에 현재 기수 배지를 표시한다.
+- 헤더 탭 라벨을 `루프팩`, `스터디`, `뒷풀이` 흐름에 맞춘다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |------|------|
-| `src/app/dashboard-header.tsx` | 브랜드 마크/문구 추가, 탭에 `루프팩` 추가, 날짜 query 유지 |
-| `src/app/meetup-dashboard.tsx` | 기존 메인 대시보드를 공용 컴포넌트로 전환, 타이틀/활성 탭/경로 props 추가 |
-| `src/app/page.tsx` | `/`에서 `LOOP:PAK` 대시보드 렌더 |
-| `src/app/loop-pak/page.tsx` | `/loop-pak`에서 `루프팩` 대시보드 렌더 |
-| `public/loopers-meetup-icon.svg` | 제공 아이콘을 앱 정적 자산으로 반영 |
+| `src/app/meetup-dashboard.tsx` | 로그인 첫 화면 문구, 입력 라벨, 버튼, 전체 관리자 링크 변경 |
+| `src/app/dashboard-header.tsx` | 스터디 탭 라벨 복구, 현재 기수 배지 추가 |
+| `src/app/page.tsx` | 스터디 화면 타이틀 복구 |
+| `src/app/layout.tsx` | 브라우저 메타데이터를 루퍼스 문구로 변경 |
 
 ## 테스트
 
 - `npm run typecheck`
 - `npm run lint`
 - `npm test`
-- UI 라우트 추가이므로 가능하면 `npm run build`까지 확인
+- `npx next build --webpack`
+- 로컬 HTML 문구 확인
 
 ## 위험
 
-- 루프팩은 이번 PR에서 기존 스터디 데이터 모델을 재사용한다. 완전히 분리된 데이터 집계가 필요하면 후속 PR에서 `meeting_kind` 또는 별도 도메인 분리가 필요하다.
-- 제공 아이콘은 대화에 첨부된 이미지를 정적 SVG로 재현한다. 원본 PNG가 별도 파일로 제공되면 동일 파일명으로 교체 가능하다.
+- 전체 관리자 링크는 노출만 추가한다. 실제 접근 권한은 기존 `/admin` 인증 흐름을 그대로 따른다.
+- 운영 단위 선택, 기수별 비밀번호, `/cohorts/{slug}` 라우팅은 후속 LFP-2~LFP-5에서 처리한다.
