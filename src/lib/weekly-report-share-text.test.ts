@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { getCycleMock, listCommentsMock, listReportsMock, loadMemberPresetMock } =
-  vi.hoisted(() => ({
+const {
+  countCommentsByReportIdsMock,
+  getCycleMock,
+  listReportsMock,
+  loadMemberPresetMock,
+} = vi.hoisted(() => ({
+    countCommentsByReportIdsMock: vi.fn(),
     getCycleMock: vi.fn(),
-    listCommentsMock: vi.fn(),
     listReportsMock: vi.fn(),
     loadMemberPresetMock: vi.fn(),
   }));
@@ -13,9 +17,9 @@ vi.mock("@/lib/member-store", () => ({
 }));
 
 vi.mock("@/lib/weekly-report-store", () => ({
+  countCommentsByReportIds: countCommentsByReportIdsMock,
   getWeeklyReportCycleById: getCycleMock,
   listAngelWeeklyReports: listReportsMock,
-  listComments: listCommentsMock,
 }));
 
 import { buildCycleShareText } from "@/lib/weekly-report-share-text";
@@ -64,13 +68,24 @@ function report(teamName: string, id = `${teamName}-report`) {
 }
 
 describe("buildCycleShareText", () => {
+  it("cycleId가 비어 있으면 에러를 던진다", async () => {
+    await expect(buildCycleShareText("   ")).rejects.toThrow("보고 주차 ID는 필수입니다.");
+  });
+
+  it("사이클이 없으면 에러를 던진다", async () => {
+    getCycleMock.mockResolvedValue(null);
+    loadMemberPresetMock.mockResolvedValue(memberPreset);
+
+    await expect(buildCycleShareText("missing-cycle")).rejects.toThrow(
+      "보고 주차를 찾을 수 없습니다."
+    );
+  });
+
   it("정상 사이클의 팀별 보고와 댓글 수를 공유 문구로 만든다", async () => {
     getCycleMock.mockResolvedValue(cycle);
     loadMemberPresetMock.mockResolvedValue(memberPreset);
     listReportsMock.mockResolvedValue([report("1팀"), report("2팀")]);
-    listCommentsMock
-      .mockResolvedValueOnce([{ id: "comment-1" }, { id: "comment-2" }])
-      .mockResolvedValueOnce([]);
+    countCommentsByReportIdsMock.mockResolvedValue(new Map([["1팀-report", 2]]));
 
     const text = await buildCycleShareText("cycle-1");
 
@@ -85,6 +100,7 @@ describe("buildCycleShareText", () => {
     getCycleMock.mockResolvedValue(cycle);
     loadMemberPresetMock.mockResolvedValue(memberPreset);
     listReportsMock.mockResolvedValue([]);
+    countCommentsByReportIdsMock.mockResolvedValue(new Map());
 
     const text = await buildCycleShareText("cycle-1");
 
@@ -97,7 +113,7 @@ describe("buildCycleShareText", () => {
     getCycleMock.mockResolvedValue(cycle);
     loadMemberPresetMock.mockResolvedValue(memberPreset);
     listReportsMock.mockResolvedValue([report("1팀")]);
-    listCommentsMock.mockResolvedValue([{ id: "comment-1" }]);
+    countCommentsByReportIdsMock.mockResolvedValue(new Map([["1팀-report", 1]]));
 
     const text = await buildCycleShareText("cycle-1");
 

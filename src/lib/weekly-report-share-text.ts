@@ -1,9 +1,9 @@
 import { loadMemberPreset } from "@/lib/member-store";
 import {
   type AngelWeeklyReport,
+  countCommentsByReportIds,
   getWeeklyReportCycleById,
   listAngelWeeklyReports,
-  listComments,
 } from "@/lib/weekly-report-store";
 
 type ReportWithCommentCount = AngelWeeklyReport & {
@@ -45,11 +45,14 @@ export async function buildCycleShareText(cycleId: string): Promise<string> {
   }
 
   const reports = await listAngelWeeklyReports(cycle.id);
-  const reportsWithCommentCounts: ReportWithCommentCount[] = await Promise.all(
-    reports.map(async (report) => ({
+  const commentCountByReportId = await countCommentsByReportIds(
+    reports.map((report) => report.id)
+  );
+  const reportsWithCommentCounts: ReportWithCommentCount[] = reports.map(
+    (report) => ({
       ...report,
-      commentCount: (await listComments(report.id)).length,
-    }))
+      commentCount: commentCountByReportId.get(report.id) ?? 0,
+    })
   );
   const reportByTeam = new Map(
     reportsWithCommentCounts.map((report) => [report.teamName, report])

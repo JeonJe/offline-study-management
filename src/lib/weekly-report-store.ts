@@ -123,6 +123,11 @@ export type WeeklyReportComment = {
   createdAt: string;
 };
 
+export type WeeklyReportCommentCount = {
+  reportId: string;
+  commentCount: number;
+};
+
 type AddWeeklyReportCommentInput = {
   reportId: string;
   authorRole: WeeklyReportCommentAuthorRole;
@@ -863,6 +868,32 @@ export async function listComments(
      order by created_at asc`,
     [id]
   );
+}
+
+export async function countCommentsByReportIds(
+  reportIds: string[]
+): Promise<Map<string, number>> {
+  await ensureWeeklyReportSchema();
+
+  const ids = Array.from(
+    new Set(reportIds.map((reportId) => cleanText(reportId)).filter(Boolean))
+  );
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const rows = await query<WeeklyReportCommentCount>(
+    `select
+       report_id as "reportId",
+       count(*)::int as "commentCount"
+     from public.weekly_report_comments
+     where report_id = any($1::uuid[])
+       and deleted_at is null
+     group by report_id`,
+    [ids]
+  );
+
+  return new Map(rows.map((row) => [row.reportId, row.commentCount]));
 }
 
 export async function addComment(

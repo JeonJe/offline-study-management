@@ -160,7 +160,7 @@ describe("operating-unit-store", () => {
     }
   });
 
-  it("upserts a named operating unit", async () => {
+  it("creates a named operating unit without overwriting existing slugs", async () => {
     const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
     process.env.SKIP_SCHEMA_CHECK = "1";
     try {
@@ -183,8 +183,31 @@ describe("operating-unit-store", () => {
       expect(created.slug).toBe("4기");
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("on conflict (slug)");
+      expect(sql).toContain("do nothing");
+      expect(sql).not.toContain("do update");
       expect(params[0]).toBe("4");
       expect(params[1]).toBe("4기");
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+  });
+
+  it("createOperatingUnit rejects duplicate slugs instead of silently updating", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      queryMock.mockResolvedValueOnce([]);
+
+      await expect(
+        createOperatingUnit({
+          slug: "cohort-4",
+          name: "4기",
+        })
+      ).rejects.toThrow("이미 존재하는 운영 단위 식별자입니다.");
     } finally {
       if (prevSkipSchemaCheck === undefined) {
         delete process.env.SKIP_SCHEMA_CHECK;

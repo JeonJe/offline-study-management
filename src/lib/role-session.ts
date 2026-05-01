@@ -55,6 +55,30 @@ export function verifyRolePagePassword(role: RolePageRole, password: string): bo
   );
 }
 
+export function createRoleScopedToken(
+  role: RolePageRole,
+  purpose: string,
+  payload: string
+): string | null {
+  const password = rolePassword(role);
+  if (!password) return null;
+
+  return createHash("sha256")
+    .update(`saturday-meetup:${role}:${password}:${purpose}:${payload}`)
+    .digest("hex");
+}
+
+export function verifyRoleScopedToken(
+  role: RolePageRole,
+  purpose: string,
+  payload: string,
+  token: string
+): boolean {
+  const expectedToken = createRoleScopedToken(role, purpose, payload);
+  if (!expectedToken || !token) return false;
+  return safeEquals(token, expectedToken);
+}
+
 export async function getCurrentRolePageRole(): Promise<RolePageRole | null> {
   const cookieStore = await cookies();
   const cookieValue = cookieStore.get(ROLE_COOKIE_NAME)?.value;

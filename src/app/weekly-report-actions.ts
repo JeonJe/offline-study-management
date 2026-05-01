@@ -15,7 +15,10 @@ import {
   upsertAngelWeeklyReport,
 } from "@/lib/weekly-report-store";
 import type { WeeklyReportCommentAuthorRole } from "@/lib/weekly-report-store";
-import { getCurrentRolePageRole } from "@/lib/role-session";
+import {
+  getCurrentRolePageRole,
+  verifyRoleScopedToken,
+} from "@/lib/role-session";
 import type { RolePageRole } from "@/lib/role-page";
 
 function textFrom(formData: FormData, key: string): string {
@@ -196,6 +199,17 @@ export async function addWeeklyReportCommentAction(formData: FormData): Promise<
     authorRole === "admin"
       ? "관리자"
       : textFrom(formData, "authorLabel");
+  if (
+    authorRole === "angel" &&
+    !verifyRoleScopedToken(
+      "angel",
+      "weekly-report-comment-author",
+      `${reportId}:${authorLabel}`,
+      textFrom(formData, "authorToken")
+    )
+  ) {
+    redirect(returnPath ? `${returnPath}?comment=forbidden` : "/angel/reports?comment=forbidden");
+  }
 
   await addComment({
     reportId,
@@ -218,6 +232,7 @@ export async function deleteWeeklyReportCommentAction(formData: FormData): Promi
   const reportId = textFrom(formData, "reportId");
   const returnPath = safeReturnPath(formData);
   const authorLabel = textFrom(formData, "authorLabel");
+  const ownershipToken = textFrom(formData, "ownershipToken");
   const comments = await listComments(reportId);
   const target = comments.find((comment) => comment.id === commentId);
 
@@ -229,7 +244,13 @@ export async function deleteWeeklyReportCommentAction(formData: FormData): Promi
     currentRole === "admin" ||
     (currentRole === "angel" &&
       target.authorRole === "angel" &&
-      target.authorLabel === authorLabel);
+      target.authorLabel === authorLabel &&
+      verifyRoleScopedToken(
+        "angel",
+        "weekly-report-comment-delete",
+        `${reportId}:${commentId}:${authorLabel}`,
+        ownershipToken
+      ));
 
   if (!canDelete) {
     redirect(returnPath ? `${returnPath}?comment=forbidden` : "/angel/reports?comment=forbidden");

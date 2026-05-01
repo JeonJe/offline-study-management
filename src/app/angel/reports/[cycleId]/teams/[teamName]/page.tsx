@@ -22,6 +22,7 @@ import {
 import {
   getConfiguredRolePages,
   getCurrentRolePageRole,
+  createRoleScopedToken,
 } from "@/lib/role-session";
 import {
   type AngelWeeklyReport,
@@ -151,6 +152,13 @@ function TeamReportForm({
     report?.angelName && team.angels.includes(report.angelName)
       ? report.angelName
       : team.angels[0] ?? "";
+  const commentAuthorToken = report
+    ? createRoleScopedToken(
+        "angel",
+        "weekly-report-comment-author",
+        `${report.id}:${defaultAngelName}`
+      )
+    : null;
   const fieldByKey = {
     summary: {
       name: "summary",
@@ -336,11 +344,22 @@ function TeamReportForm({
                           {comment.authorLabel}
                         </p>
                         {canDelete ? (
-                          <form action={deleteWeeklyReportCommentAction}>
-                            <input type="hidden" name="commentId" value={comment.id} />
-                            <input type="hidden" name="reportId" value={report.id} />
-                            <input type="hidden" name="authorLabel" value={defaultAngelName} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
+	                          <form action={deleteWeeklyReportCommentAction}>
+	                            <input type="hidden" name="commentId" value={comment.id} />
+	                            <input type="hidden" name="reportId" value={report.id} />
+	                            <input type="hidden" name="authorLabel" value={defaultAngelName} />
+	                            <input
+	                              type="hidden"
+	                              name="ownershipToken"
+	                              value={
+	                                createRoleScopedToken(
+	                                  "angel",
+	                                  "weekly-report-comment-delete",
+	                                  `${report.id}:${comment.id}:${defaultAngelName}`
+	                                ) ?? ""
+	                              }
+	                            />
+	                            <input type="hidden" name="returnPath" value={returnPath} />
                             <button
                               type="submit"
                               className="btn-press rounded-full border px-2.5 py-1 text-xs font-bold"
@@ -361,9 +380,10 @@ function TeamReportForm({
             </div>
 
             <form action={addWeeklyReportCommentAction} className="grid gap-3">
-              <input type="hidden" name="reportId" value={report.id} />
-              <input type="hidden" name="authorLabel" value={defaultAngelName} />
-              <input type="hidden" name="returnPath" value={returnPath} />
+	              <input type="hidden" name="reportId" value={report.id} />
+	              <input type="hidden" name="authorLabel" value={defaultAngelName} />
+	              <input type="hidden" name="authorToken" value={commentAuthorToken ?? ""} />
+	              <input type="hidden" name="returnPath" value={returnPath} />
               <textarea
                 name="body"
                 required

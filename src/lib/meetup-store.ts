@@ -651,8 +651,9 @@ export async function createRsvpsBulk(
          i.name,
          i.role,
          i.id,
-         row_number() over () as position
-       from unnest($1::text[], $2::text[], $3::uuid[]) as i(name, role, id)
+         i.position
+       from unnest($1::text[], $2::text[], $3::uuid[])
+         with ordinality as i(name, role, id, position)
      ),
      inserted as (
        insert into public.rsvps (id, meeting_id, name, role, status, note)

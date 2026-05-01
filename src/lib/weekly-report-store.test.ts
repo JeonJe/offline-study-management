@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => ({
 import {
   _resetSchemaStateForTesting,
   addComment,
+  countCommentsByReportIds,
   createWeeklyReportCycle,
   createWeeklyReportTemplate,
   listComments,
@@ -331,6 +332,19 @@ describe("weekly report comments", () => {
     expect(selectCall).toBeDefined();
     expect(selectCall?.[0]).toContain("deleted_at is null");
     expect(selectCall?.[1]).toEqual(["report-1"]);
+  });
+
+  it("countCommentsByReportIds는 삭제되지 않은 댓글 수를 report_id별로 집계한다", async () => {
+    await countCommentsByReportIds(["report-1", "report-2", "report-1", "   "]);
+
+    const selectCall = queryMock.mock.calls.find(([sql]) =>
+      sql.includes("count(*)::int as \"commentCount\"")
+    );
+    expect(selectCall).toBeDefined();
+    expect(selectCall?.[0]).toContain("report_id = any($1::uuid[])");
+    expect(selectCall?.[0]).toContain("deleted_at is null");
+    expect(selectCall?.[0]).toContain("group by report_id");
+    expect(selectCall?.[1]).toEqual([["report-1", "report-2"]]);
   });
 
   it("T5: softDeleteComment - deleted_at = now() + deleted_at IS NULL 조건 포함", async () => {

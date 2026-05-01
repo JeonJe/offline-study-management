@@ -200,6 +200,8 @@ describe("meetup-store meeting password flows", () => {
     const [sql] = queryMock.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("for update");
     expect(sql).toContain("where r.status = 'confirmed'");
+    expect(sql).toContain("with ordinality");
+    expect(sql).not.toContain("row_number() over ()");
     expect(sql).toContain("insert into public.rsvps (id, meeting_id, name, role, status, note)");
     expect(sql).toContain("when ml.capacity is null then 'confirmed'");
     expect(sql).toContain("else 'waitlist'");

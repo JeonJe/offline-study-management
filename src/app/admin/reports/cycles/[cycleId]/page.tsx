@@ -72,13 +72,18 @@ async function safeLoadCycleDetail(
       getWeeklyReportCycleById(cycleId),
       loadMemberPreset(),
     ]);
-    const [reports, template, shareText] = cycle
+    const [reports, template] = cycle
       ? await Promise.all([
           listAngelWeeklyReports(cycle.id),
           getWeeklyReportTemplateById(cycle.templateId),
-          buildCycleShareText(cycle.id),
         ])
-      : [[], null, ""];
+      : [[], null];
+    const shareText = cycle
+      ? await buildCycleShareText(cycle.id).catch((error) => {
+          console.error("Failed to build weekly report share text", error);
+          return "";
+        })
+      : "";
 
     return {
       cycle,

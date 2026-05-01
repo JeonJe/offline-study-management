@@ -173,11 +173,7 @@ export async function createOperatingUnit(input: {
   const [created] = await query<OperatingUnit>(
     `insert into public.operating_units (slug, name, description)
      values ($1, $2, nullif($3, ''))
-     on conflict (slug)
-     do update set
-       name = excluded.name,
-       description = excluded.description,
-       updated_at = now()
+     on conflict (slug) do nothing
      returning
        slug,
        name,
@@ -189,7 +185,7 @@ export async function createOperatingUnit(input: {
   );
 
   if (!created) {
-    throw new Error("운영 단위를 저장하지 못했습니다.");
+    throw new Error("이미 존재하는 운영 단위 식별자입니다.");
   }
   return created;
 }
