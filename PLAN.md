@@ -1,20 +1,24 @@
-# LFP-2B 전체 관리자 모달 분리 계획
+# LFP-3A 운영 단위 URL 호환 레이어 계획
 
 ## 목표
-- 첫 화면에서 기수 입장 코드 입력과 전체 관리자 코드 입력을 명확히 분리한다.
-- 전체 관리자 진입은 별도 링크를 누르면 모달로 열리게 한다.
-- 관리자 코드 실패 시 모달이 열린 상태로 에러 메시지를 보여준다.
+- `/angel`처럼 운영 단위가 드러나지 않는 직접 진입 문제를 줄인다.
+- `/cohorts/{unit}/...` 주소를 먼저 지원하고, 기존 화면은 유지한다.
+- 로그인 성공 시 선택한 기수의 cohort URL로 진입시킨다.
 
 ## 변경 파일
 | 파일 | 변경 |
 |------|------|
-| `src/app/meetup-dashboard.tsx` | 기존 `details` 관리자 폼을 CSS 기반 모달로 교체 |
+| `src/lib/cohort-routes.ts` | cohort URL 생성/rewrite 대상 계산 유틸 추가 |
+| `src/lib/cohort-routes.test.ts` | URL 생성과 rewrite 매핑 회귀 테스트 |
+| `src/proxy.ts` | `/cohorts/{unit}/...` 요청을 기존 route로 rewrite |
+| `src/app/actions.ts` | 기수 로그인 성공 기본 이동을 `/cohorts/{unit}/loop-pak`으로 변경 |
+
+## 비범위
+- 데이터 조회/저장 스코프 분리는 아직 하지 않는다.
+- 헤더 탭의 모든 링크를 cohort URL로 치환하는 작업은 다음 PR에서 처리한다.
+- 운영 단위별 비밀번호/권한 분리는 LFP-4/LFP-5에서 처리한다.
 
 ## 검증
-- 첫 화면에 기수 드롭다운 + 입장 코드만 기본 노출되는지 확인
-- `전체 관리자` 클릭 시 관리자 코드 모달이 나타나는지 확인
-- `?adminAuth=invalid` 진입 시 모달이 열린 상태로 에러가 보이는지 확인
+- `/cohorts/3%EA%B8%B0/loop-pak`이 `/loop-pak?unit=3%EA%B8%B0`로 rewrite되는지 확인
+- `/cohorts/3%EA%B8%B0/angel`이 `/angel?unit=3%EA%B8%B0`로 rewrite되는지 확인
 - `npm run typecheck`, `npm run lint`, `npm test`, `npx next build --webpack`
-
-## 위험
-- 클라이언트 상태 없이 CSS `:target`과 서버 렌더 상태를 사용한다. URL hash는 서버에 전달되지 않으므로 실패 상태는 기존 `adminAuth=invalid` 쿼리로 처리한다.

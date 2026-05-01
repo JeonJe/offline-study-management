@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAuthenticated, login, logout } from "@/lib/auth";
+import { cohortScopedPath } from "@/lib/cohort-routes";
 import { withSettlementInPath } from "@/lib/navigation-utils";
 import {
   isAfterpartyPasswordError,
@@ -162,6 +163,10 @@ function afterpartyPath(state: DashboardState = {}): string {
   return query ? `/afterparty?${query}` : "/afterparty";
 }
 
+function cohortEntryPath(unitSlug: string): string {
+  return unitSlug.trim() ? cohortScopedPath(unitSlug, "loop-pak") : dashboardPath();
+}
+
 function safeReturnPath(formData: FormData): string | null {
   const raw = textFrom(formData, "returnPath").trim();
   if (!raw.startsWith("/")) return null;
@@ -305,7 +310,7 @@ export async function loginAction(formData: FormData): Promise<void> {
     redirect(`/?${loginParams.toString()}`);
   }
 
-  redirect(returnPath ?? dashboardPath());
+  redirect(returnPath ?? (authScope === "unit" ? cohortEntryPath(selectedUnit) : dashboardPath()));
 }
 
 export async function logoutAction(): Promise<void> {
