@@ -42,6 +42,7 @@ vi.mock("@/lib/role-session", () => ({
 
 import {
   createOperatingUnitAction,
+  updateOperatingUnitAccessCodeAction,
   updateOperatingUnitAction,
 } from "@/app/admin/operating-units/operating-unit-actions";
 import {
@@ -446,6 +447,52 @@ describe("operating-unit-store", () => {
         "redirect:/admin/operating-units/cohort-4/edit?unit=updated"
       );
       expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
+    });
+  });
+
+  it("updateOperatingUnitAccessCodeAction requires the admin role password", async () => {
+    isAuthenticatedMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("admin");
+    verifyRolePagePasswordMock.mockReturnValue(false);
+    const formData = new FormData();
+    formData.set("slug", "cohort-4");
+    formData.set("accessPassword", "new-unit-code");
+    formData.set("adminPassword", "wrong");
+
+    await expect(updateOperatingUnitAccessCodeAction(formData)).rejects.toThrow(
+      "redirect:/admin/operating-units/cohort-4/edit?unit=password-invalid"
+    );
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("access_password_hash")
+      )
+    ).toBe(false);
+  });
+
+  it("updateOperatingUnitAccessCodeAction stores a hashed access code when admin password is valid", async () => {
+    await withSkipSchemaCheck(async () => {
+      isAuthenticatedMock.mockResolvedValue(true);
+      getCurrentRolePageRoleMock.mockResolvedValue("admin");
+      verifyRolePagePasswordMock.mockReturnValue(true);
+      queryMock.mockResolvedValueOnce([{ slug: "cohort-4" }]);
+
+      const formData = new FormData();
+      formData.set("slug", "cohort-4");
+      formData.set("accessPassword", "new-unit-code");
+      formData.set("adminPassword", "admin-secret");
+
+      await expect(updateOperatingUnitAccessCodeAction(formData)).rejects.toThrow(
+        "redirect:/admin/operating-units/cohort-4/edit?unit=access-code-updated"
+      );
+
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("access_password_hash = $2");
+      expect(params[0]).toBe("cohort-4");
+      expect(params[1]).not.toBe("new-unit-code");
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
+      expect(revalidatePathMock).toHaveBeenCalledWith(
+        "/admin/operating-units/cohort-4/edit"
+      );
     });
   });
 });

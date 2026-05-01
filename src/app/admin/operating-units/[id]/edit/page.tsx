@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { updateOperatingUnitAction } from "@/app/admin/operating-units/operating-unit-actions";
+import {
+  updateOperatingUnitAccessCodeAction,
+  updateOperatingUnitAction,
+} from "@/app/admin/operating-units/operating-unit-actions";
 import {
   RoleAccessRequired,
   RoleNotConfigured,
@@ -24,7 +27,16 @@ import {
 
 type EditOperatingUnitPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+function singleParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
 
 async function safeGetOperatingUnit(slug: string): Promise<{
   unit: OperatingUnit | null;
@@ -144,8 +156,100 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
   );
 }
 
+function AccessCodeForm({
+  unit,
+  status,
+}: {
+  unit: OperatingUnit;
+  status: string;
+}) {
+  const statusMessage =
+    status === "access-code-updated"
+      ? "입장 코드가 변경됐습니다."
+      : status === "access-code-required"
+        ? "새 입장 코드를 입력하세요."
+        : status === "password-invalid"
+          ? "관리자 비밀번호가 맞지 않습니다."
+          : "";
+
+  return (
+    <form
+      action={updateOperatingUnitAccessCodeAction}
+      className="card-static grid gap-4 p-5 sm:p-6"
+    >
+      <input type="hidden" name="slug" value={unit.slug} />
+
+      <div className="grid gap-1">
+        <h2 className="text-base font-bold" style={{ color: "var(--ink)" }}>
+          입장 코드
+        </h2>
+        <p className="text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
+          {unit.hasAccessPassword
+            ? "현재 이 운영 단위는 별도 입장 코드를 사용합니다."
+            : "아직 별도 입장 코드가 없어 공용 코드로 입장합니다."}
+        </p>
+      </div>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-bold" htmlFor="accessPassword" style={{ color: "var(--ink)" }}>
+          새 입장 코드
+        </label>
+        <input
+          id="accessPassword"
+          name="accessPassword"
+          type="password"
+          required
+          minLength={1}
+          autoComplete="new-password"
+          className="h-11 rounded-xl border px-3 text-sm outline-none"
+          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-bold" htmlFor="accessCodeAdminPassword" style={{ color: "var(--ink)" }}>
+          관리자 비밀번호
+        </label>
+        <input
+          id="accessCodeAdminPassword"
+          name="adminPassword"
+          type="password"
+          required
+          autoComplete="current-password"
+          className="h-11 rounded-xl border px-3 text-sm outline-none"
+          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+        />
+      </div>
+
+      {statusMessage ? (
+        <p
+          className="rounded-xl border px-3 py-2 text-sm font-semibold"
+          style={{
+            borderColor: status === "access-code-updated" ? "rgba(21, 128, 61, 0.25)" : "#fecaca",
+            backgroundColor: status === "access-code-updated" ? "rgba(21, 128, 61, 0.08)" : "var(--danger-bg)",
+            color: status === "access-code-updated" ? "var(--success)" : "var(--danger)",
+          }}
+        >
+          {statusMessage}
+        </p>
+      ) : null}
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white"
+          style={{ backgroundColor: "var(--accent)" }}
+        >
+          입장 코드 변경
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default async function EditOperatingUnitPage({
   params,
+  searchParams,
 }: EditOperatingUnitPageProps) {
   const authenticated = await isAuthenticated();
   if (!authenticated) {
@@ -160,6 +264,8 @@ export default async function EditOperatingUnitPage({
     getCurrentRolePageRole(),
     params,
   ]);
+  const query = await searchParams;
+  const status = singleParam(query.unit);
   const page = getRolePage("admin");
   const access = canOpenRolePage("admin", currentRole, getConfiguredRolePages());
 
@@ -183,7 +289,12 @@ export default async function EditOperatingUnitPage({
         </section>
       );
     } else {
-      content = <EditOperatingUnitForm unit={unit} />;
+      content = (
+        <div className="grid gap-4">
+          <EditOperatingUnitForm unit={unit} />
+          <AccessCodeForm unit={unit} status={status} />
+        </div>
+      );
     }
   }
 
@@ -191,7 +302,7 @@ export default async function EditOperatingUnitPage({
     <RoleShell
       activeRole="admin"
       title="운영 단위 편집"
-      summary="기수 이름과 설명을 수정합니다."
+      summary="기수 이름, 설명, 입장 코드를 수정합니다."
     >
       {content}
     </RoleShell>
