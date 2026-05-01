@@ -88,12 +88,11 @@ export function DashboardHeader({
 
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className="text-[11px] font-semibold"
-                style={{ color: "var(--ink-muted)" }}
-                aria-label={`선택한 이름 ${DEFAULT_OPERATING_UNIT_NAME}`}
+                className="text-xs font-semibold"
+                style={{ color: "var(--ink-soft)" }}
+                aria-label={`현재 항목 ${DEFAULT_OPERATING_UNIT_NAME}`}
               >
-                <span className="font-medium">이름</span>{" "}
-                <span style={{ color: "var(--ink-soft)" }}>{DEFAULT_OPERATING_UNIT_NAME}</span>
+                {DEFAULT_OPERATING_UNIT_NAME}
               </span>
               <nav className="flex flex-wrap items-center gap-2" aria-label="대시보드 탭 이동">
                 {TAB_ITEMS.map((tab) => (
@@ -126,14 +125,9 @@ export function DashboardHeader({
               </form>
             </div>
           </div>
-          {currentDate ? (
-            <p className="mt-1.5 text-xs font-medium" style={{ color: "var(--ink-muted)" }}>
-              모임일 {currentDate}
-            </p>
-          ) : null}
         </div>
       </header>
-      <div className={currentDate ? "h-[118px] sm:h-[76px]" : "h-[100px] sm:h-[60px]"} aria-hidden="true" />
+      <div className="h-[96px] sm:h-[60px]" aria-hidden="true" />
     </>
   );
 }

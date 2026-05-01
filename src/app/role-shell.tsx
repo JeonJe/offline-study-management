@@ -64,12 +64,11 @@ export function RoleShell({
 
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className="text-[11px] font-semibold"
-                style={{ color: "var(--ink-muted)" }}
-                aria-label={`선택한 범위 ${displayScope}`}
+                className="text-xs font-semibold"
+                style={{ color: "var(--ink-soft)" }}
+                aria-label={`현재 항목 ${displayScope}`}
               >
-                <span className="font-medium">범위</span>{" "}
-                <span style={{ color: "var(--ink-soft)" }}>{displayScope}</span>
+                {displayScope}
               </span>
               {showRoleNav ? (
                 <nav className="flex flex-wrap items-center gap-2" aria-label="역할별 페이지 이동">
