@@ -130,6 +130,33 @@ export async function listOperatingUnits(): Promise<OperatingUnit[]> {
   );
 }
 
+export async function getOperatingUnit(
+  slug: string
+): Promise<OperatingUnit | null> {
+  await ensureOperatingUnitSchema();
+
+  const normalizedSlug = normalizeOperatingUnitSlug(slug);
+  if (!normalizedSlug) {
+    return null;
+  }
+
+  const [unit] = await query<OperatingUnit>(
+    `select
+       slug,
+       name,
+       description,
+       is_default as "isDefault",
+       created_at::text as "createdAt",
+       updated_at::text as "updatedAt"
+     from public.operating_units
+     where slug = $1
+     limit 1`,
+    [normalizedSlug]
+  );
+
+  return unit ?? null;
+}
+
 export async function createOperatingUnit(input: {
   slug: string;
   name: string;
@@ -167,11 +194,46 @@ export async function createOperatingUnit(input: {
   return created;
 }
 
+export async function updateOperatingUnit(input: {
+  slug: string;
+  name: string;
+  description?: string;
+}): Promise<OperatingUnit> {
+  await ensureOperatingUnitSchema();
+
+  const slug = normalizeOperatingUnitSlug(input.slug);
+  const name = input.name.trim();
+  if (!slug || !name) {
+    throw new Error("운영 단위 이름과 식별자가 필요합니다.");
+  }
+
+  const [updated] = await query<OperatingUnit>(
+    `update public.operating_units
+     set name = $2,
+         description = nullif($3, ''),
+         updated_at = now()
+     where slug = $1
+     returning
+       slug,
+       name,
+       description,
+       is_default as "isDefault",
+       created_at::text as "createdAt",
+       updated_at::text as "updatedAt"`,
+    [slug, name, input.description?.trim() ?? ""]
+  );
+
+  if (!updated) {
+    throw new Error("운영 단위를 수정하지 못했습니다.");
+  }
+  return updated;
+}
+
 export function normalizeOperatingUnitSlug(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣_-]+/g, "-")
+    .replace(/[^a-z0-9_-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 }

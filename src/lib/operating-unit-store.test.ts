@@ -1,32 +1,75 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { queryMock } = vi.hoisted(() => ({
+const {
+  getCurrentRolePageRoleMock,
+  isAuthenticatedMock,
+  queryMock,
+  redirectMock,
+  revalidatePathMock,
+  verifyRolePagePasswordMock,
+} = vi.hoisted(() => ({
+  getCurrentRolePageRoleMock: vi.fn(),
+  isAuthenticatedMock: vi.fn(),
   queryMock: vi.fn(),
+  redirectMock: vi.fn((path: string) => {
+    throw new Error(`redirect:${path}`);
+  }),
+  revalidatePathMock: vi.fn(),
+  verifyRolePagePasswordMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   query: queryMock,
 }));
 
+vi.mock("next/cache", () => ({
+  revalidatePath: revalidatePathMock,
+}));
+
+vi.mock("next/navigation", () => ({
+  redirect: redirectMock,
+}));
+
+vi.mock("@/lib/auth", () => ({
+  isAuthenticated: isAuthenticatedMock,
+}));
+
+vi.mock("@/lib/role-session", () => ({
+  getCurrentRolePageRole: getCurrentRolePageRoleMock,
+  verifyRolePagePassword: verifyRolePagePasswordMock,
+}));
+
+import {
+  createOperatingUnitAction,
+  updateOperatingUnitAction,
+} from "@/app/admin/operating-units/operating-unit-actions";
 import {
   _resetSchemaStateForTesting,
   createOperatingUnit,
+  getOperatingUnit,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
   listOperatingUnits,
   normalizeOperatingUnitSlug,
+  updateOperatingUnit,
 } from "@/lib/operating-unit-store";
 
 describe("operating-unit-store", () => {
   beforeEach(() => {
+    getCurrentRolePageRoleMock.mockReset();
+    isAuthenticatedMock.mockReset();
     queryMock.mockReset();
     queryMock.mockResolvedValue([]);
+    redirectMock.mockClear();
+    revalidatePathMock.mockClear();
+    verifyRolePagePasswordMock.mockReset();
     _resetSchemaStateForTesting();
   });
 
-  it("normalizes labels into stable slugs", () => {
-    expect(normalizeOperatingUnitSlug(" 4기 루퍼스 ")).toBe("4기-루퍼스");
+  it("normalizes labels into ascii-only stable slugs", () => {
+    expect(normalizeOperatingUnitSlug(" 4기 루퍼스 ")).toBe("4");
     expect(normalizeOperatingUnitSlug("Career Framework")).toBe("career-framework");
+    expect(normalizeOperatingUnitSlug("4기 루퍼스")).not.toContain("기");
   });
 
   it("creates the default operating unit schema and default row", async () => {
@@ -140,8 +183,126 @@ describe("operating-unit-store", () => {
       expect(created.slug).toBe("4기");
       const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
       expect(sql).toContain("on conflict (slug)");
-      expect(params[0]).toBe("4기");
+      expect(params[0]).toBe("4");
       expect(params[1]).toBe("4기");
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+  });
+
+  it("gets one operating unit by normalized slug", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: "신규 기수",
+          isDefault: false,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+
+      const unit = await getOperatingUnit(" Cohort 4 ");
+
+      expect(unit?.slug).toBe("cohort-4");
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("where slug = $1");
+      expect(params).toEqual(["cohort-4"]);
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+  });
+
+  it("updates operating unit name and description without changing default status", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: "수정됨",
+          isDefault: false,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+
+      await updateOperatingUnit({
+        slug: "cohort-4",
+        name: " 4기 ",
+        description: " 수정됨 ",
+      });
+
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("update public.operating_units");
+      expect(sql).not.toContain("set is_default");
+      expect(params).toEqual(["cohort-4", "4기", "수정됨"]);
+    } finally {
+      if (prevSkipSchemaCheck === undefined) {
+        delete process.env.SKIP_SCHEMA_CHECK;
+      } else {
+        process.env.SKIP_SCHEMA_CHECK = prevSkipSchemaCheck;
+      }
+    }
+  });
+
+  it("createOperatingUnitAction requires the admin role password before mutation", async () => {
+    isAuthenticatedMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("admin");
+    verifyRolePagePasswordMock.mockReturnValue(false);
+    const formData = new FormData();
+    formData.set("slug", "cohort-4");
+    formData.set("name", "4기");
+    formData.set("adminPassword", "wrong");
+
+    await expect(createOperatingUnitAction(formData)).rejects.toThrow(
+      "redirect:/admin/operating-units?unit=password-invalid"
+    );
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("insert into public.operating_units")
+      )
+    ).toBe(false);
+  });
+
+  it("updateOperatingUnitAction mutates when admin role password is valid", async () => {
+    const prevSkipSchemaCheck = process.env.SKIP_SCHEMA_CHECK;
+    process.env.SKIP_SCHEMA_CHECK = "1";
+    try {
+      isAuthenticatedMock.mockResolvedValue(true);
+      getCurrentRolePageRoleMock.mockResolvedValue("admin");
+      verifyRolePagePasswordMock.mockReturnValue(true);
+      queryMock.mockResolvedValueOnce([
+        {
+          slug: "cohort-4",
+          name: "4기",
+          description: null,
+          isDefault: false,
+          createdAt: "2026-05-01",
+          updatedAt: "2026-05-01",
+        },
+      ]);
+      const formData = new FormData();
+      formData.set("slug", "cohort-4");
+      formData.set("name", "4기");
+      formData.set("adminPassword", "admin-secret");
+
+      await expect(updateOperatingUnitAction(formData)).rejects.toThrow(
+        "redirect:/admin/operating-units/cohort-4/edit?unit=updated"
+      );
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
     } finally {
       if (prevSkipSchemaCheck === undefined) {
         delete process.env.SKIP_SCHEMA_CHECK;
