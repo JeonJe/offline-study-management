@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AttendanceChart } from "@/app/admin/history/attendance-chart";
 import { PeriodPicker } from "@/app/admin/history/period-picker";
 import {
   RoleAccessRequired,
@@ -378,6 +379,14 @@ function HistoryPanel({
           />
         </div>
       </section>
+
+      {!data.error && tab === "team" ? (
+        <AttendanceChart kind="team" rows={data.teams} />
+      ) : null}
+
+      {!data.error && tab === "member" ? (
+        <AttendanceChart kind="member" rows={data.members} />
+      ) : null}
 
       <section className="card-static overflow-hidden">
         {data.error ? (
