@@ -16,6 +16,7 @@ import {
   ensureSchema,
   MAX_MEETING_CAPACITY,
   parseCapacityInput,
+  promoteWaitlistedRsvp,
   updateMeeting,
 } from "@/lib/meetup-store";
 
@@ -205,6 +206,20 @@ describe("meetup-store meeting password flows", () => {
     expect(sql).toContain("insert into public.rsvps (id, meeting_id, name, role, status, note)");
     expect(sql).toContain("when ml.capacity is null then 'confirmed'");
     expect(sql).toContain("else 'waitlist'");
+  });
+
+  it("promotes a waitlisted RSVP only when confirmed capacity remains", async () => {
+    queryMock.mockResolvedValueOnce([{ promoted: true }]);
+
+    await expect(promoteWaitlistedRsvp("meeting-1", "rsvp-1")).resolves.toBe(true);
+
+    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("for update");
+    expect(sql).toContain("where r.status = 'confirmed'");
+    expect(sql).toContain("r.status = 'waitlist'");
+    expect(sql).toContain("cc.count < ml.capacity");
+    expect(sql).toContain("set status = 'confirmed'");
+    expect(params).toEqual(["meeting-1", "rsvp-1"]);
   });
 });
 

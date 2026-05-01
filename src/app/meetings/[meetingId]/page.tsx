@@ -3,6 +3,7 @@ import {
   bulkCreateRsvpsAction,
   deleteMeetingAction,
   deleteRsvpAction,
+  promoteWaitlistedRsvpAction,
   updateMeetingAction,
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
@@ -297,7 +298,23 @@ function resolveParticipantFeedback(status: string, source: string): Participant
     };
   }
 
+  if (status === "waitlist-full") {
+    return {
+      title: "승격할 수 없습니다",
+      description: "정원이 이미 가득 차 있어 대기 인원을 확정으로 바꾸지 못했습니다.",
+      tone: "notice",
+    };
+  }
+
   return null;
+}
+
+function capacityLabel(
+  meeting: { capacity: number | null; totalCount: number },
+  waitlistCount: number
+): string | null {
+  if (meeting.capacity === null) return null;
+  return `확정 ${meeting.totalCount}/${meeting.capacity} · 대기 ${waitlistCount}`;
 }
 
 function ParticipantFeedbackBanner({ feedback }: { feedback: ParticipantFeedback }) {
@@ -424,7 +441,9 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     }
   }
 
-  const displayRsvps = rsvps.map((row) => {
+  const waitlistRsvps = rsvps.filter((row) => row.status === "waitlist");
+  const confirmedRsvps = rsvps.filter((row) => row.status === "confirmed");
+  const displayRsvps = confirmedRsvps.map((row) => {
     const resolvedRole = roleByName.get(normalizeName(row.name));
     if (row.role === "student" && resolvedRole) {
       return { ...row, role: resolvedRole };
@@ -488,7 +507,8 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     ...teamSections,
   ];
 
-  const assignedNameSet = new Set(displayRsvps.map((row) => normalizeName(row.name)));
+  const assignedNameSet = new Set(rsvps.map((row) => normalizeName(row.name)));
+  const waitlistSummary = capacityLabel(meeting, waitlistRsvps.length);
 
   const operationEntries = operationRoleOrder.flatMap((role) =>
     (operationNamesByRole.get(role) ?? []).map((name) => ({ name, role }))
@@ -632,6 +652,18 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                   총 {meeting.totalCount}명 · 멤버 {meeting.studentCount}명 · 운영진 {meeting.operationCount}명
                   {meeting.capacity !== null ? ` · 정원 ${meeting.capacity}명` : null}
                 </p>
+                {waitlistSummary ? (
+                  <p
+                    className="mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-bold"
+                    style={{
+                      borderColor: "rgba(13, 127, 242, 0.25)",
+                      backgroundColor: "var(--accent-weak)",
+                      color: "var(--accent-strong)",
+                    }}
+                  >
+                    {waitlistSummary}
+                  </p>
+                ) : null}
                 <a
                   href="#team-assignment"
                   className="btn-press mt-3 inline-flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-semibold lg:hidden"
@@ -855,6 +887,51 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             ) : (
               <p className="mt-3 text-xs" style={{ color: "var(--ink-muted)" }}>없음</p>
             )}
+            {meeting.capacity !== null ? (
+              <section
+                className="mt-3 rounded-xl border p-3"
+                style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold" style={{ color: "var(--ink)" }}>
+                    대기 인원
+                  </h3>
+                  <span className="text-xs font-semibold" style={{ color: "var(--accent)" }}>
+                    {waitlistRsvps.length}명
+                  </span>
+                </div>
+                {waitlistRsvps.length > 0 ? (
+                  <ul className="mt-2 grid gap-2">
+                    {waitlistRsvps.map((row) => (
+                      <li
+                        key={`waitlist-${row.id}`}
+                        className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2"
+                        style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
+                      >
+                        <span className="min-w-0 truncate text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                          {withTeamLabel(row.name, teamLabelByName)}
+                        </span>
+                        <form action={promoteWaitlistedRsvpAction}>
+                          <input type="hidden" name="meetingId" value={meeting.id} />
+                          <input type="hidden" name="rsvpId" value={row.id} />
+                          <input type="hidden" name="returnPath" value={returnPath} />
+                          <PendingSubmitButton
+                            idleLabel="승격"
+                            pendingLabel="승격중..."
+                            className="btn-press h-8 rounded-md px-3 text-xs font-bold text-white"
+                            style={{ backgroundColor: "var(--accent)" }}
+                          />
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs" style={{ color: "var(--ink-muted)" }}>
+                    대기 중인 인원이 없습니다.
+                  </p>
+                )}
+              </section>
+            ) : null}
           </section>
 
         </div>

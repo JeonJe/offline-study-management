@@ -1,6 +1,9 @@
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL ?? "https://offline-study-management.vercel.app";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -9,7 +12,7 @@ export default defineConfig({
   timeout: 30_000,
   globalSetup: "./e2e/global-setup.ts",
   use: {
-    baseURL: "https://offline-study-management.vercel.app",
+    baseURL,
     storageState: path.join(__dirname, "e2e/.auth/state.json"),
     headless: true,
     trace: "on-first-retry",

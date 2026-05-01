@@ -7,7 +7,8 @@ const DASHBOARD = `/?date=${TEST_DATE}`;
 const AUTH_STATE = path.join(__dirname, ".auth", "state.json");
 // 수동 chromium.launch() context는 playwright.config의 use.baseURL을 상속받지 않으므로
 // beforeAll cleanup용 context 생성 시 명시적으로 전달한다
-const BASE_URL = "https://offline-study-management.vercel.app";
+const BASE_URL =
+  process.env.PLAYWRIGHT_BASE_URL ?? "https://offline-study-management.vercel.app";
 
 // 회귀 테스트 전용 라벨 prefix — 다른 spec의 E2E 데이터와 구분
 const TEST_LABEL = "R회귀모임";
@@ -17,12 +18,20 @@ const TEST_LABEL = "R회귀모임";
 /** 모임 상세 페이지에서 삭제 수행 (cache-consistency.spec.ts 패턴 차용) */
 async function deleteMeetingFromDetail(page: import("@playwright/test").Page) {
   page.once("dialog", (d) => d.accept());
-  await page.locator('button:has-text("수정 관리")').click();
-  await page.locator('[role="dialog"]').waitFor();
+  await openManageModal(page);
   await page
     .locator('[role="dialog"] button:has-text("이 모임 삭제")')
     .click();
   await page.waitForURL(`**/?date=${TEST_DATE}**`, { timeout: 10_000 });
+}
+
+async function openManageModal(page: import("@playwright/test").Page) {
+  const button = page.getByRole("button", { name: "수정 관리" });
+  await expect(button).toBeVisible();
+  await expect(async () => {
+    await button.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
 }
 
 /**
@@ -199,6 +208,72 @@ test.describe.serial("회귀: 모임 생성 → 참석 → 취소 → 재등록"
     await page.goto(DASHBOARD);
     await expect(
       page.locator(`a[aria-label="${TEST_LABEL}A 상세 보기"]`),
+    ).toHaveCount(0);
+  });
+});
+
+test.describe.serial("회귀: 정원 초과 대기 → 승격", () => {
+  const WAITLIST_LABEL = `${TEST_LABEL}대기`;
+  let meetingDetailUrl = "";
+
+  test.beforeAll(async () => {
+    const browser = await chromium.launch();
+    const context = await browser.newContext({
+      storageState: AUTH_STATE,
+      baseURL: BASE_URL,
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(10_000);
+
+    await cleanupByLabel(page, WAITLIST_LABEL, DASHBOARD);
+
+    await context.close();
+    await browser.close();
+  });
+
+  test("R5: 대기 등록 → 승격 → 확정 표시", async ({ page }) => {
+    await page.goto(DASHBOARD);
+
+    const fab = page.locator("details:has(summary.fab-pulse)");
+    await fab.locator("summary").click();
+    await fab.locator('input[name="title"]').fill(WAITLIST_LABEL);
+    await fab.locator('input[name="location"]').fill("회귀테스트장소");
+    await fab.locator("form").evaluate((form) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "capacity";
+      input.value = "1";
+      form.appendChild(input);
+    });
+    await fab.locator('button[type="submit"]:has-text("생성")').click();
+    await page.waitForURL(`**/?date=${TEST_DATE}**`);
+
+    const link = page
+      .locator(`a[aria-label="${WAITLIST_LABEL} 상세 보기"]`)
+      .first();
+    meetingDetailUrl = (await link.getAttribute("href")) ?? "";
+    expect(meetingDetailUrl).toContain("/meetings/");
+    await page.goto(meetingDetailUrl);
+    await expect(page.getByText("확정 0/1 · 대기 0")).toBeVisible();
+
+    const manualAdd = page.locator('form:has(input[name="mutationSource"][value="manual-add"])');
+    await manualAdd.locator('input[name="names"]').fill("대기확정, 대기후보");
+    await manualAdd.locator('button[type="submit"]:has-text("추가")').click();
+    await expect(page.getByText("확정 1/1 · 대기 1")).toBeVisible();
+    await expect(page.getByText("대기후보")).toBeVisible();
+
+    page.once("dialog", (d) => d.accept());
+    await page.locator('button[aria-label="참여자 제거"]').first().click();
+    await expect(page.getByText("확정 0/1 · 대기 1")).toBeVisible();
+
+    await page.locator('li:has-text("대기후보") button:has-text("승격")').click();
+    await expect(page.getByText("확정 1/1 · 대기 0")).toBeVisible();
+    await expect(page.locator("section").filter({ hasText: "대기 인원" }).getByText("대기 중인 인원이 없습니다.")).toBeVisible();
+
+    await deleteMeetingFromDetail(page);
+    await page.goto(DASHBOARD);
+    await expect(
+      page.locator(`a[aria-label="${WAITLIST_LABEL} 상세 보기"]`),
     ).toHaveCount(0);
   });
 });

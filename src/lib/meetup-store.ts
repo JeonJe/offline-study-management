@@ -702,6 +702,49 @@ export async function createRsvpsBulk(
   return row?.changedCount ?? 0;
 }
 
+export async function promoteWaitlistedRsvp(
+  meetingId: string,
+  rsvpId: string
+): Promise<boolean> {
+  await ensureSchema();
+
+  const normalizedMeetingId = meetingId.trim();
+  const normalizedRsvpId = rsvpId.trim();
+  if (!normalizedMeetingId || !normalizedRsvpId) {
+    return false;
+  }
+
+  const [row] = await query<{ promoted: boolean }>(
+    `with meeting_lock as (
+       select id, capacity
+       from public.meetings
+       where id = $1
+       for update
+     ),
+     confirmed_count as (
+       select count(r.id)::int as count
+       from public.rsvps r
+       join meeting_lock ml on ml.id = r.meeting_id
+       where r.status = 'confirmed'
+     ),
+     promoted as (
+       update public.rsvps r
+       set status = 'confirmed'
+       from meeting_lock ml
+       cross join confirmed_count cc
+       where r.id = $2
+         and r.meeting_id = ml.id
+         and r.status = 'waitlist'
+         and (ml.capacity is null or cc.count < ml.capacity)
+       returning r.id
+     )
+     select exists(select 1 from promoted) as promoted`,
+    [normalizedMeetingId, normalizedRsvpId]
+  );
+
+  return Boolean(row?.promoted);
+}
+
 async function getMeetingPasswordHash(meetingId: string): Promise<string | null> {
   const [row] = await query<{ passwordHash: string | null }>(
     `select password_hash as "passwordHash"

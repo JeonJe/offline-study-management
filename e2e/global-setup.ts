@@ -3,6 +3,8 @@ import path from "node:path";
 import fs from "node:fs";
 
 const AUTH_FILE = path.join(__dirname, ".auth", "state.json");
+const BASE_URL =
+  process.env.PLAYWRIGHT_BASE_URL ?? "https://offline-study-management.vercel.app";
 
 export default async function globalSetup() {
   const password = process.env.APP_PASSWORD;
@@ -15,9 +17,7 @@ export default async function globalSetup() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  await page.goto(
-    "https://offline-study-management.vercel.app/?date=2026-03-01",
-  );
+  await page.goto(`${BASE_URL}/?date=2026-03-01`);
 
   await page.locator('input[name="password"]').fill(password);
   await page.locator("button.login-submit").click();

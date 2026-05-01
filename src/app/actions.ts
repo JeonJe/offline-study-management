@@ -26,6 +26,7 @@ import {
   getMeetingTitle,
   isMeetingPasswordError,
   parseCapacityInput,
+  promoteWaitlistedRsvp,
   type ParticipantRole,
   updateMeeting,
   updateRsvp,
@@ -44,7 +45,7 @@ type DashboardState = {
   keyword?: string;
 };
 
-type ParticipantAddFeedbackStatus = "invalid-input" | "already-added";
+type ParticipantAddFeedbackStatus = "invalid-input" | "already-added" | "waitlist-full";
 type ParticipantAddFeedbackSource = "manual" | "quick";
 
 const PARTICIPANT_INPUT_STOP_WORDS = new Set([
@@ -724,6 +725,27 @@ export async function deleteRsvpAction(formData: FormData): Promise<void> {
 
   revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date, keyword }));
+}
+
+export async function promoteWaitlistedRsvpAction(formData: FormData): Promise<void> {
+  const meetingId = textFrom(formData, "meetingId").trim();
+  const rsvpId = textFrom(formData, "rsvpId").trim();
+  const returnPath = safeReturnPath(formData);
+  const fallbackPath = returnPath ?? (meetingId ? `/meetings/${meetingId}` : "/");
+
+  await requireAuthOrRedirect();
+
+  if (!meetingId || !rsvpId) {
+    redirect(fallbackPath);
+  }
+
+  const promoted = await promoteWaitlistedRsvp(meetingId, rsvpId);
+  if (!promoted) {
+    redirect(participantFeedbackPath(fallbackPath, "waitlist-full", "manual"));
+  }
+
+  revalidateMeetupViews(meetingId, returnPath);
+  redirect(fallbackPath);
 }
 
 export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
