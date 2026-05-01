@@ -18,7 +18,8 @@ import {
 import { redirect } from "next/navigation";
 import { EditManageModal } from "@/app/meetings/[meetingId]/edit-manage-modal";
 import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-button";
-import { extractHttpUrl } from "@/lib/location-utils";
+import { extractHttpUrl, extractMapEmbedInfo } from "@/lib/location-utils";
+import { MapPreview } from "@/app/meetings/[meetingId]/map-preview";
 import {
   normalizeMemberName,
   toTeamLabel,
@@ -604,6 +605,18 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
                   <span className="font-semibold">방장:</span>
                   <LeaderChips leaders={meeting.leaders} />
                 </div>
+                {(() => {
+                  const placeLink = extractHttpUrl(meeting.location);
+                  const embedInfo = placeLink ? extractMapEmbedInfo(placeLink) : null;
+                  return embedInfo && placeLink ? (
+                    <MapPreview
+                      embedUrl={embedInfo.embedUrl}
+                      provider={embedInfo.provider}
+                      locationText={meeting.location}
+                      placeLink={placeLink}
+                    />
+                  ) : null;
+                })()}
                 <section
                   className="mt-3 rounded-xl border p-3"
                   style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
