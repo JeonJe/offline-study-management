@@ -12,7 +12,9 @@
     "db:ping": "node scripts/db-ping.mjs",
     "db:backup": "node scripts/backup-db.mjs",
     "docs:screenshots": "node scripts/capture-readme-screenshots.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "e2e": "npx playwright test --project=chromium",
+    "e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "next": "16.1.6",
