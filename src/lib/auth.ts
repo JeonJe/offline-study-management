@@ -56,6 +56,28 @@ export async function isGlobalAuthenticated(): Promise<boolean> {
   return Boolean(currentToken && isGlobalAuthToken(currentToken));
 }
 
+export async function isAuthenticatedForUnit(unitSlug: string): Promise<boolean> {
+  const normalizedUnitSlug = normalizeOperatingUnitSlug(unitSlug);
+  if (!normalizedUnitSlug) {
+    return false;
+  }
+
+  const cookieStore = await cookies();
+  const currentToken = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+  if (!currentToken) return false;
+
+  if (isGlobalAuthToken(currentToken)) {
+    return true;
+  }
+
+  const unitToken = parseUnitAuthToken(currentToken);
+  if (!unitToken || normalizeOperatingUnitSlug(unitToken.slug) !== normalizedUnitSlug) {
+    return false;
+  }
+
+  return verifyOperatingUnitAccessToken(normalizedUnitSlug, unitToken.token);
+}
+
 export async function login(
   password: string,
   options: { unitSlug?: string } = {}

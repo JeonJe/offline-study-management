@@ -32,6 +32,7 @@ vi.mock("@/lib/operating-unit-store", () => ({
 }));
 
 import {
+  isAuthenticatedForUnit,
   isAuthenticated,
   isGlobalAuthenticated,
   login,
@@ -100,6 +101,28 @@ describe("auth", () => {
       "cohort-4",
       "unit-token"
     );
+  });
+
+  it("accepts a scoped unit auth cookie only for its own unit", async () => {
+    cookieGetMock.mockReturnValue({ value: "unit:cohort-4:unit-token" });
+    verifyOperatingUnitAccessTokenMock.mockResolvedValue(true);
+
+    await expect(isAuthenticatedForUnit("cohort-4")).resolves.toBe(true);
+    await expect(isAuthenticatedForUnit("cohort-5")).resolves.toBe(false);
+
+    expect(verifyOperatingUnitAccessTokenMock).toHaveBeenCalledTimes(1);
+    expect(verifyOperatingUnitAccessTokenMock).toHaveBeenCalledWith(
+      "cohort-4",
+      "unit-token"
+    );
+  });
+
+  it("accepts a global admin auth cookie for any unit", async () => {
+    cookieGetMock.mockReturnValue({ value: globalToken("global-admin-code") });
+
+    await expect(isAuthenticatedForUnit("cohort-4")).resolves.toBe(true);
+
+    expect(verifyOperatingUnitAccessTokenMock).not.toHaveBeenCalled();
   });
 
   it("does not accept a scoped unit auth cookie as global admin auth", async () => {
