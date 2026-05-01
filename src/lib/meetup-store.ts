@@ -15,6 +15,41 @@ export type ParticipantRole =
   | "mentor"
   | "manager";
 
+/** 모임 정원 상한. UI(input max), Server Action 검증, init schema CHECK 제약을 한 지점으로 묶는다. */
+export const MAX_MEETING_CAPACITY = 10000;
+
+/**
+ * formData에서 받은 capacity 문자열의 정규화 결과.
+ * - empty: 입력 없음(정원 미설정)
+ * - value: 0..MAX_MEETING_CAPACITY 사이의 정수
+ * - invalid: 음수/소수/비숫자/범위 초과 — 호출자가 사용자 피드백 책임
+ */
+export type ParsedCapacity =
+  | { kind: "empty" }
+  | { kind: "value"; value: number }
+  | { kind: "invalid" };
+
+/**
+ * formData의 capacity raw 문자열을 정규화한다.
+ * silent drop을 막기 위해 invalid를 명시적으로 구분한다.
+ */
+export function parseCapacityInput(raw: string): ParsedCapacity {
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return { kind: "empty" };
+  }
+  const parsed = Number(trimmed);
+  if (
+    !Number.isFinite(parsed) ||
+    !Number.isInteger(parsed) ||
+    parsed < 0 ||
+    parsed > MAX_MEETING_CAPACITY
+  ) {
+    return { kind: "invalid" };
+  }
+  return { kind: "value", value: parsed };
+}
+
 export type MeetingSummary = {
   id: string;
   operatingUnitSlug: string;
@@ -70,6 +105,10 @@ type UpdateMeetingInput = {
   accessPassword?: string;
   nextPassword?: string;
   clearPassword?: boolean;
+  /**
+   * 정원. null = 정원 제거(정원 없는 모임으로 전환), 양의 정수 = 정원 설정.
+   * undefined 비허용 — 호출자가 항상 명시적으로 의도를 전달해야 한다.
+   */
   capacity: number | null;
 };
 

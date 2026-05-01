@@ -14,6 +14,8 @@ import {
   createRsvpsBulk,
   deleteMeeting,
   ensureSchema,
+  MAX_MEETING_CAPACITY,
+  parseCapacityInput,
   updateMeeting,
 } from "@/lib/meetup-store";
 
@@ -364,5 +366,58 @@ describe("meetup-store capacity flows", () => {
 
     const [, params] = queryMock.mock.calls[1] as [string, unknown[]];
     expect(params[8]).toBe(30);
+  });
+});
+
+describe("parseCapacityInput", () => {
+  it("빈 문자열은 empty를 반환한다 (정원 미설정)", () => {
+    expect(parseCapacityInput("")).toEqual({ kind: "empty" });
+  });
+
+  it("공백만 있는 문자열은 empty를 반환한다", () => {
+    expect(parseCapacityInput("   ")).toEqual({ kind: "empty" });
+  });
+
+  it("0은 value 0으로 파싱된다 (정원 마감 의도)", () => {
+    expect(parseCapacityInput("0")).toEqual({ kind: "value", value: 0 });
+  });
+
+  it("양의 정수는 value로 파싱된다", () => {
+    expect(parseCapacityInput("30")).toEqual({ kind: "value", value: 30 });
+  });
+
+  it("앞뒤 공백이 있는 정수도 정상 파싱된다", () => {
+    expect(parseCapacityInput(" 30 ")).toEqual({ kind: "value", value: 30 });
+  });
+
+  it("MAX_MEETING_CAPACITY 경계값은 허용된다", () => {
+    expect(parseCapacityInput(String(MAX_MEETING_CAPACITY))).toEqual({
+      kind: "value",
+      value: MAX_MEETING_CAPACITY,
+    });
+  });
+
+  it("MAX_MEETING_CAPACITY + 1은 invalid", () => {
+    expect(parseCapacityInput(String(MAX_MEETING_CAPACITY + 1))).toEqual({
+      kind: "invalid",
+    });
+  });
+
+  it("음수는 invalid", () => {
+    expect(parseCapacityInput("-1")).toEqual({ kind: "invalid" });
+  });
+
+  it("소수는 invalid", () => {
+    expect(parseCapacityInput("3.14")).toEqual({ kind: "invalid" });
+  });
+
+  it("숫자가 아닌 문자열은 invalid", () => {
+    expect(parseCapacityInput("abc")).toEqual({ kind: "invalid" });
+    expect(parseCapacityInput("10명")).toEqual({ kind: "invalid" });
+  });
+
+  it("Infinity / NaN 표현은 invalid", () => {
+    expect(parseCapacityInput("Infinity")).toEqual({ kind: "invalid" });
+    expect(parseCapacityInput("NaN")).toEqual({ kind: "invalid" });
   });
 });

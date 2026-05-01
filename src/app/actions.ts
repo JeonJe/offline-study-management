@@ -25,6 +25,7 @@ import {
   deleteRsvp,
   getMeetingTitle,
   isMeetingPasswordError,
+  parseCapacityInput,
   type ParticipantRole,
   updateMeeting,
   updateRsvp,
@@ -321,14 +322,11 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
     redirect(dashboardPath(state));
   }
 
-  const capacityRaw = textFrom(formData, "capacity").trim();
-  const capacity = capacityRaw === "" ? undefined : Number(capacityRaw);
+  // NOTE(SM-4A2): create 흐름의 capacity invalid 사용자 피드백은 dashboard manage 채널 도입 후 처리.
+  // 본 PR에서는 헬퍼로 정규화만 통일하고, invalid는 정원 미설정으로 fallback.
+  const capacityResult = parseCapacityInput(textFrom(formData, "capacity"));
   const capacityValue =
-    capacity === undefined
-      ? undefined
-      : Number.isFinite(capacity) && Number.isInteger(capacity) && capacity >= 0 && capacity <= 10000
-        ? capacity
-        : undefined;
+    capacityResult.kind === "value" ? capacityResult.value : undefined;
 
   const created = await createMeeting({
     title,
@@ -808,18 +806,18 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
   const accessPassword = textFrom(formData, "meetingPassword").trim();
   const nextPassword = textFrom(formData, "nextMeetingPassword").trim();
   const clearPassword = textFrom(formData, "clearMeetingPassword") === "true";
-  const capacityRaw = textFrom(formData, "capacity").trim();
-  const capacityParsed = capacityRaw === "" ? null : Number(capacityRaw);
-  const capacity =
-    capacityParsed === null
-      ? null
-      : Number.isFinite(capacityParsed) && Number.isInteger(capacityParsed) && capacityParsed >= 0 && capacityParsed <= 10000
-        ? capacityParsed
-        : null;
+  const capacityResult = parseCapacityInput(textFrom(formData, "capacity"));
 
   if (!meetingId || !title || !meetingDate || !startTime || !location) {
     redirect(dashboardPath({ date, keyword }));
   }
+
+  // 사용자가 잘못된 capacity를 입력하면 silent drop 대신 manage 채널로 피드백.
+  if (capacityResult.kind === "invalid") {
+    redirect(meetingManagePath(meetingId, returnPath, "capacity-invalid"));
+  }
+  const capacity =
+    capacityResult.kind === "value" ? capacityResult.value : null;
 
   try {
     await updateMeeting({
