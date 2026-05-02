@@ -36,6 +36,7 @@ import {
   listAngelWeeklyReports,
   listComments,
 } from "@/lib/weekly-report-store";
+import { formatCommentDateTime } from "@/lib/date-utils";
 import type { RolePageRole } from "@/lib/role-page";
 
 type AngelTeamReportPageProps = {
@@ -70,17 +71,7 @@ function decodeTeamName(value: string): string {
 }
 
 function formatCommentDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Seoul",
-  }).format(date);
+  return formatCommentDateTime(value);
 }
 
 function commentInitial(name: string): string {

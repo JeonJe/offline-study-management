@@ -37,6 +37,7 @@ import {
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
 import { buildOfflineStudyShareText } from "@/lib/share-text";
+import { compareText } from "@/lib/sort-utils";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -768,20 +769,18 @@ function sortRsvpsForRole(
         return teamOrderA - teamOrderB;
       }
       if (teamA !== teamB) {
-        return teamA.localeCompare(teamB, "ko");
+        return compareText(teamA, teamB);
       }
 
-      return normalizeMemberName(a.name).localeCompare(normalizeMemberName(b.name), "ko");
+      return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
     });
     return sorted;
   }
 
-  sorted.sort((a, b) =>
-    withTeamLabel(a.name, teamLabelByMemberName).localeCompare(
-      withTeamLabel(b.name, teamLabelByMemberName),
-      "ko"
-    )
-  );
+  sorted.sort((a, b) => compareText(
+    withTeamLabel(a.name, teamLabelByMemberName),
+    withTeamLabel(b.name, teamLabelByMemberName)
+  ));
   return sorted;
 }
 

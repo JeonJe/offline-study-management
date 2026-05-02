@@ -15,3 +15,11 @@ export function compareByText<T>(
   return (a, b) => compareText(getValue(a), getValue(b), locale);
 }
 
+export function compareNullableText(a: string, b: string): number {
+  if (a !== b) return compareText(a, b);
+  return 0;
+}
+
+export function compareTextDesc(a: string, b: string): number {
+  return compareText(b, a);
+}

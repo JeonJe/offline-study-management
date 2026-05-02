@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { compareByText, compareText, sortText } from "@/lib/sort-utils";
+import {
+  compareByText,
+  compareNullableText,
+  compareText,
+  compareTextDesc,
+  sortText,
+} from "@/lib/sort-utils";
 
 describe("sort-utils", () => {
   it("기본 locale 기반 텍스트 비교 결과를 반환한다", () => {
@@ -22,5 +28,16 @@ describe("sort-utils", () => {
       { name: "다" },
     ]);
   });
-});
 
+  it("빈 문자열 포함 텍스트도 기본 locale로 비교한다", () => {
+    expect(["나", "", "가"].sort(compareNullableText)).toEqual(["", "가", "나"]);
+  });
+
+  it("텍스트 내림차순 comparator를 제공한다", () => {
+    expect(["2026-01-01", "2026-03-01", "2026-02-01"].sort(compareTextDesc)).toEqual([
+      "2026-03-01",
+      "2026-02-01",
+      "2026-01-01",
+    ]);
+  });
+});

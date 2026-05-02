@@ -27,6 +27,7 @@ import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
+import { compareText } from "@/lib/sort-utils";
 import { dataLoadErrorMessage } from "@/lib/ui-error-messages";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -76,7 +77,7 @@ function sortAfterpartiesByStartTime(rows: AfterpartySummary[]): AfterpartySumma
   return [...rows].sort((a, b) => {
     const timeDiff = timeOrderValue(a.startTime) - timeOrderValue(b.startTime);
     if (timeDiff !== 0) return timeDiff;
-    return a.title.localeCompare(b.title, "ko");
+    return compareText(a.title, b.title);
   });
 }
 
@@ -320,8 +321,8 @@ function AfterpartyCard({
       if (aHasTeam !== bHasTeam) return aHasTeam ? -1 : 1;
 
       if (a.teamOrder !== b.teamOrder) return a.teamOrder - b.teamOrder;
-      if (a.teamLabel !== b.teamLabel) return a.teamLabel.localeCompare(b.teamLabel, "ko");
-      return a.displayName.localeCompare(b.displayName, "ko");
+      if (a.teamLabel !== b.teamLabel) return compareText(a.teamLabel, b.teamLabel);
+      return compareText(a.displayName, b.displayName);
     });
   const participantsByRole = new Map<ParticipantRole, DecoratedAfterpartyParticipant[]>();
   for (const role of PARTICIPANT_ROLE_ORDER) {

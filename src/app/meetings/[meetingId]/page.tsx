@@ -36,6 +36,7 @@ import { PendingSubmitButton } from "@/app/pending-submit-button";
 import { QuerySelectFilter } from "@/app/query-select-filter";
 import { LeaderChipInput } from "@/app/leader-chip-input";
 import { SharedFormPasswordField } from "@/app/shared-form-password-field";
+import { compareText } from "@/lib/sort-utils";
 
 type PageProps = {
   params: Promise<{ meetingId: string }>;
@@ -139,19 +140,17 @@ function sortRsvpsForRole(
       const teamOrderB = teamOrderFromLabel(teamB);
 
       if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-      if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+      if (teamA !== teamB) return compareText(teamA, teamB);
 
-      return normalizeName(a.name).localeCompare(normalizeName(b.name), "ko");
+      return compareText(normalizeName(a.name), normalizeName(b.name));
     });
     return sorted;
   }
 
-  sorted.sort((a, b) =>
-    withTeamLabel(a.name, teamLabelByName).localeCompare(
-      withTeamLabel(b.name, teamLabelByName),
-      "ko"
-    )
-  );
+  sorted.sort((a, b) => compareText(
+    withTeamLabel(a.name, teamLabelByName),
+    withTeamLabel(b.name, teamLabelByName)
+  ));
   return sorted;
 }
 
@@ -497,7 +496,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
       const orderA = teamOrderFromLabel(teamA);
       const orderB = teamOrderFromLabel(teamB);
       if (orderA !== orderB) return orderA - orderB;
-      return teamA.localeCompare(teamB, "ko");
+      return compareText(teamA, teamB);
     })
     .map(([label, rows]) => ({
       key: `team-${label}`,
@@ -524,8 +523,8 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     const teamOrderA = teamOrderFromLabel(teamA);
     const teamOrderB = teamOrderFromLabel(teamB);
     if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-    if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
-    return normalizeName(a.name).localeCompare(normalizeName(b.name), "ko");
+    if (teamA !== teamB) return compareText(teamA, teamB);
+    return compareText(normalizeName(a.name), normalizeName(b.name));
   });
   const quickAddGroups = [
     ...memberPreset.teamGroups.map((team) => ({
@@ -545,8 +544,8 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
           const teamOrderA = teamOrderFromLabel(teamA);
           const teamOrderB = teamOrderFromLabel(teamB);
           if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-          if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
-          return normalizeName(a.name).localeCompare(normalizeName(b.name), "ko");
+          if (teamA !== teamB) return compareText(teamA, teamB);
+          return compareText(normalizeName(a.name), normalizeName(b.name));
         }),
     })),
     ...(operationEntries.length > 0

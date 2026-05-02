@@ -2,7 +2,7 @@ import { query } from "@/lib/db";
 import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
 import { ensureSchema } from "@/lib/meetup-store";
 import { ensureAfterpartySchema } from "@/lib/afterparty-store";
-import { compareText } from "@/lib/sort-utils";
+import { compareText, compareTextDesc } from "@/lib/sort-utils";
 
 /**
  * 팀별 기간 출석 집계 결과 행
@@ -381,8 +381,8 @@ export async function getMemberAttendanceDetailByPeriod(
   ]);
 
   const items = [...meetingRows, ...afterpartyRows].sort((a, b) => {
-    if (a.eventDate !== b.eventDate) return b.eventDate.localeCompare(a.eventDate);
-    if (a.startTime !== b.startTime) return b.startTime.localeCompare(a.startTime);
+    if (a.eventDate !== b.eventDate) return compareTextDesc(a.eventDate, b.eventDate);
+    if (a.startTime !== b.startTime) return compareTextDesc(a.startTime, b.startTime);
     return compareText(a.title, b.title);
   });
 

@@ -38,6 +38,7 @@ import {
 import { PendingSubmitButton } from "@/app/pending-submit-button";
 import { QuerySelectFilter } from "@/app/query-select-filter";
 import { SharedFormPasswordField } from "@/app/shared-form-password-field";
+import { compareText } from "@/lib/sort-utils";
 
 type PageProps = {
   params: Promise<{ afterpartyId: string }>;
@@ -214,19 +215,17 @@ function sortParticipantsForRole(
       const teamOrderB = teamOrderFromLabel(teamB);
 
       if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-      if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+      if (teamA !== teamB) return compareText(teamA, teamB);
 
-      return normalizeMemberName(a.name).localeCompare(normalizeMemberName(b.name), "ko");
+      return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
     });
     return sorted;
   }
 
-  sorted.sort((a, b) =>
-    withTeamLabel(a.name, teamLabelByMemberName).localeCompare(
-      withTeamLabel(b.name, teamLabelByMemberName),
-      "ko"
-    )
-  );
+  sorted.sort((a, b) => compareText(
+    withTeamLabel(a.name, teamLabelByMemberName),
+    withTeamLabel(b.name, teamLabelByMemberName)
+  ));
   return sorted;
 }
 
@@ -409,9 +408,9 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
     const teamOrderB = teamOrderFromLabel(teamB);
 
     if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-    if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+    if (teamA !== teamB) return compareText(teamA, teamB);
 
-    return normalizeMemberName(a.name).localeCompare(normalizeMemberName(b.name), "ko");
+    return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
   });
   const currentSettlementNames = new Set(participants.map((row) => normalizeName(row.name)));
   const displayParticipants = participants.map((participant) => {
@@ -462,9 +461,9 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
           const teamOrderB = teamOrderFromLabel(teamB);
 
           if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-          if (teamA !== teamB) return teamA.localeCompare(teamB, "ko");
+          if (teamA !== teamB) return compareText(teamA, teamB);
 
-          return normalizeMemberName(a.name).localeCompare(normalizeMemberName(b.name), "ko");
+          return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
         }),
     })),
     ...(operationEntries.length > 0

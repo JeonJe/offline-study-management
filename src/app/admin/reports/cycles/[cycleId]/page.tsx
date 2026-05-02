@@ -29,6 +29,7 @@ import {
   getWeeklyReportTemplateById,
   listAngelWeeklyReports,
 } from "@/lib/weekly-report-store";
+import { formatShortDateTime } from "@/lib/date-utils";
 
 type AdminReportCycleDetailPageProps = {
   params: Promise<{ cycleId: string }>;
@@ -53,15 +54,7 @@ function singleParam(value: string | string[] | undefined): string {
 }
 
 function shortDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleString("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatShortDateTime(value);
 }
 
 async function safeLoadCycleDetail(

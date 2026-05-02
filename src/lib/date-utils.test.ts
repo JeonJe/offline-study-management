@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { pickNearestUpcomingIsoDate, toKstIsoDate } from "@/lib/date-utils";
+import {
+  formatCommentDateTime,
+  formatShortDateTime,
+  pickNearestUpcomingIsoDate,
+  toKstIsoDate,
+} from "@/lib/date-utils";
 
 describe("toKstIsoDate", () => {
   it("returns same calendar day for midday UTC", () => {
@@ -39,5 +44,12 @@ describe("pickNearestUpcomingIsoDate", () => {
 
   it("returns today when there are no scheduled dates", () => {
     expect(pickNearestUpcomingIsoDate([], "2026-03-12")).toBe("2026-03-12");
+  });
+});
+
+describe("date formatters", () => {
+  it("returns empty string for invalid datetime values", () => {
+    expect(formatShortDateTime("not-a-date")).toBe("");
+    expect(formatCommentDateTime("not-a-date")).toBe("");
   });
 });
