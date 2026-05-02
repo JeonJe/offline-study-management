@@ -421,12 +421,12 @@ App Router 서버 컴포넌트 안에 데이터 로딩, 정렬, 표시 컴포넌
 #### 확인된 근거
 
 - `src/lib/app-config.ts`에 `APP_LOCALE`, `APP_TIME_ZONE`이 이미 있다.
-- 그런데 `meetup-dashboard.tsx`, `meetings/[meetingId]/page.tsx`, `afterparty/page.tsx`, `afterparty/[afterpartyId]/page.tsx`, `admin/reports/...`, `angel/reports/...`에서 `"ko"`, `"ko-KR"`, `"Asia/Seoul"`을 직접 사용한다.
+- 화면별 `"ko"`, `"ko-KR"`, `"Asia/Seoul"` 직접 사용은 `src/lib/sort-utils.ts`, `src/lib/date-utils.ts`, `src/lib/app-config.ts` 경계로 모았다.
 - 참여자 정렬과 팀 라벨 정렬 로직이 여러 화면에 반복된다.
 
 #### 왜 필요한가
 
-정렬/날짜/locale은 화면 전체의 일관성을 만든다. 외부 개발사가 화면을 추가할 때 직접 `localeCompare(..., "ko")`를 복사하면 정렬 기준이 분산되고 테스트하기 어렵다.
+정렬/날짜/locale은 화면 전체의 일관성을 만든다. 외부 개발사가 화면을 추가할 때 page-local locale 문자열이나 직접 `localeCompare`를 복사하면 정렬 기준이 분산되고 테스트하기 어렵다.
 
 #### 어떻게 진행할 것인가
 
@@ -436,7 +436,7 @@ App Router 서버 컴포넌트 안에 데이터 로딩, 정렬, 표시 컴포넌
    - 날짜/시간 내림차순 정렬
 2. 날짜 표시 유틸을 정리한다.
    - `APP_LOCALE`, `APP_TIME_ZONE`만 사용한다.
-   - 화면별 `toLocaleString("ko-KR")` 직접 사용을 제거한다.
+   - 화면별 locale/timezone 직접 사용을 제거한다.
 3. 참여자 그룹/정렬/표시 이름 계산을 순수 함수로 분리한다.
    - 모임 상세
    - 뒷풀이 상세
