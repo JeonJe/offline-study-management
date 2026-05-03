@@ -1,13 +1,14 @@
 import { test, expect, chromium } from "@playwright/test";
-import path from "node:path";
+import {
+  AUTH_STATE,
+  BASE_URL,
+  REGRESSION_TEST_DATE,
+  cohortPath,
+  waitForCohortDateUrl,
+} from "./support/test-config";
 
-// 기존 spec(cache-consistency, performance)은 2026-03-01 사용 → 날짜 충돌 방지
-const TEST_DATE = "2026-09-01";
-const AFTERPARTY_PAGE = `/afterparty?date=${TEST_DATE}`;
-const AUTH_STATE = path.join(__dirname, ".auth", "state.json");
-// 수동 chromium.launch() context는 playwright.config의 use.baseURL을 상속받지 않으므로
-// beforeAll cleanup용 context 생성 시 명시적으로 전달한다
-const BASE_URL = "https://offline-study-management.vercel.app";
+// cache/performance spec과 날짜 충돌 방지
+const AFTERPARTY_PAGE = cohortPath("afterparty", { date: REGRESSION_TEST_DATE });
 
 // 회귀 테스트 전용 라벨 prefix — 다른 spec의 E2E 데이터와 구분
 const TEST_LABEL = "R회귀뒷풀이";
@@ -26,7 +27,7 @@ async function deleteAfterpartyFromDetail(
   await page
     .locator('[role="dialog"] button:has-text("이 뒷풀이 삭제")')
     .click();
-  await page.waitForURL(`**/afterparty?date=${TEST_DATE}**`, {
+  await page.waitForURL(waitForCohortDateUrl("afterparty"), {
     timeout: 10_000,
   });
 }
@@ -107,7 +108,7 @@ test.describe.serial("회귀: 뒷풀이 생성 → 참여 → 정산 → 삭제"
     await fab.locator('button[type="submit"]:has-text("생성")').click();
 
     // 뒷풀이 목록 리다이렉트 대기
-    await page.waitForURL(`**/afterparty?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("afterparty"));
 
     // 생성된 뒷풀이 카드 노출 확인
     await expect(

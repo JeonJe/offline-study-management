@@ -3,10 +3,10 @@ import { query } from "@/lib/db";
 import { MEETING_KIND, normalizeMeetingKind, type MeetingKind } from "@/lib/meeting-kind";
 import { isMasterOverridePassword } from "@/lib/master-password";
 import {
-  DEFAULT_OPERATING_UNIT_SLUG,
   assertOperatingUnitAcceptsNewData,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
+  requireOperatingUnitSlug,
 } from "@/lib/operating-unit-store";
 
 export type ParticipantRole =
@@ -82,7 +82,7 @@ export type RsvpRecord = {
 export type RsvpStatus = "confirmed" | "waitlist";
 
 type CreateMeetingInput = {
-  operatingUnitSlug?: string;
+  operatingUnitSlug: string;
   meetingKind?: MeetingKind;
   title: string;
   meetingDate: string;
@@ -329,6 +329,23 @@ async function ensureRsvpStatusColumn(): Promise<void> {
   );
 }
 
+async function ensureMeetupQueryIndexes(): Promise<void> {
+  await query(
+    `create index if not exists idx_meetings_unit_date
+     on public.meetings (operating_unit_slug, meeting_date desc, start_time desc)`
+  );
+
+  await query(
+    `create index if not exists idx_meetings_unit_kind_date
+     on public.meetings (operating_unit_slug, meeting_kind, meeting_date desc, start_time desc)`
+  );
+
+  await query(
+    `create index if not exists idx_rsvps_name_meeting
+     on public.rsvps (lower(name), meeting_id)`
+  );
+}
+
 export async function ensureSchema(): Promise<void> {
   if (schemaReady || process.env.SKIP_SCHEMA_CHECK === "1") return;
   if (schemaPromise) return schemaPromise;
@@ -343,6 +360,7 @@ export async function ensureSchema(): Promise<void> {
       await ensureMeetingOperatingUnitColumn();
       await ensureMeetingKindColumn();
       await ensureRsvpStatusColumn();
+      await ensureMeetupQueryIndexes();
       if (!runtimeMigrationsEnabled) {
         schemaReady = true;
         return;
@@ -361,7 +379,7 @@ export async function ensureSchema(): Promise<void> {
         password_hash text,
         capacity integer,
         constraint chk_meetings_capacity check (capacity is null or capacity >= 0),
-        operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}',
+        operating_unit_slug text not null,
         meeting_kind text not null default 'study' check (meeting_kind in ('study', 'loop-pak')),
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
@@ -434,6 +452,8 @@ export async function ensureSchema(): Promise<void> {
        on public.rsvps (meeting_id, lower(name))`
     );
 
+    await ensureMeetupQueryIndexes();
+
     schemaReady = true;
   })().finally(() => {
     schemaPromise = null;
@@ -442,13 +462,14 @@ export async function ensureSchema(): Promise<void> {
   return schemaPromise;
 }
 
-export async function listMeetings(): Promise<MeetingSummary[]> {
+export async function listMeetings(operatingUnitSlug: string): Promise<MeetingSummary[]> {
   await ensureSchema();
+  const unitSlug = requireOperatingUnitSlug(operatingUnitSlug);
 
   return query<MeetingSummary>(
     `select
        m.id,
-       coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.operating_unit_slug, $1) as "operatingUnitSlug",
        coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
@@ -466,18 +487,22 @@ export async function listMeetings(): Promise<MeetingSummary[]> {
      where coalesce(m.operating_unit_slug, $1) = $1
      group by m.id
      order by m.meeting_date desc, m.start_time desc, m.created_at desc`,
-    [DEFAULT_OPERATING_UNIT_SLUG]
+    [unitSlug]
   );
 }
 
-export async function listMeetingsByKind(meetingKind: MeetingKind): Promise<MeetingSummary[]> {
+export async function listMeetingsByKind(
+  meetingKind: MeetingKind,
+  operatingUnitSlug: string
+): Promise<MeetingSummary[]> {
   await ensureSchema();
   const normalizedKind = normalizeMeetingKind(meetingKind);
+  const unitSlug = requireOperatingUnitSlug(operatingUnitSlug);
 
   return query<MeetingSummary>(
     `select
        m.id,
-       coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.operating_unit_slug, $1) as "operatingUnitSlug",
        coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
@@ -496,21 +521,23 @@ export async function listMeetingsByKind(meetingKind: MeetingKind): Promise<Meet
        and coalesce(m.meeting_kind, '${MEETING_KIND.study}') = $2
      group by m.id
      order by m.meeting_date desc, m.start_time desc, m.created_at desc`,
-    [DEFAULT_OPERATING_UNIT_SLUG, normalizedKind]
+    [unitSlug, normalizedKind]
   );
 }
 
 export async function listMeetingsByKindAndDate(
   meetingKind: MeetingKind,
-  meetingDate: string
+  meetingDate: string,
+  operatingUnitSlug: string
 ): Promise<MeetingSummary[]> {
   await ensureSchema();
   const normalizedKind = normalizeMeetingKind(meetingKind);
+  const unitSlug = requireOperatingUnitSlug(operatingUnitSlug);
 
   return query<MeetingSummary>(
     `select
        m.id,
-       coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.operating_unit_slug, $1) as "operatingUnitSlug",
        coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
@@ -530,17 +557,21 @@ export async function listMeetingsByKindAndDate(
        and m.meeting_date = $3
      group by m.id
      order by m.meeting_date desc, m.start_time desc, m.created_at desc`,
-    [DEFAULT_OPERATING_UNIT_SLUG, normalizedKind, meetingDate]
+    [unitSlug, normalizedKind, meetingDate]
   );
 }
 
-export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSummary[]> {
+export async function listMeetingsByDate(
+  meetingDate: string,
+  operatingUnitSlug: string
+): Promise<MeetingSummary[]> {
   await ensureSchema();
+  const unitSlug = requireOperatingUnitSlug(operatingUnitSlug);
 
   return query<MeetingSummary>(
     `select
        m.id,
-       coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       coalesce(m.operating_unit_slug, $2) as "operatingUnitSlug",
        coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
@@ -559,7 +590,7 @@ export async function listMeetingsByDate(meetingDate: string): Promise<MeetingSu
        and coalesce(m.operating_unit_slug, $2) = $2
      group by m.id
      order by m.meeting_date desc, m.start_time desc, m.created_at desc`,
-    [meetingDate, DEFAULT_OPERATING_UNIT_SLUG]
+    [meetingDate, unitSlug]
   );
 }
 
@@ -569,7 +600,7 @@ export async function getMeetingById(meetingId: string): Promise<MeetingSummary 
   const [row] = await query<MeetingSummary>(
     `select
        m.id,
-       coalesce(m.operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       m.operating_unit_slug as "operatingUnitSlug",
        coalesce(m.meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        m.title,
        m.meeting_date::text as "meetingDate",
@@ -613,7 +644,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
   const leaders = normalizeLeaders(input.leaders);
   const password = normalizeMeetingPassword(input.password);
   const passwordHash = password ? hashMeetingPassword(password) : null;
-  const operatingUnitSlug = input.operatingUnitSlug?.trim() || DEFAULT_OPERATING_UNIT_SLUG;
+  const operatingUnitSlug = requireOperatingUnitSlug(input.operatingUnitSlug);
   const meetingKind = normalizeMeetingKind(input.meetingKind);
   await assertOperatingUnitAcceptsNewData(operatingUnitSlug);
 
@@ -622,7 +653,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<MeetingS
      values ($1, $2, $3, $4, $5, nullif($6, ''), $7::text[], $8, $9, $10, $11)
      returning
        id,
-       coalesce(operating_unit_slug, '${DEFAULT_OPERATING_UNIT_SLUG}') as "operatingUnitSlug",
+       operating_unit_slug as "operatingUnitSlug",
        coalesce(meeting_kind, '${MEETING_KIND.study}') as "meetingKind",
        title,
        meeting_date::text as "meetingDate",

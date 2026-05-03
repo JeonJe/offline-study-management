@@ -7,6 +7,7 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { createWeeklyReportCycleAction } from "@/app/weekly-report-actions";
 import { isGlobalAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -35,13 +36,13 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-async function safeListTemplates(): Promise<{
+async function safeListTemplates(unitSlug: string): Promise<{
   templates: WeeklyReportTemplate[];
   error: boolean;
 }> {
   try {
     return {
-      templates: await listWeeklyReportTemplates(),
+      templates: await listWeeklyReportTemplates(unitSlug),
       error: false,
     };
   } catch (error) {
@@ -56,9 +57,11 @@ async function safeListTemplates(): Promise<{
 function CycleForm({
   templates,
   loadError,
+  unitSlug,
 }: {
   templates: WeeklyReportTemplate[];
   loadError: boolean;
+  unitSlug: string;
 }) {
   return (
     <section className="mx-auto grid max-w-3xl gap-5">
@@ -73,7 +76,7 @@ function CycleForm({
             </p>
           </div>
           <Link
-            href="/admin/reports"
+            href={cohortAwarePath(unitSlug, "/admin/reports")}
             className="btn-press rounded-full border px-4 py-2 text-sm font-bold"
             style={{
               borderColor: "var(--line)",
@@ -92,6 +95,7 @@ function CycleForm({
         ) : null}
 
         <form action={createWeeklyReportCycleAction} className="mt-6 grid gap-5">
+          <input type="hidden" name="unit" value={unitSlug} />
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <label className="grid gap-2 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>
               제목
@@ -207,8 +211,9 @@ export default async function NewWeeklyReportCyclePage({
       />
     );
   } else {
-    const { templates, error } = await safeListTemplates();
-    content = <CycleForm templates={templates} loadError={error} />;
+    const unitSlug = singleParam(query.unit);
+    const { templates, error } = await safeListTemplates(unitSlug);
+    content = <CycleForm templates={templates} loadError={error} unitSlug={unitSlug} />;
   }
 
   return (
@@ -216,6 +221,7 @@ export default async function NewWeeklyReportCyclePage({
       activeRole="admin"
       title="보고 주차"
       summary="주차별 엔젤 보고를 생성합니다."
+      unitSlug={singleParam(query.unit)}
     >
       {content}
     </RoleShell>

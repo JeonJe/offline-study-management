@@ -1,10 +1,12 @@
 import { loadMemberPreset } from "@/lib/member-store";
+import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
 import {
   type AngelWeeklyReport,
   countCommentsByReportIds,
   getWeeklyReportCycleById,
   listAngelWeeklyReports,
 } from "@/lib/weekly-report-store";
+import { compareText } from "@/lib/sort-utils";
 
 type ReportWithCommentCount = AngelWeeklyReport & {
   commentCount: number;
@@ -33,18 +35,22 @@ function buildSubmittedTeamLines(report: ReportWithCommentCount): string[] {
   ].filter((line): line is string => Boolean(line));
 }
 
-export async function buildCycleShareText(cycleId: string): Promise<string> {
+export async function buildCycleShareText(
+  cycleId: string,
+  operatingUnitSlugInput: string
+): Promise<string> {
   const id = cleanCycleId(cycleId);
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   const [cycle, memberPreset] = await Promise.all([
-    getWeeklyReportCycleById(id),
-    loadMemberPreset(),
+    getWeeklyReportCycleById(id, operatingUnitSlug),
+    loadMemberPreset(operatingUnitSlug),
   ]);
 
   if (!cycle) {
     throw new Error("보고 주차를 찾을 수 없습니다.");
   }
 
-  const reports = await listAngelWeeklyReports(cycle.id);
+  const reports = await listAngelWeeklyReports(cycle.id, operatingUnitSlug);
   const commentCountByReportId = await countCommentsByReportIds(
     reports.map((report) => report.id)
   );
@@ -60,7 +66,7 @@ export async function buildCycleShareText(cycleId: string): Promise<string> {
   const presetTeamNames = new Set(memberPreset.teamGroups.map((team) => team.teamName));
   const extraReports = reportsWithCommentCounts
     .filter((report) => !presetTeamNames.has(report.teamName))
-    .sort((a, b) => a.teamName.localeCompare(b.teamName, "ko"));
+    .sort((a, b) => compareText(a.teamName, b.teamName));
 
   const lines: string[] = [
     `[주간 보고] ${cycle.title}`,

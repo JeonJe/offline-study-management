@@ -22,7 +22,7 @@ const runE2e = process.env.RUN_E2E === "1" || process.env.RUN_E2E === "true";
 const allowProductionE2e =
   process.env.ALLOW_PRODUCTION_E2E === "1" ||
   process.env.ALLOW_PRODUCTION_E2E === "true";
-const e2eBaseUrl = process.env.E2E_BASE_URL ?? "";
+const e2eBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? process.env.E2E_BASE_URL ?? "";
 const productionLikeE2e =
   e2eBaseUrl.includes("offline-study-management.vercel.app") ||
   e2eBaseUrl.includes("vercel.app");

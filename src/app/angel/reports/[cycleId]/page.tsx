@@ -25,6 +25,7 @@ import {
   listAngelWeeklyReports,
 } from "@/lib/weekly-report-store";
 import { cohortAwarePath } from "@/lib/cohort-routes";
+import { formatShortDateTime } from "@/lib/date-utils";
 
 type AngelReportCyclePageProps = {
   params: Promise<{ cycleId: string }>;
@@ -46,17 +47,20 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-async function loadAngelReportPageData(cycleId: string): Promise<AngelReportPageData> {
+async function loadAngelReportPageData(
+  cycleId: string,
+  unitSlug: string
+): Promise<AngelReportPageData> {
   try {
     const [cycle, preset] = await Promise.all([
-      getWeeklyReportCycleById(cycleId),
-      loadMemberPreset(),
+      getWeeklyReportCycleById(cycleId, unitSlug),
+      loadMemberPreset(unitSlug),
     ]);
 
     return {
       cycle,
       teamGroups: preset.teamGroups,
-      reports: cycle ? await listAngelWeeklyReports(cycle.id) : [],
+      reports: cycle ? await listAngelWeeklyReports(cycle.id, unitSlug) : [],
       error: false,
     };
   } catch (error) {
@@ -78,17 +82,7 @@ function reportsForTeam(
 }
 
 function shortDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return date.toLocaleString("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatShortDateTime(value);
 }
 
 function TeamReportCard({
@@ -331,7 +325,8 @@ export default async function AngelReportCyclePage({
       />
     );
   } else {
-    const data = await loadAngelReportPageData(routeParams.cycleId);
+    const unitSlug = singleParam(query.unit);
+    const data = await loadAngelReportPageData(routeParams.cycleId, unitSlug);
 
     content = (
       <WeeklyReportAngelPanel

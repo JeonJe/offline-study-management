@@ -54,7 +54,7 @@ node scripts/apply-schema.mjs --env-file .env.staging --verify-only
 | 테이블 | SQL 파일의 `create table if not exists public.*` 목록이 모두 존재 |
 | 인덱스 | SQL 파일의 `create index if not exists *` 목록이 모두 존재 |
 | RLS | 현재 스키마는 RLS를 활성화하지 않으므로 모든 앱 테이블 `DISABLED` |
-| 기본 운영 단위 | `operating_units`에 `3기` 기본 row 존재 |
+| 운영 단위 | `operating_units`에 `loop-pak-3` row 존재, 앱 데이터 테이블의 `operating_unit_slug`에는 DB default 없음 |
 
 RLS가 켜진 테이블이 있으면 스크립트가 경고로 출력한다. 현재 앱은 서버 측 `pg` 연결과 자체 역할 쿠키 검증에 기대므로, RLS 정책을 추가하려면 별도 PR에서 앱 쿼리 권한 모델까지 같이 설계한다.
 

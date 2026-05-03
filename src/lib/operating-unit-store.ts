@@ -2,9 +2,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
 
 export const LEGACY_OPERATING_UNIT_SLUG = "default";
-export const OLD_DEFAULT_OPERATING_UNIT_SLUG = "3기";
-export const DEFAULT_OPERATING_UNIT_SLUG = "loop-pak-3";
-export const DEFAULT_OPERATING_UNIT_NAME = "3기";
+export const LEGACY_OPERATING_UNIT_NAME = "3기";
+export const MIGRATED_OPERATING_UNIT_SLUG = "loop-pak-3";
+export const MIGRATED_OPERATING_UNIT_NAME = "3기";
 
 export type OperatingUnit = {
   slug: string;
@@ -19,11 +19,19 @@ export type OperatingUnit = {
 
 export function operatingUnitDisplayName(unitSlug?: string, fallback?: string): string {
   const normalizedSlug = normalizeOperatingUnitSlug(unitSlug ?? "");
-  if (!normalizedSlug || normalizedSlug === DEFAULT_OPERATING_UNIT_SLUG) {
-    return fallback?.trim() || DEFAULT_OPERATING_UNIT_NAME;
+  if (normalizedSlug === MIGRATED_OPERATING_UNIT_SLUG) {
+    return fallback?.trim() || MIGRATED_OPERATING_UNIT_NAME;
   }
 
-  return fallback?.trim() || normalizedSlug;
+  return fallback?.trim() || normalizedSlug || "";
+}
+
+export function requireOperatingUnitSlug(raw: string): string {
+  const normalizedSlug = normalizeOperatingUnitSlug(raw);
+  if (!normalizedSlug || normalizedSlug === LEGACY_OPERATING_UNIT_SLUG) {
+    throw new Error("운영 단위가 필요합니다.");
+  }
+  return normalizedSlug;
 }
 
 let schemaReady = false;
@@ -71,14 +79,14 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
       `update public.operating_units
        set slug = $1,
            name = coalesce(nullif(name, ''), $2),
-           is_default = true,
+           is_default = false,
            is_active = true,
            updated_at = now()
        where slug = $3
          and not exists (
            select 1 from public.operating_units where slug = $1
          )`,
-      [DEFAULT_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_NAME, OLD_DEFAULT_OPERATING_UNIT_SLUG]
+      [MIGRATED_OPERATING_UNIT_SLUG, MIGRATED_OPERATING_UNIT_NAME, LEGACY_OPERATING_UNIT_NAME]
     );
 
     await query(
@@ -94,14 +102,14 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
 
     await query(
       `insert into public.operating_units (slug, name, is_default)
-       values ($1, $2, true)
+       values ($1, $2, false)
        on conflict (slug)
        do update set
          name = coalesce(nullif(public.operating_units.name, ''), excluded.name),
          is_active = true,
-         is_default = true,
+         is_default = false,
          updated_at = now()`,
-      [DEFAULT_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_NAME]
+      [MIGRATED_OPERATING_UNIT_SLUG, MIGRATED_OPERATING_UNIT_NAME]
     );
 
     await query(
@@ -109,10 +117,10 @@ export async function ensureOperatingUnitSchema(): Promise<void> {
        set is_default = false,
            is_active = true,
            updated_at = now()
-       where slug = $1
-          or slug = $2
-          or (slug <> $3 and is_default)`,
-      [LEGACY_OPERATING_UNIT_SLUG, OLD_DEFAULT_OPERATING_UNIT_SLUG, DEFAULT_OPERATING_UNIT_SLUG]
+       where is_default
+          or slug = $1
+          or slug = $2`,
+      [LEGACY_OPERATING_UNIT_SLUG, LEGACY_OPERATING_UNIT_NAME]
     );
 
     schemaReady = true;
@@ -133,12 +141,7 @@ export async function ensureOperatingUnitColumn(
 
   await query(
     `alter table public.${tableName}
-     add column if not exists operating_unit_slug text not null default '${DEFAULT_OPERATING_UNIT_SLUG}'`
-  );
-
-  await query(
-    `alter table public.${tableName}
-     alter column operating_unit_slug set default '${DEFAULT_OPERATING_UNIT_SLUG}'`
+     add column if not exists operating_unit_slug text`
   );
 
   await query(
@@ -148,7 +151,17 @@ export async function ensureOperatingUnitColumn(
         or btrim(operating_unit_slug) = ''
         or operating_unit_slug = $2
         or operating_unit_slug = $3`,
-    [DEFAULT_OPERATING_UNIT_SLUG, LEGACY_OPERATING_UNIT_SLUG, OLD_DEFAULT_OPERATING_UNIT_SLUG]
+    [MIGRATED_OPERATING_UNIT_SLUG, LEGACY_OPERATING_UNIT_SLUG, LEGACY_OPERATING_UNIT_NAME]
+  );
+
+  await query(
+    `alter table public.${tableName}
+     alter column operating_unit_slug set not null`
+  );
+
+  await query(
+    `alter table public.${tableName}
+     alter column operating_unit_slug drop default`
   );
 
   await query(
@@ -288,7 +301,7 @@ export async function updateOperatingUnit(input: {
 }
 
 export async function assertOperatingUnitAcceptsNewData(slug: string): Promise<void> {
-  const unit = await getOperatingUnit(slug || DEFAULT_OPERATING_UNIT_SLUG);
+  const unit = await getOperatingUnit(requireOperatingUnitSlug(slug));
   if (!unit) {
     throw new Error("항목을 찾을 수 없습니다.");
   }
@@ -384,16 +397,16 @@ export async function setOperatingUnitAccessCode(input: {
 
 export function isProtectedOperatingUnitSlug(slug: string): boolean {
   const normalizedSlug = normalizeOperatingUnitSlug(slug);
-  return normalizedSlug === LEGACY_OPERATING_UNIT_SLUG || normalizedSlug === DEFAULT_OPERATING_UNIT_SLUG;
+  return normalizedSlug === LEGACY_OPERATING_UNIT_SLUG || normalizedSlug === MIGRATED_OPERATING_UNIT_SLUG;
 }
 
 export function normalizeOperatingUnitSlug(raw: string): string {
   const trimmed = safeDecode(raw.trim());
-  if (trimmed === OLD_DEFAULT_OPERATING_UNIT_SLUG || trimmed === encodeURIComponent(OLD_DEFAULT_OPERATING_UNIT_SLUG)) {
-    return DEFAULT_OPERATING_UNIT_SLUG;
+  if (trimmed === LEGACY_OPERATING_UNIT_NAME || trimmed === encodeURIComponent(LEGACY_OPERATING_UNIT_NAME)) {
+    return MIGRATED_OPERATING_UNIT_SLUG;
   }
-  if (trimmed === DEFAULT_OPERATING_UNIT_SLUG) {
-    return DEFAULT_OPERATING_UNIT_SLUG;
+  if (trimmed === MIGRATED_OPERATING_UNIT_SLUG) {
+    return MIGRATED_OPERATING_UNIT_SLUG;
   }
 
   return trimmed

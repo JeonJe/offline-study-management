@@ -27,6 +27,7 @@ import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
+import { compareText } from "@/lib/sort-utils";
 import { dataLoadErrorMessage } from "@/lib/ui-error-messages";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -76,7 +77,7 @@ function sortAfterpartiesByStartTime(rows: AfterpartySummary[]): AfterpartySumma
   return [...rows].sort((a, b) => {
     const timeDiff = timeOrderValue(a.startTime) - timeOrderValue(b.startTime);
     if (timeDiff !== 0) return timeDiff;
-    return a.title.localeCompare(b.title, "ko");
+    return compareText(a.title, b.title);
   });
 }
 
@@ -123,7 +124,15 @@ function AfterpartyParticipantChip({ participant }: { participant: DecoratedAfte
   );
 }
 
-function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
+function CreateAfterpartyModal({
+  selectedDate,
+  returnPath,
+  unitSlug,
+}: {
+  selectedDate: string;
+  returnPath: string;
+  unitSlug: string;
+}) {
   return (
     <details className="fixed bottom-6 right-6 z-40">
       <summary
@@ -146,6 +155,8 @@ function CreateAfterpartyModal({ selectedDate }: { selectedDate: string }) {
 
         <form action={createAfterpartyAction} className="grid gap-3">
           <input type="hidden" name="returnDate" value={selectedDate} />
+          <input type="hidden" name="returnPath" value={returnPath} />
+          <input type="hidden" name="unit" value={unitSlug} />
 
           <section
             className="grid gap-3 rounded-xl border p-3 sm:grid-cols-6"
@@ -310,8 +321,8 @@ function AfterpartyCard({
       if (aHasTeam !== bHasTeam) return aHasTeam ? -1 : 1;
 
       if (a.teamOrder !== b.teamOrder) return a.teamOrder - b.teamOrder;
-      if (a.teamLabel !== b.teamLabel) return a.teamLabel.localeCompare(b.teamLabel, "ko");
-      return a.displayName.localeCompare(b.displayName, "ko");
+      if (a.teamLabel !== b.teamLabel) return compareText(a.teamLabel, b.teamLabel);
+      return compareText(a.displayName, b.displayName);
     });
   const participantsByRole = new Map<ParticipantRole, DecoratedAfterpartyParticipant[]>();
   for (const role of PARTICIPANT_ROLE_ORDER) {
@@ -444,7 +455,7 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
   let loadError = "";
 
   try {
-    const memberPreset = await cachedLoadMemberPreset();
+    const memberPreset = await cachedLoadMemberPreset(unitSlug);
     for (const group of memberPreset.teamGroups) {
       const teamLabel = toTeamLabel(group.teamName);
       for (const angel of group.angels) {
@@ -464,16 +475,16 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
     if (isIsoDate(requestDate)) {
       selectedDate = requestDate;
       afterpartiesOnDate = sortAfterpartiesByStartTime(
-        await cachedListAfterpartiesByDate(selectedDate)
+        await cachedListAfterpartiesByDate(selectedDate, unitSlug)
       );
     } else {
-      const allAfterparties = await cachedListAfterparties();
+      const allAfterparties = await cachedListAfterparties(unitSlug);
       selectedDate = pickNearestUpcomingIsoDate(
         allAfterparties.map((item) => item.eventDate),
         todayIsoDate
       );
       afterpartiesOnDate = sortAfterpartiesByStartTime(
-        await cachedListAfterpartiesByDate(selectedDate)
+        await cachedListAfterpartiesByDate(selectedDate, unitSlug)
       );
     }
     participantsByAfterparty = await cachedListParticipantsForAfterparties(
@@ -599,7 +610,11 @@ export default async function AfterpartyPage({ searchParams }: AfterpartyPagePro
         </section>
       ) : null}
 
-      <CreateAfterpartyModal selectedDate={selectedDate} />
+      <CreateAfterpartyModal
+        selectedDate={selectedDate}
+        returnPath={`${afterpartyBasePath}?date=${encodeURIComponent(selectedDate)}`}
+        unitSlug={unitSlug}
+      />
     </main>
   );
 }

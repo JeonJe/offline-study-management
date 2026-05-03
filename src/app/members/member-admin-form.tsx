@@ -7,9 +7,14 @@ import type {
   TeamMemberEntry,
   TeamMemberGroup,
 } from "@/lib/member-store";
+import { saveMemberPresetAction } from "@/app/members/member-actions";
+import { MemberSaveToolbar } from "@/app/members/member-save-toolbar";
+import { MemberEditModal } from "@/app/members/_components/member-edit-modal";
+import { TeamEditModal } from "@/app/members/_components/team-edit-modal";
 import { PARTICIPANT_ROLE_META } from "@/lib/participant-role-utils";
 
 type MemberAdminFormProps = {
+  operatingUnitSlug: string;
   initialFixedAngels: string[];
   initialTeamGroups: TeamMemberGroup[];
   initialSpecialRoles: SpecialRoleDirectory;
@@ -71,27 +76,8 @@ const SPECIAL_PARTICIPANT_ROLES: SpecialParticipantRole[] = [
 ];
 const OPERATION_ROLE_ORDER: OperationRole[] = ["angel", "mentor", "manager", "supporter", "buddy"];
 
-function RemoveChipButton({
-  onClick,
-  label,
-}: {
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[11px] leading-none transition hover:bg-black/10"
-    >
-      ×
-    </button>
-  );
-}
-
 export function MemberAdminForm({
+  operatingUnitSlug,
   initialFixedAngels,
   initialTeamGroups,
   initialSpecialRoles,
@@ -174,18 +160,17 @@ export function MemberAdminForm({
     setSaveState("idle");
 
     try {
-      const response = await fetch("/api/members/save", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+      const result = await saveMemberPresetAction({
+        ...payload,
+        operatingUnitSlug,
       });
-      setSaveState(response.ok ? "saved" : "error");
+      setSaveState(result.ok ? "saved" : "error");
     } catch {
       setSaveState("error");
     } finally {
       setSaving(false);
     }
-  }, [canSave, payload, saving]);
+  }, [canSave, operatingUnitSlug, payload, saving]);
 
   function updateTeam(index: number, updater: (team: TeamDraft) => TeamDraft): void {
     setTeams((prev) => prev.map((team, i) => (i === index ? updater(team) : team)));
@@ -256,6 +241,7 @@ export function MemberAdminForm({
   function roleMeta(role: OperationRole): {
     label: string;
     emoji: string;
+    accentColor: string;
     borderColor: string;
     backgroundColor: string;
     textColor: string;
@@ -263,13 +249,28 @@ export function MemberAdminForm({
     if (role === "angel") {
       return {
         label: "엔젤",
-        emoji: "🪽",
-        borderColor: "var(--angel-border)",
-        backgroundColor: "var(--angel-bg)",
-        textColor: "var(--angel-text)",
+        emoji: "",
+        accentColor: "#2563eb",
+        borderColor: "var(--line)",
+        backgroundColor: "#f8fbff",
+        textColor: "var(--ink-soft)",
       };
     }
-    return PARTICIPANT_ROLE_META[role];
+    const meta = PARTICIPANT_ROLE_META[role];
+    const accentColorByRole: Record<SpecialParticipantRole, string> = {
+      mentor: "#7c3aed",
+      manager: "#0f766e",
+      supporter: "#2563eb",
+      buddy: "#15803d",
+    };
+    return {
+      ...meta,
+      emoji: "",
+      accentColor: accentColorByRole[role],
+      borderColor: "var(--line)",
+      backgroundColor: "#f8fbff",
+      textColor: "var(--ink-soft)",
+    };
   }
 
   function operationMembers(role: OperationRole): string[] {
@@ -371,9 +372,10 @@ export function MemberAdminForm({
                 return (
                   <span
                     key={`operations-role-summary-tab-${role}`}
-                    className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                    style={{ borderColor: meta.borderColor, backgroundColor: meta.backgroundColor, color: meta.textColor }}
+                    className="inline-flex items-center gap-1.5 rounded-full border bg-white px-2 py-0.5 text-[11px] font-semibold"
+                    style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
                   >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.accentColor }} aria-hidden="true" />
                     {meta.label} {operationMembers(role).length}명
                   </span>
                 );
@@ -406,27 +408,27 @@ export function MemberAdminForm({
               return (
                 <article
                   key={`operation-role-card-${role}`}
-                  className="overflow-hidden rounded-2xl border bg-white"
-                  style={{ borderColor: meta.borderColor }}
+                  className="overflow-hidden rounded-2xl border border-t-[3px] bg-white"
+                  style={{ borderColor: "var(--line)", borderTopColor: meta.accentColor }}
                 >
                   <div
                     className="flex items-center justify-between gap-2 border-b px-3 py-2"
-                    style={{ borderColor: meta.borderColor, backgroundColor: meta.backgroundColor }}
+                    style={{ borderColor: "var(--line)", backgroundColor: "#ffffff" }}
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="text-sm" aria-hidden="true">{meta.emoji}</span>
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: meta.accentColor }} aria-hidden="true" />
                       <p className="truncate text-sm font-extrabold" style={{ color: meta.textColor }}>
                         {meta.label}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold" style={{ color: meta.textColor }}>
+                      <span className="rounded-full border px-2 py-0.5 text-[11px] font-bold" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
                         {members.length}명
                       </span>
                       <button
                         type="button"
-                        className="btn-press rounded-lg bg-white/80 px-2 py-0.5 text-[11px] font-bold"
-                        style={{ color: meta.textColor }}
+                        className="btn-press rounded-lg border px-2 py-0.5 text-[11px] font-bold"
+                        style={{ borderColor: "var(--line)", color: "var(--ink-soft)", backgroundColor: "var(--surface)" }}
                         onClick={() => {
                           setActiveOperationRole(role);
                           setOperationAddOpen(true);
@@ -449,7 +451,7 @@ export function MemberAdminForm({
                             <div className="flex min-w-0 items-center gap-2">
                               <span
                                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold"
-                                style={{ backgroundColor: meta.backgroundColor, color: meta.textColor }}
+                                style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}
                               >
                                 {memberIndex + 1}
                               </span>
@@ -484,62 +486,18 @@ export function MemberAdminForm({
       </section>
 
       <section className="app-section order-1 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>멤버 명단</p>
-              <span
-                className="rounded-full border px-2 py-1 text-xs font-semibold"
-                style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)", color: "var(--ink-soft)" }}
-              >
-                {teams.length}팀 / {totalTeamMemberCount}명
-              </span>
-            </div>
-            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-              팀별 참석/뒷풀이 집계에 사용하는 기본 명단입니다.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="btn-press rounded-full border px-4 py-2 text-sm font-semibold transition"
-              style={{ borderColor: "rgba(13, 127, 242, 0.25)", backgroundColor: "var(--accent-weak)", color: "var(--accent-strong)" }}
-              onClick={() => {
-                setNewTeamName(`${teams.length + 1}팀`);
-                setTeamAddOpen(true);
-              }}
-            >
-              팀 추가
-            </button>
-            <button
-              type="button"
-              disabled={!canSave || saving}
-              className="btn-press rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "var(--accent)", boxShadow: "0 8px 20px rgba(13, 127, 242, 0.26)", opacity: canSave && !saving ? 1 : 0.45 }}
-              onClick={() => void saveNow()}
-            >
-              {saving ? "저장 중" : "저장"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
-          {!canSave ? (
-            <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: "var(--angel-bg)", color: "var(--angel)" }}>
-              팀명/팀 엔젤 입력 필요
-            </span>
-          ) : null}
-          {saveState === "saved" ? (
-            <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: "var(--success-bg)", color: "var(--success)" }}>
-              저장 완료
-            </span>
-          ) : null}
-          {saveState === "error" ? (
-            <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: "var(--danger-bg)", color: "var(--danger)" }}>
-              저장 실패
-            </span>
-          ) : null}
-        </div>
+        <MemberSaveToolbar
+          teamCount={teams.length}
+          memberCount={totalTeamMemberCount}
+          canSave={canSave}
+          saving={saving}
+          saveState={saveState}
+          onAddTeam={() => {
+            setNewTeamName(`${teams.length + 1}팀`);
+            setTeamAddOpen(true);
+          }}
+          onSave={() => void saveNow()}
+        />
 
         <div className="mt-3">
           {teams.length === 0 ? (
@@ -831,122 +789,24 @@ export function MemberAdminForm({
         </div>
       ) : null}
 
-      {pendingTeamEditIndex !== null ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="team-edit-modal-title"
-            className="modal-surface w-full max-w-md p-5"
-          >
-            <h4 id="team-edit-modal-title" className="text-base font-semibold" style={{ color: "var(--ink)" }}>
-              팀 수정
-            </h4>
-            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-              팀 이름과 담당 엔젤을 수정합니다. 엔젤은 최대 2명까지 등록됩니다.
-            </p>
-
-            <div className="mt-4 grid gap-3">
-              <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
-                팀 이름
-                <input
-                  value={teamEditName}
-                  onChange={(event) => setTeamEditName(event.target.value)}
-                  className="h-10 rounded-xl border bg-white px-3 text-sm"
-                  style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                  placeholder="예: 1팀"
-                  autoFocus
-                />
-              </label>
-              <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
-                담당 엔젤
-                <div
-                  className="rounded-xl border p-2"
-                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {teamEditAngels.length > 0 ? (
-                      teamEditAngels.map((angel) => (
-                        <span
-                          key={`team-edit-angel-${angel}`}
-                          className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs"
-                          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
-                        >
-                          {angel}
-                          <RemoveChipButton
-                            label={`${angel} 담당 엔젤 제거`}
-                            onClick={() => setTeamEditAngels((prev) => prev.filter((name) => name !== angel))}
-                          />
-                        </span>
-                      ))
-                    ) : (
-                      <span className="py-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-                        담당 엔젤을 선택해주세요.
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <select
-                      value={teamEditAngelInput}
-                      onChange={(event) => setTeamEditAngelInput(event.target.value)}
-                      className="h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm"
-                      style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                      disabled={teamEditAngels.length >= 2}
-                    >
-                      <option value="">엔젤 선택</option>
-                      {fixedAngels
-                        .filter((angel) => !teamEditAngels.includes(angel))
-                        .map((angel) => (
-                          <option key={`team-edit-angel-option-${angel}`} value={angel}>
-                            {angel}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!teamEditAngelInput || teamEditAngels.length >= 2}
-                      className="btn-press h-10 rounded-xl border px-3 text-xs font-semibold disabled:cursor-not-allowed"
-                      style={{
-                        borderColor: "rgba(13, 127, 242, 0.25)",
-                        backgroundColor: "var(--accent-weak)",
-                        color: "var(--accent-strong)",
-                        opacity: teamEditAngelInput && teamEditAngels.length < 2 ? 1 : 0.45,
-                      }}
-                      onClick={addTeamEditAngel}
-                    >
-                      추가
-                    </button>
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn-press rounded-xl border bg-white px-3 py-2 text-xs font-semibold"
-                style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-                onClick={() => {
-                  setPendingTeamEditIndex(null);
-                  setTeamEditName("");
-                  setTeamEditAngels([]);
-                  setTeamEditAngelInput("");
-                }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="btn-press rounded-xl px-3 py-2 text-xs font-semibold text-white"
-                style={{ backgroundColor: "var(--accent)" }}
-                onClick={submitTeamEdit}
-              >
-                수정
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TeamEditModal
+        open={pendingTeamEditIndex !== null}
+        fixedAngels={fixedAngels}
+        teamName={teamEditName}
+        teamAngels={teamEditAngels}
+        teamAngelInput={teamEditAngelInput}
+        onTeamNameChange={setTeamEditName}
+        onTeamAngelsChange={setTeamEditAngels}
+        onTeamAngelInputChange={setTeamEditAngelInput}
+        onAddAngel={addTeamEditAngel}
+        onCancel={() => {
+          setPendingTeamEditIndex(null);
+          setTeamEditName("");
+          setTeamEditAngels([]);
+          setTeamEditAngelInput("");
+        }}
+        onSubmit={submitTeamEdit}
+      />
 
       {pendingMemberManageIndex !== null ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
@@ -1000,68 +860,18 @@ export function MemberAdminForm({
         </div>
       ) : null}
 
-      {pendingMemberEdit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="member-edit-modal-title"
-            className="modal-surface w-full max-w-md p-5"
-          >
-            <h4 id="member-edit-modal-title" className="text-base font-semibold" style={{ color: "var(--ink)" }}>
-              멤버 수정
-            </h4>
-            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-              이름을 수정하거나 명단에서 제거합니다.
-            </p>
-
-            <label className="mt-4 grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
-              이름
-              <input
-                value={memberEditName}
-                onChange={(event) => setMemberEditName(event.target.value)}
-                className="h-10 rounded-xl border bg-white px-3 text-sm"
-                style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                placeholder="멤버 이름"
-                autoFocus
-              />
-            </label>
-
-            <div className="mt-4 flex flex-wrap justify-between gap-2">
-              <button
-                type="button"
-                className="btn-press rounded-xl border px-3 py-2 text-xs font-semibold"
-                style={{ borderColor: "#fecaca", color: "var(--danger)", backgroundColor: "var(--danger-bg)" }}
-                onClick={deleteEditingMember}
-              >
-                명단에서 제거
-              </button>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="btn-press rounded-xl border bg-white px-3 py-2 text-xs font-semibold"
-                  style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-                  onClick={() => {
-                    setPendingMemberEdit(null);
-                    setMemberEditName("");
-                  }}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  disabled={memberEditName.trim().length === 0}
-                  className="btn-press rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed"
-                  style={{ backgroundColor: "var(--accent)", opacity: memberEditName.trim().length > 0 ? 1 : 0.45 }}
-                  onClick={submitMemberEdit}
-                >
-                  수정
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <MemberEditModal
+        open={pendingMemberEdit !== null}
+        memberName={memberEditName}
+        canSubmit={memberEditName.trim().length > 0}
+        onMemberNameChange={setMemberEditName}
+        onCancel={() => {
+          setPendingMemberEdit(null);
+          setMemberEditName("");
+        }}
+        onDelete={deleteEditingMember}
+        onSubmit={submitMemberEdit}
+      />
 
       {pendingDeleteIndex !== null ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">

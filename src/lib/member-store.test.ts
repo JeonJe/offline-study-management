@@ -25,6 +25,7 @@ describe("member-store stable member identity", () => {
 
   it("saves same-name members in one team as distinct member ids", async () => {
     await saveMemberPresetToDb(
+      "loop-pak-3",
       [
         {
           teamName: "1팀",

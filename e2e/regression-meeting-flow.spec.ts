@@ -1,14 +1,14 @@
 import { test, expect, chromium } from "@playwright/test";
-import path from "node:path";
+import {
+  AUTH_STATE,
+  BASE_URL,
+  REGRESSION_TEST_DATE,
+  cohortPath,
+  waitForCohortDateUrl,
+} from "./support/test-config";
 
-// 기존 spec(cache-consistency, performance)은 2026-03-01 사용 → 날짜 충돌 방지
-const TEST_DATE = "2026-09-01";
-const DASHBOARD = `/?date=${TEST_DATE}`;
-const AUTH_STATE = path.join(__dirname, ".auth", "state.json");
-// 수동 chromium.launch() context는 playwright.config의 use.baseURL을 상속받지 않으므로
-// beforeAll cleanup용 context 생성 시 명시적으로 전달한다
-const BASE_URL =
-  process.env.PLAYWRIGHT_BASE_URL ?? "https://offline-study-management.vercel.app";
+// cache/performance spec과 날짜 충돌 방지
+const DASHBOARD = cohortPath("study", { date: REGRESSION_TEST_DATE });
 
 // 회귀 테스트 전용 라벨 prefix — 다른 spec의 E2E 데이터와 구분
 const TEST_LABEL = "R회귀모임";
@@ -22,7 +22,7 @@ async function deleteMeetingFromDetail(page: import("@playwright/test").Page) {
   await page
     .locator('[role="dialog"] button:has-text("이 모임 삭제")')
     .click();
-  await page.waitForURL(`**/?date=${TEST_DATE}**`, { timeout: 10_000 });
+  await page.waitForURL(waitForCohortDateUrl("study"), { timeout: 10_000 });
 }
 
 async function openManageModal(page: import("@playwright/test").Page) {
@@ -61,10 +61,10 @@ async function cleanupByLabel(
 async function getMeetingParticipantCount(
   page: import("@playwright/test").Page,
 ): Promise<number> {
-  const summary = page.getByText(/총 \d+명 · 멤버 \d+명 · 운영진 \d+명/).first();
-  await expect(summary).toBeVisible();
-  const text = (await summary.textContent()) ?? "";
-  const match = text.match(/총\s*(\d+)명/);
+  const totalTerm = page.locator("dt").filter({ hasText: /^총원$/ }).first();
+  await expect(totalTerm).toBeVisible();
+  const text = (await totalTerm.locator("xpath=following-sibling::dd[1]").textContent()) ?? "";
+  const match = text.match(/(\d+)명/);
   if (!match) throw new Error(`참여자 수 파싱 실패: ${text}`);
   return Number(match[1]);
 }
@@ -108,7 +108,7 @@ test.describe.serial("회귀: 모임 생성 → 참석 → 취소 → 재등록"
     await fab.locator('button[type="submit"]:has-text("생성")').click();
 
     // 대시보드 리다이렉트 대기
-    await page.waitForURL(`**/?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("study"));
 
     // 생성된 모임 카드 노출 확인
     await expect(
@@ -246,7 +246,7 @@ test.describe.serial("회귀: 정원 초과 대기 → 승격", () => {
       form.appendChild(input);
     });
     await fab.locator('button[type="submit"]:has-text("생성")').click();
-    await page.waitForURL(`**/?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("study"));
 
     const link = page
       .locator(`a[aria-label="${WAITLIST_LABEL} 상세 보기"]`)

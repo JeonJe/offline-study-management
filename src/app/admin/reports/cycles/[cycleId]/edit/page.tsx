@@ -7,6 +7,7 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { updateWeeklyReportCycleAction } from "@/app/weekly-report-actions";
 import { isGlobalAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -44,11 +45,11 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-async function safeLoadCycleData(cycleId: string): Promise<EditCycleData> {
+async function safeLoadCycleData(cycleId: string, unitSlug: string): Promise<EditCycleData> {
   try {
     const [cycle, templates] = await Promise.all([
-      getWeeklyReportCycleById(cycleId),
-      listWeeklyReportTemplates(),
+      getWeeklyReportCycleById(cycleId, unitSlug),
+      listWeeklyReportTemplates(unitSlug),
     ]);
 
     return {
@@ -70,10 +71,12 @@ function EditCycleForm({
   cycle,
   templates,
   loadError,
+  unitSlug,
 }: {
   cycle: WeeklyReportCycle | null;
   templates: WeeklyReportTemplate[];
   loadError: boolean;
+  unitSlug: string;
 }) {
   if (loadError) {
     return (
@@ -104,7 +107,7 @@ function EditCycleForm({
             </p>
           </div>
           <Link
-            href="/admin/reports"
+            href={cohortAwarePath(unitSlug, "/admin/reports")}
             className="btn-press rounded-full border px-4 py-2 text-sm font-bold"
             style={{
               borderColor: "var(--line)",
@@ -117,6 +120,7 @@ function EditCycleForm({
         </div>
 
         <form action={updateWeeklyReportCycleAction} className="mt-6 grid gap-5">
+          <input type="hidden" name="unit" value={unitSlug} />
           <input type="hidden" name="cycleId" value={cycle.id} />
 
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
@@ -239,12 +243,14 @@ export default async function EditWeeklyReportCyclePage({
       />
     );
   } else {
-    const data = await safeLoadCycleData(routeParams.cycleId);
+    const unitSlug = singleParam(query.unit);
+    const data = await safeLoadCycleData(routeParams.cycleId, unitSlug);
     content = (
       <EditCycleForm
         cycle={data.cycle}
         templates={data.templates}
         loadError={data.error}
+        unitSlug={unitSlug}
       />
     );
   }
@@ -254,6 +260,7 @@ export default async function EditWeeklyReportCyclePage({
       activeRole="admin"
       title="보고 주차"
       summary="주간 보고 내용을 수정합니다."
+      unitSlug={singleParam(query.unit)}
     >
       {content}
     </RoleShell>

@@ -69,14 +69,14 @@ function report(teamName: string, id = `${teamName}-report`) {
 
 describe("buildCycleShareText", () => {
   it("cycleId가 비어 있으면 에러를 던진다", async () => {
-    await expect(buildCycleShareText("   ")).rejects.toThrow("보고 주차 ID는 필수입니다.");
+    await expect(buildCycleShareText("   ", "loop-pak-4")).rejects.toThrow("보고 주차 ID는 필수입니다.");
   });
 
   it("사이클이 없으면 에러를 던진다", async () => {
     getCycleMock.mockResolvedValue(null);
     loadMemberPresetMock.mockResolvedValue(memberPreset);
 
-    await expect(buildCycleShareText("missing-cycle")).rejects.toThrow(
+    await expect(buildCycleShareText("missing-cycle", "loop-pak-4")).rejects.toThrow(
       "보고 주차를 찾을 수 없습니다."
     );
   });
@@ -87,13 +87,16 @@ describe("buildCycleShareText", () => {
     listReportsMock.mockResolvedValue([report("1팀"), report("2팀")]);
     countCommentsByReportIdsMock.mockResolvedValue(new Map([["1팀-report", 2]]));
 
-    const text = await buildCycleShareText("cycle-1");
+    const text = await buildCycleShareText("cycle-1", "loop-pak-4");
 
     expect(text).toContain("[주간 보고] 4기 3주차 엔젤 보고");
     expect(text).toContain("제출 2/2팀");
     expect(text).toContain("- 1팀: 제출 (애니) / 댓글 2개");
     expect(text).toContain("  - 도움 요청: 장소 안내 필요");
     expect(text).toContain("- 2팀: 제출 (보라) / 댓글 0개");
+    expect(getCycleMock).toHaveBeenCalledWith("cycle-1", "loop-pak-4");
+    expect(loadMemberPresetMock).toHaveBeenCalledWith("loop-pak-4");
+    expect(listReportsMock).toHaveBeenCalledWith("cycle-1", "loop-pak-4");
   });
 
   it("빈 사이클이면 모든 팀을 미제출로 표시한다", async () => {
@@ -102,7 +105,7 @@ describe("buildCycleShareText", () => {
     listReportsMock.mockResolvedValue([]);
     countCommentsByReportIdsMock.mockResolvedValue(new Map());
 
-    const text = await buildCycleShareText("cycle-1");
+    const text = await buildCycleShareText("cycle-1", "loop-pak-4");
 
     expect(text).toContain("제출 0/2팀");
     expect(text).toContain("- 1팀: 미제출 / 엔젤 애니");
@@ -115,7 +118,7 @@ describe("buildCycleShareText", () => {
     listReportsMock.mockResolvedValue([report("1팀")]);
     countCommentsByReportIdsMock.mockResolvedValue(new Map([["1팀-report", 1]]));
 
-    const text = await buildCycleShareText("cycle-1");
+    const text = await buildCycleShareText("cycle-1", "loop-pak-4");
 
     expect(text).toContain("제출 1/2팀");
     expect(text).toContain("- 1팀: 제출 (애니) / 댓글 1개");

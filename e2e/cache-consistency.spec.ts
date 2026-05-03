@@ -1,11 +1,14 @@
 import { test, expect, chromium } from "@playwright/test";
-import path from "node:path";
+import {
+  AUTH_STATE,
+  CACHE_TEST_DATE,
+  cohortPath,
+  waitForCohortDateUrl,
+} from "./support/test-config";
 
-const TEST_DATE = "2026-03-01";
-const DASHBOARD = `/?date=${TEST_DATE}`;
-const AFTERPARTY_PAGE = `/afterparty?date=${TEST_DATE}`;
-const MEMBERS_PAGE = "/members";
-const AUTH_STATE = path.join(__dirname, ".auth", "state.json");
+const DASHBOARD = cohortPath("study", { date: CACHE_TEST_DATE });
+const AFTERPARTY_PAGE = cohortPath("afterparty", { date: CACHE_TEST_DATE });
+const MEMBERS_PAGE = cohortPath("members");
 
 // ---------- helpers ----------
 
@@ -17,19 +20,20 @@ async function deleteMeetingFromDetail(page: import("@playwright/test").Page) {
   await page
     .locator('[role="dialog"] button:has-text("이 모임 삭제")')
     .click();
-  await page.waitForURL(`**/?date=${TEST_DATE}**`, { timeout: 10_000 });
+  await page.waitForURL(waitForCohortDateUrl("study"), { timeout: 10_000 });
 }
 
 /** 뒤풀이 상세 페이지에서 삭제 수행 */
 async function deleteAfterpartyFromDetail(
   page: import("@playwright/test").Page,
 ) {
+  page.once("dialog", (d) => d.accept());
   await page.locator('button:has-text("수정 관리")').click();
   await page.locator('[role="dialog"]').waitFor();
   await page
     .locator('[role="dialog"] button:has-text("뒷풀이 삭제")')
     .click();
-  await page.waitForURL(`**/afterparty?date=${TEST_DATE}**`, {
+  await page.waitForURL(waitForCohortDateUrl("afterparty"), {
     timeout: 10_000,
   });
 }
@@ -64,10 +68,13 @@ async function cleanupByLabel(
 async function getMeetingParticipantCount(
   page: import("@playwright/test").Page,
 ): Promise<number> {
-  const summary = page.getByText(/총 \d+명 · 멤버 \d+명 · 운영진 \d+명/).first();
+  const summary = page
+    .locator("dt", { hasText: "총원" })
+    .first()
+    .locator("xpath=following-sibling::dd[1]");
   await expect(summary).toBeVisible();
   const text = (await summary.textContent()) ?? "";
-  const match = text.match(/총\s*(\d+)명/);
+  const match = text.match(/(\d+)명/);
   if (!match) throw new Error(`참여자 수 파싱 실패: ${text}`);
   return Number(match[1]);
 }
@@ -111,22 +118,24 @@ test.describe.serial("캐시 정합성", () => {
     leadersSupported = (await leadersInput.count()) > 0;
     if (leadersSupported) {
       await leadersInput.fill("E2E방장A, E2E방장B");
+      await fab.locator('button[type="button"]:has-text("추가")').click();
     }
 
     // 제출
     await fab.locator('button[type="submit"]:has-text("생성")').click();
 
     // 대시보드 리다이렉트 대기
-    await page.waitForURL(`**/?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("study"));
 
     // 생성된 모임 확인
     await expect(
       page.locator('article:has-text("E2E테스트모임")').first(),
     ).toBeVisible();
     if (leadersSupported) {
-      await expect(
-        page.locator('article:has-text("E2E테스트모임")').first().getByText("방장: E2E방장A, E2E방장B"),
-      ).toBeVisible();
+      const card = page.locator('article:has-text("E2E테스트모임")').first();
+      await expect(card.getByText("방장:")).toBeVisible();
+      await expect(card.getByText("E2E방장A")).toBeVisible();
+      await expect(card.getByText("E2E방장B")).toBeVisible();
     }
 
     // 상세 URL 저장
@@ -143,7 +152,9 @@ test.describe.serial("캐시 정합성", () => {
 
     await page.goto(meetingDetailUrl);
     if (leadersSupported) {
-      await expect(page.getByText("방장: E2E방장A, E2E방장B")).toBeVisible();
+      await expect(page.getByText("방장:")).toBeVisible();
+      await expect(page.getByText("E2E방장A")).toBeVisible();
+      await expect(page.getByText("E2E방장B")).toBeVisible();
     }
 
     // 현재 참여자 수 기록
@@ -202,7 +213,7 @@ test.describe.serial("캐시 정합성", () => {
     await fab.locator('button[type="submit"]:has-text("생성")').click();
 
     // 리다이렉트 대기
-    await page.waitForURL(`**/afterparty?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("afterparty"));
 
     // 생성된 뒤풀이 확인
     await expect(
@@ -225,13 +236,13 @@ test.describe.serial("캐시 정합성", () => {
 
     // 참여자 추가 (텍스트 입력)
     const participantForm = page.locator(
-      'form:has(input[name="names"][placeholder*="이름"])',
+      'form:has(input[name="mutationSource"][value="manual-add"])',
     );
     await participantForm
       .locator('input[name="names"]')
       .fill("E2E테스트참석자");
     await participantForm
-      .locator('button[type="submit"]:has-text("참여자 추가")')
+      .locator('button[type="submit"]:has-text("추가")')
       .click();
     await page.waitForLoadState("domcontentloaded");
 
@@ -261,9 +272,11 @@ test.describe.serial("캐시 정합성", () => {
     await page.goto(MEMBERS_PAGE);
     await page.waitForLoadState("domcontentloaded");
 
+    await expect(page.getByText("멤버 명단")).toBeVisible();
+    await expect(page.locator("p").filter({ hasText: /^운영진$/ })).toBeVisible();
+
     // 현재 페이지 텍스트 스냅샷 (주요 영역)
-    const sections = page.locator("section.card-static");
-    const contentBefore = await sections.allTextContents();
+    const contentBefore = await page.locator("main").innerText();
     expect(contentBefore.length).toBeGreaterThan(0);
 
     // 새로고침
@@ -271,7 +284,7 @@ test.describe.serial("캐시 정합성", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // 동일 데이터 확인
-    const contentAfter = await sections.allTextContents();
+    const contentAfter = await page.locator("main").innerText();
     expect(contentAfter).toEqual(contentBefore);
   });
 
@@ -286,7 +299,7 @@ test.describe.serial("캐시 정합성", () => {
     await meetingFab
       .locator('button[type="submit"]:has-text("생성")')
       .click();
-    await page.waitForURL(`**/?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("study"));
 
     const crossMeetingUrl =
       (await page
@@ -305,7 +318,7 @@ test.describe.serial("캐시 정합성", () => {
     await afterpartyFab
       .locator('button[type="submit"]:has-text("생성")')
       .click();
-    await page.waitForURL(`**/afterparty?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("afterparty"));
 
     const crossAfterpartyUrl =
       (await page
@@ -328,11 +341,11 @@ test.describe.serial("캐시 정합성", () => {
     // 같은 멤버를 뒤풀이에도 추가
     await page.goto(crossAfterpartyUrl);
     const apForm = page.locator(
-      'form:has(input[name="names"][placeholder*="이름"])',
+      'form:has(input[name="mutationSource"][value="manual-add"])',
     );
     await apForm.locator('input[name="names"]').fill(memberName);
     await apForm
-      .locator('button[type="submit"]:has-text("참여자 추가")')
+      .locator('button[type="submit"]:has-text("추가")')
       .click();
     await page.waitForLoadState("domcontentloaded");
 

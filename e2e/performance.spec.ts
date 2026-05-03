@@ -1,13 +1,17 @@
 import { test, expect, chromium } from "@playwright/test";
-import path from "node:path";
-
-const TEST_DATE = "2026-03-01";
-const AUTH_STATE = path.join(__dirname, ".auth", "state.json");
+import {
+  AUTH_STATE,
+  CACHE_TEST_DATE,
+  cohortPath,
+  waitForCohortDateUrl,
+} from "./support/test-config";
 
 const PAGES = [
-  { name: "대시보드", url: `/?date=${TEST_DATE}` },
-  { name: "뒤풀이", url: `/afterparty?date=${TEST_DATE}` },
-  { name: "멤버", url: "/members" },
+  { name: "대시보드", url: cohortPath("study", { date: CACHE_TEST_DATE }) },
+  { name: "뒤풀이", url: cohortPath("afterparty", { date: CACHE_TEST_DATE }) },
+  { name: "멤버", url: cohortPath("members") },
+  { name: "엔젤 보고", url: cohortPath("angel/reports") },
+  { name: "관리자 보고", url: cohortPath("admin/reports") },
 ] as const;
 
 const VISITS_PER_PAGE = 3;
@@ -64,7 +68,7 @@ test.describe("페이지 성능", () => {
 
   test("시나리오 9: 뮤테이션 후 응답 속도", async ({ page }) => {
     // 1. 캐시 워밍
-    await page.goto(`/?date=${TEST_DATE}`, { waitUntil: "load" });
+    await page.goto(cohortPath("study", { date: "" }), { waitUntil: "load" });
 
     // 2. 모임 생성 (캐시 무효화 트리거)
     const fab = page.locator("details:has(summary.fab-pulse)");
@@ -76,7 +80,7 @@ test.describe("페이지 성능", () => {
     await fab.locator('button[type="submit"]:has-text("생성")').click();
 
     // 3. 리다이렉트 후 페이지 로드 완료까지 측정
-    await page.waitForURL(`**/?date=${TEST_DATE}**`);
+    await page.waitForURL(waitForCohortDateUrl("study"));
     await page.waitForLoadState("domcontentloaded");
     const elapsed = Date.now() - startTime;
 
@@ -102,7 +106,7 @@ test.describe("페이지 성능", () => {
       await page
         .locator('[role="dialog"] button:has-text("이 모임 삭제")')
         .click();
-      await page.waitForURL(`**/?date=${TEST_DATE}**`);
+      await page.waitForURL(waitForCohortDateUrl("study"));
     }
   });
 
@@ -114,7 +118,7 @@ test.describe("페이지 성능", () => {
     page.setDefaultTimeout(10_000);
 
     for (let i = 0; i < 5; i++) {
-      await page.goto(`/?date=${TEST_DATE}`, {
+      await page.goto(cohortPath("study", { date: "" }), {
         waitUntil: "domcontentloaded",
       });
       const link = page

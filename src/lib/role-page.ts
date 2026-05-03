@@ -109,9 +109,9 @@ export const ROLE_PAGES: RolePageDefinition[] = [
             description: "주차별 제출 현황 확인",
           },
           {
-            label: "팀/멤버 히스토리",
-            href: "/admin",
-            description: "기간별 참여 흐름 확인",
+            label: "참여 통계",
+            href: "/admin/history",
+            description: "팀과 멤버의 참여율 확인",
           },
         ],
       },

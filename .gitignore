@@ -26,6 +26,10 @@ e2e/.auth/
 # misc
 .DS_Store
 *.pem
+.idea/
+.claude/settings.local.json
+.omc/
+.omx/
 
 # debug
 npm-debug.log*

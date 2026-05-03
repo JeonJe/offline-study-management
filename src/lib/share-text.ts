@@ -12,6 +12,7 @@ import {
   PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
 import { withTeamLabel } from "@/lib/member-label-utils";
+import { sortText } from "@/lib/sort-utils";
 
 function formatStartTime(timeText: string): string {
   const [hourText, minuteText] = timeText.split(":");
@@ -28,7 +29,7 @@ function formatStartTime(timeText: string): string {
 }
 
 function sortNames(names: string[]): string[] {
-  return [...names].sort((a, b) => a.localeCompare(b, "ko"));
+  return sortText(names);
 }
 
 export function buildOfflineStudyShareText({

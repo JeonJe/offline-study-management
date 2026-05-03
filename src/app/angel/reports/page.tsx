@@ -32,13 +32,13 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-async function safeListCycles(): Promise<{
+async function safeListCycles(unitSlug: string): Promise<{
   cycles: WeeklyReportCycle[];
   error: boolean;
 }> {
   try {
     return {
-      cycles: await listWeeklyReportCycles(),
+      cycles: await listWeeklyReportCycles(unitSlug),
       error: false,
     };
   } catch (error) {
@@ -146,7 +146,7 @@ export default async function AngelReportsPage({ searchParams }: AngelReportsPag
       />
     );
   } else {
-    const data = await safeListCycles();
+    const data = await safeListCycles(unitSlug);
     content = <ReportCycleList cycles={data.cycles} loadError={data.error} unitSlug={unitSlug} />;
   }
 

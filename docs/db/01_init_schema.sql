@@ -16,11 +16,11 @@ create unique index if not exists idx_operating_units_single_default
   where is_default;
 
 insert into public.operating_units (slug, name, is_default)
-values ('3기', '3기', true)
+values ('loop-pak-3', '3기', false)
 on conflict (slug)
 do update set
   name = coalesce(nullif(public.operating_units.name, ''), excluded.name),
-  is_default = true,
+  is_default = false,
   updated_at = now();
 
 create table if not exists public.meetings (
@@ -34,7 +34,7 @@ create table if not exists public.meetings (
   password_hash text,
   capacity integer,
   constraint chk_meetings_capacity check (capacity is null or capacity >= 0),
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -71,7 +71,7 @@ create table if not exists public.afterparties (
   settlement_manager text,
   settlement_account text,
   password_hash text,
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -134,7 +134,7 @@ create table if not exists public.member_teams (
   angel_name text not null,
   angel_names text[] not null default '{}'::text[],
   team_order integer not null default 0,
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -149,7 +149,7 @@ create table if not exists public.member_team_members (
   team_name text not null references public.member_teams(team_name) on delete cascade,
   member_name text not null,
   member_order integer not null default 0,
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   primary key (team_name, member_name)
 );
@@ -163,7 +163,7 @@ create index if not exists idx_member_team_members_operating_unit
 create table if not exists public.member_angels (
   angel_name text primary key,
   angel_order integer not null default 0,
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now()
 );
 
@@ -177,7 +177,7 @@ create table if not exists public.member_special_roles (
   role text not null check (role in ('supporter', 'buddy', 'mentor', 'manager')),
   member_name text not null,
   member_order integer not null default 0,
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   primary key (role, member_name)
 );
@@ -194,7 +194,7 @@ create table if not exists public.weekly_report_templates (
   prompt text not null,
   sections jsonb not null default '[]'::jsonb,
   is_default boolean not null default false,
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -214,7 +214,7 @@ create table if not exists public.weekly_report_cycles (
   due_date date,
   prompt text,
   status text not null default 'open' check (status in ('open', 'closed')),
-  operating_unit_slug text not null default '3기',
+  operating_unit_slug text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

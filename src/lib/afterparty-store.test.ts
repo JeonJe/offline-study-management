@@ -208,6 +208,7 @@ describe("afterparty-store settlement flows", () => {
     });
 
     const created = await createAfterparty({
+      operatingUnitSlug: "loop-pak-3",
       title: "홍대 뒷풀이",
       eventDate: "2026-03-12",
       startTime: "19:00",

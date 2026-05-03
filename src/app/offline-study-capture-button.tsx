@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_LANGUAGE } from "@/lib/app-config";
 import { useState } from "react";
 
 type OfflineStudyCaptureButtonProps = {
@@ -310,8 +311,8 @@ function openCapturePreviewWindow(target: HTMLElement): boolean {
   const styleMarkup = `${stylesheetLinks}\n${inlineStyleTags}\n<style>${stylesheetRules}</style>`;
 
   popup.document.open();
-  popup.document.write(`<!doctype html>
-<html lang="ko">
+popup.document.write(`<!doctype html>
+<html lang="${APP_LANGUAGE}">
 <head>
   <meta charset="utf-8" />
   <base href="${window.location.origin}${window.location.pathname}" />

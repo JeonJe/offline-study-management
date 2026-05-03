@@ -106,26 +106,26 @@ describe("operating-unit-store", () => {
     expect(normalizeOperatingUnitSlug("4기 루퍼스")).not.toContain("기");
   });
 
-  it("keeps the current default operating unit stable even when URL-encoded", () => {
+  it("keeps the migrated 3기 operating unit stable even when URL-encoded", () => {
     expect(normalizeOperatingUnitSlug("3%EA%B8%B0")).toBe("loop-pak-3");
     expect(normalizeOperatingUnitSlug("3기")).toBe("loop-pak-3");
     expect(normalizeOperatingUnitSlug("loop-pak-3")).toBe("loop-pak-3");
   });
 
-  it("shows the default operating unit by display name instead of slug", () => {
+  it("shows the migrated 3기 operating unit by display name instead of slug", () => {
     expect(operatingUnitDisplayName("loop-pak-3")).toBe("3기");
     expect(operatingUnitDisplayName("3기")).toBe("3기");
     expect(operatingUnitDisplayName("loop-pak-4")).toBe("loop-pak-4");
   });
 
-  it("protects legacy migration and current default operating unit slugs", () => {
+  it("protects legacy migration and migrated 3기 operating unit slugs", () => {
     expect(isProtectedOperatingUnitSlug("default")).toBe(true);
     expect(isProtectedOperatingUnitSlug("3기")).toBe(true);
     expect(isProtectedOperatingUnitSlug("loop-pak-3")).toBe(true);
     expect(isProtectedOperatingUnitSlug("loop-pak-4")).toBe(false);
   });
 
-  it("creates the default operating unit schema and default row", async () => {
+  it("creates the operating unit schema and migrated 3기 row", async () => {
     await ensureOperatingUnitSchema();
 
     const sql = queryMock.mock.calls.map(([text]) => String(text));
@@ -135,13 +135,15 @@ describe("operating-unit-store", () => {
     expect(sql.some((text) => text.includes("insert into public.operating_units"))).toBe(true);
   });
 
-  it("adds a defaulted operating unit column without requiring callers to pass a unit", async () => {
+  it("adds a required operating unit column and migrates legacy values", async () => {
     await ensureOperatingUnitColumn("meetings", "idx_meetings_operating_unit");
 
     const sql = queryMock.mock.calls.map(([text]) => String(text));
-    expect(sql.some((text) => text.includes("add column if not exists operating_unit_slug text not null default 'loop-pak-3'"))).toBe(true);
+    expect(sql.some((text) => text.includes("add column if not exists operating_unit_slug text"))).toBe(true);
     expect(sql.some((text) => text.includes("where operating_unit_slug is null"))).toBe(true);
     expect(sql.some((text) => text.includes("or operating_unit_slug = $3"))).toBe(true);
+    expect(sql.some((text) => text.includes("alter column operating_unit_slug set not null"))).toBe(true);
+    expect(sql.some((text) => text.includes("alter column operating_unit_slug drop default"))).toBe(true);
     expect(sql.some((text) => text.includes("idx_meetings_operating_unit"))).toBe(true);
   });
 

@@ -36,6 +36,7 @@ import {
   listAngelWeeklyReports,
   listComments,
 } from "@/lib/weekly-report-store";
+import { formatCommentDateTime } from "@/lib/date-utils";
 import type { RolePageRole } from "@/lib/role-page";
 
 type AngelTeamReportPageProps = {
@@ -70,23 +71,7 @@ function decodeTeamName(value: string): string {
 }
 
 function formatCommentDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Seoul",
-  }).format(date);
-}
-
-function commentAuthorRoleLabel(comment: WeeklyReportComment): string {
-  if (comment.authorRole === "admin") return "관리자";
-  if (comment.authorRole === "leader") return "방장";
-  return "엔젤";
+  return formatCommentDateTime(value);
 }
 
 function commentInitial(name: string): string {
@@ -95,18 +80,19 @@ function commentInitial(name: string): string {
 
 async function loadAngelTeamReportPageData(
   cycleId: string,
-  teamName: string
+  teamName: string,
+  unitSlug: string
 ): Promise<AngelTeamReportPageData> {
   try {
     const [cycle, preset] = await Promise.all([
-      getWeeklyReportCycleById(cycleId),
-      loadMemberPreset(),
+      getWeeklyReportCycleById(cycleId, unitSlug),
+      loadMemberPreset(unitSlug),
     ]);
     const team = preset.teamGroups.find((group) => group.teamName === teamName) ?? null;
     const [reports, template] = cycle
       ? await Promise.all([
-          listAngelWeeklyReports(cycle.id),
-          getWeeklyReportTemplateById(cycle.templateId),
+          listAngelWeeklyReports(cycle.id, unitSlug),
+          getWeeklyReportTemplateById(cycle.templateId, unitSlug),
         ])
       : [[], null];
 
@@ -278,6 +264,7 @@ function TeamReportForm({
                 </div>
 
                 <form action={submitAngelWeeklyReportAction} className="grid gap-4">
+                  <input type="hidden" name="unit" value={unitSlug} />
                   <input type="hidden" name="cycleId" value={cycle.id} />
                   <input type="hidden" name="teamName" value={team.teamName} />
                   <input type="hidden" name="returnPath" value={returnPath} />
@@ -451,9 +438,6 @@ function TeamReportForm({
                                 <p className="text-sm font-extrabold" style={{ color: "var(--ink)" }}>
                                   {comment.authorLabel}
                                 </p>
-                                <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: "var(--surface-alt)", color: "var(--ink-muted)" }}>
-                                  {commentAuthorRoleLabel(comment)}
-                                </span>
                                 {commentDate ? (
                                   <time className="text-xs" style={{ color: "var(--ink-muted)" }} dateTime={comment.createdAt}>
                                     {commentDate}
@@ -586,7 +570,8 @@ export default async function AngelTeamReportPage({
       />
     );
   } else {
-    const data = await loadAngelTeamReportPageData(routeParams.cycleId, teamName);
+    const unitSlug = singleParam(query.unit);
+    const data = await loadAngelTeamReportPageData(routeParams.cycleId, teamName, unitSlug);
 
     if (data.error) {
       content = (

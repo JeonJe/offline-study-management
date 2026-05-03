@@ -81,6 +81,7 @@ describe("meetup-store meeting password flows", () => {
       ]);
 
     const created = await createMeeting({
+      operatingUnitSlug: "loop-pak-3",
       title: "토요 스터디",
       meetingDate: "2026-03-12",
       startTime: "14:00",
@@ -291,6 +292,7 @@ describe("meetup-store capacity flows", () => {
       ]);
 
     const created = await createMeeting({
+      operatingUnitSlug: "loop-pak-3",
       title: "정원 있는 모임",
       meetingDate: "2026-04-05",
       startTime: "14:00",
@@ -311,7 +313,7 @@ describe("meetup-store capacity flows", () => {
       .mockResolvedValueOnce([
         {
           id: "meeting-zero",
-          operatingUnitSlug: "default",
+          operatingUnitSlug: "loop-pak-3",
           title: "정원 마감 모임",
           meetingDate: "2026-04-05",
           startTime: "14:00",
@@ -327,6 +329,7 @@ describe("meetup-store capacity flows", () => {
       ]);
 
     const created = await createMeeting({
+      operatingUnitSlug: "loop-pak-3",
       title: "정원 마감 모임",
       meetingDate: "2026-04-05",
       startTime: "14:00",
@@ -360,6 +363,7 @@ describe("meetup-store capacity flows", () => {
       ]);
 
     const created = await createMeeting({
+      operatingUnitSlug: "loop-pak-3",
       title: "정원 없는 모임",
       meetingDate: "2026-04-05",
       startTime: "14:00",

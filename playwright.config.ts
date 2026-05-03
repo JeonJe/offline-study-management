@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
 const baseURL =
-  process.env.PLAYWRIGHT_BASE_URL ?? "https://offline-study-management.vercel.app";
+  process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./e2e",

@@ -39,8 +39,8 @@ const COHORT_ADMIN_CARDS: AdminCard[] = [
     href: "/members",
   },
   {
-    title: "팀/멤버 히스토리",
-    description: "기간별 참여 흐름 확인",
+    title: "참여 통계",
+    description: "팀과 멤버의 참여율 확인",
     href: "/admin/history",
   },
 ];

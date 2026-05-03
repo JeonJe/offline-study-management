@@ -19,123 +19,152 @@ import {
 } from "@/lib/afterparty-store";
 import {
   getTeamAttendanceByPeriod,
+  getTeamAttendanceDetailByPeriod,
   getMemberAttendanceByPeriod,
+  getMemberAttendanceDetailByPeriod,
 } from "@/lib/history-store";
 import type { MeetingKind } from "@/lib/meeting-kind";
 
+function isAppCacheDisabled(): boolean {
+  return process.env.DISABLE_APP_CACHE === "1";
+}
+
+function cacheOrCall<T>(
+  fn: () => Promise<T>,
+  keys: string[],
+  tags: string[]
+): Promise<T> {
+  if (isAppCacheDisabled()) {
+    return fn();
+  }
+
+  return unstable_cache(fn, keys, { tags, revalidate: 300 })();
+}
+
 // --- meetup-data ---
 
-export const cachedListMeetings = unstable_cache(
-  listMeetings,
-  ["listMeetings"],
-  { tags: ["meetup-data"], revalidate: 300 }
-);
+export const cachedListMeetings = (operatingUnitSlug: string) =>
+  cacheOrCall(() => listMeetings(operatingUnitSlug), ["listMeetings", operatingUnitSlug], ["meetup-data"]);
 
-export const cachedListMeetingsByKind = (meetingKind: MeetingKind) =>
-  unstable_cache(
-    () => listMeetingsByKind(meetingKind),
-    ["listMeetingsByKind", meetingKind],
-    { tags: ["meetup-data"], revalidate: 300 }
-  )();
+export const cachedListMeetingsByKind = (meetingKind: MeetingKind, operatingUnitSlug: string) =>
+  cacheOrCall(
+    () => listMeetingsByKind(meetingKind, operatingUnitSlug),
+    ["listMeetingsByKind", operatingUnitSlug, meetingKind],
+    ["meetup-data"]
+  );
 
-export const cachedListMeetingsByKindAndDate = (meetingKind: MeetingKind, meetingDate: string) =>
-  unstable_cache(
-    () => listMeetingsByKindAndDate(meetingKind, meetingDate),
-    ["listMeetingsByKindAndDate", meetingKind, meetingDate],
-    { tags: ["meetup-data"], revalidate: 300 }
-  )();
+export const cachedListMeetingsByKindAndDate = (
+  meetingKind: MeetingKind,
+  meetingDate: string,
+  operatingUnitSlug: string
+) =>
+  cacheOrCall(
+    () => listMeetingsByKindAndDate(meetingKind, meetingDate, operatingUnitSlug),
+    ["listMeetingsByKindAndDate", operatingUnitSlug, meetingKind, meetingDate],
+    ["meetup-data"]
+  );
 
-export const cachedListMeetingsByDate = (meetingDate: string) =>
-  unstable_cache(
-    () => listMeetingsByDate(meetingDate),
-    ["listMeetingsByDate", meetingDate],
-    { tags: ["meetup-data"], revalidate: 300 }
-  )();
+export const cachedListMeetingsByDate = (meetingDate: string, operatingUnitSlug: string) =>
+  cacheOrCall(
+    () => listMeetingsByDate(meetingDate, operatingUnitSlug),
+    ["listMeetingsByDate", operatingUnitSlug, meetingDate],
+    ["meetup-data"]
+  );
 
 export const cachedGetMeetingById = (meetingId: string) =>
-  unstable_cache(
-    () => getMeetingById(meetingId),
-    ["getMeetingById", meetingId],
-    { tags: ["meetup-data"], revalidate: 300 }
-  )();
+  cacheOrCall(() => getMeetingById(meetingId), ["getMeetingById", meetingId], ["meetup-data"]);
 
 export const cachedListRsvpsForMeetings = (meetingIds: string[], keyword: string) =>
-  unstable_cache(
+  cacheOrCall(
     () => listRsvpsForMeetings(meetingIds, keyword),
     ["listRsvpsForMeetings", ...meetingIds.sort(), keyword],
-    { tags: ["meetup-data"], revalidate: 300 }
-  )();
+    ["meetup-data"]
+  );
 
 // --- member-data ---
 
-export const cachedLoadMemberPreset = unstable_cache(
-  loadMemberPreset,
-  ["loadMemberPreset"],
-  { tags: ["member-data"], revalidate: 300 }
-);
+export const cachedLoadMemberPreset = (operatingUnitSlug: string) =>
+  cacheOrCall(() => loadMemberPreset(operatingUnitSlug), ["loadMemberPreset", operatingUnitSlug], ["member-data"]);
 
 // --- afterparty-data ---
 
-export const cachedListAfterparties = unstable_cache(
-  listAfterparties,
-  ["listAfterparties"],
-  { tags: ["afterparty-data"], revalidate: 300 }
-);
+export const cachedListAfterparties = (operatingUnitSlug: string) =>
+  cacheOrCall(() => listAfterparties(operatingUnitSlug), ["listAfterparties", operatingUnitSlug], ["afterparty-data"]);
 
-export const cachedListAfterpartiesByDate = (eventDate: string) =>
-  unstable_cache(
-    () => listAfterpartiesByDate(eventDate),
-    ["listAfterpartiesByDate", eventDate],
-    { tags: ["afterparty-data"], revalidate: 300 }
-  )();
+export const cachedListAfterpartiesByDate = (eventDate: string, operatingUnitSlug: string) =>
+  cacheOrCall(
+    () => listAfterpartiesByDate(eventDate, operatingUnitSlug),
+    ["listAfterpartiesByDate", operatingUnitSlug, eventDate],
+    ["afterparty-data"]
+  );
 
 export const cachedGetAfterpartyById = (afterpartyId: string) =>
-  unstable_cache(
-    () => getAfterpartyById(afterpartyId),
-    ["getAfterpartyById", afterpartyId],
-    { tags: ["afterparty-data"], revalidate: 300 }
-  )();
+  cacheOrCall(() => getAfterpartyById(afterpartyId), ["getAfterpartyById", afterpartyId], ["afterparty-data"]);
 
 export const cachedListParticipantsForAfterparties = (afterpartyIds: string[], keyword: string) =>
-  unstable_cache(
+  cacheOrCall(
     () => listParticipantsForAfterparties(afterpartyIds, keyword),
     ["listParticipantsForAfterparties", ...afterpartyIds.sort(), keyword],
-    { tags: ["afterparty-data"], revalidate: 300 }
-  )();
+    ["afterparty-data"]
+  );
 
 export const cachedListSettlementsForAfterparty = (afterpartyId: string) =>
-  unstable_cache(
+  cacheOrCall(
     () => listSettlementsForAfterparty(afterpartyId),
     ["listSettlementsForAfterparty", afterpartyId],
-    { tags: ["afterparty-data"], revalidate: 300 }
-  )();
+    ["afterparty-data"]
+  );
 
 export const cachedListSettlementsForAfterparties = (afterpartyIds: string[]) =>
-  unstable_cache(
+  cacheOrCall(
     () => listSettlementsForAfterparties(afterpartyIds),
     ["listSettlementsForAfterparties", ...afterpartyIds.sort()],
-    { tags: ["afterparty-data"], revalidate: 300 }
-  )();
+    ["afterparty-data"]
+  );
 
 export const cachedListParticipantsForSettlement = (settlementId: string, keyword: string) =>
-  unstable_cache(
+  cacheOrCall(
     () => listParticipantsForSettlement(settlementId, keyword),
     ["listParticipantsForSettlement", settlementId, keyword],
-    { tags: ["afterparty-data"], revalidate: 300 }
-  )();
+    ["afterparty-data"]
+  );
 
 // --- attendance ---
 
-export const cachedGetTeamAttendanceByPeriod = (start: string, end: string, operatingUnitSlug?: string) =>
-  unstable_cache(
+export const cachedGetTeamAttendanceByPeriod = (start: string, end: string, operatingUnitSlug: string) =>
+  cacheOrCall(
     () => getTeamAttendanceByPeriod(start, end, operatingUnitSlug),
-    ["getTeamAttendanceByPeriod", start, end, operatingUnitSlug ?? ""],
-    { tags: ["attendance"], revalidate: 300 }
-  )();
+    ["getTeamAttendanceByPeriod", start, end, operatingUnitSlug],
+    ["attendance"]
+  );
 
-export const cachedGetMemberAttendanceByPeriod = (start: string, end: string, operatingUnitSlug?: string) =>
-  unstable_cache(
+export const cachedGetMemberAttendanceByPeriod = (start: string, end: string, operatingUnitSlug: string) =>
+  cacheOrCall(
     () => getMemberAttendanceByPeriod(start, end, operatingUnitSlug),
-    ["getMemberAttendanceByPeriod", start, end, operatingUnitSlug ?? ""],
-    { tags: ["attendance"], revalidate: 300 }
-  )();
+    ["getMemberAttendanceByPeriod", start, end, operatingUnitSlug],
+    ["attendance"]
+  );
+
+export const cachedGetTeamAttendanceDetailByPeriod = (
+  teamName: string,
+  start: string,
+  end: string,
+  operatingUnitSlug: string
+) =>
+  cacheOrCall(
+    () => getTeamAttendanceDetailByPeriod(teamName, start, end, operatingUnitSlug),
+    ["getTeamAttendanceDetailByPeriod", teamName, start, end, operatingUnitSlug],
+    ["attendance"]
+  );
+
+export const cachedGetMemberAttendanceDetailByPeriod = (
+  name: string,
+  start: string,
+  end: string,
+  operatingUnitSlug: string
+) =>
+  cacheOrCall(
+    () => getMemberAttendanceDetailByPeriod(name, start, end, operatingUnitSlug),
+    ["getMemberAttendanceDetailByPeriod", name, start, end, operatingUnitSlug],
+    ["attendance"]
+  );
