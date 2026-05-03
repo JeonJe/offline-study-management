@@ -7,6 +7,7 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { deleteWeeklyReportTemplateAction } from "@/app/weekly-report-actions";
 import { isGlobalAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -34,15 +35,15 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-async function safeListWeeklyReportOverview(): Promise<{
+async function safeListWeeklyReportOverview(unitSlug: string): Promise<{
   cycles: WeeklyReportCycleWithReports[];
   templates: WeeklyReportTemplate[];
   error: boolean;
 }> {
   try {
     const [cycles, templates] = await Promise.all([
-      listWeeklyReportOverview(),
-      listWeeklyReportTemplates(),
+      listWeeklyReportOverview(unitSlug),
+      listWeeklyReportTemplates(unitSlug),
     ]);
 
     return {
@@ -69,6 +70,7 @@ function WeeklyReportAdminPanel({
   templateUpdated,
   templateDeleted,
   loadError,
+  unitSlug,
 }: {
   cycles: WeeklyReportCycleWithReports[];
   templates: WeeklyReportTemplate[];
@@ -78,6 +80,7 @@ function WeeklyReportAdminPanel({
   templateUpdated: boolean;
   templateDeleted: boolean;
   loadError: boolean;
+  unitSlug: string;
 }) {
   return (
     <section id="weekly-reports" className="grid gap-5">
@@ -93,7 +96,7 @@ function WeeklyReportAdminPanel({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/admin/reports/templates/new"
+              href={cohortAwarePath(unitSlug, "/admin/reports/templates/new")}
               className="btn-press rounded-full border px-4 py-2 text-sm font-bold"
               style={{
                 borderColor: "rgba(13, 127, 242, 0.25)",
@@ -104,7 +107,7 @@ function WeeklyReportAdminPanel({
               템플릿 만들기
             </Link>
             <Link
-              href="/admin/reports/cycles/new"
+              href={cohortAwarePath(unitSlug, "/admin/reports/cycles/new")}
               className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white"
               style={{ backgroundColor: "var(--accent)" }}
             >
@@ -201,7 +204,7 @@ function WeeklyReportAdminPanel({
                     </div>
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/admin/reports/templates/${template.id}/edit`}
+                        href={cohortAwarePath(unitSlug, `/admin/reports/templates/${template.id}/edit`)}
                         className="rounded-full border px-3 py-1 text-xs font-bold"
                         style={{
                           borderColor: "var(--line)",
@@ -212,6 +215,7 @@ function WeeklyReportAdminPanel({
                         수정
                       </Link>
                       <form action={deleteWeeklyReportTemplateAction}>
+                        <input type="hidden" name="unit" value={unitSlug} />
                         <input type="hidden" name="templateId" value={template.id} />
                         <button
                           type="submit"
@@ -261,14 +265,14 @@ function WeeklyReportAdminPanel({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
-                    href={`/admin/reports/cycles/${cycle.id}`}
+                    href={cohortAwarePath(unitSlug, `/admin/reports/cycles/${cycle.id}`)}
                     className="btn-press rounded-full px-3 py-1 text-sm font-bold text-white"
                     style={{ backgroundColor: "var(--accent)" }}
                   >
                     상세
                   </Link>
                   <Link
-                    href={`/admin/reports/cycles/${cycle.id}/edit`}
+                    href={cohortAwarePath(unitSlug, `/admin/reports/cycles/${cycle.id}/edit`)}
                     className="btn-press rounded-full border px-3 py-1 text-sm font-bold"
                     style={{
                       borderColor: "var(--line)",
@@ -327,7 +331,8 @@ export default async function AdminReportsPage({ searchParams }: AdminReportsPag
       />
     );
   } else {
-    const overview = await safeListWeeklyReportOverview();
+    const unitSlug = singleParam(query.unit);
+    const overview = await safeListWeeklyReportOverview(unitSlug);
     content = (
       <WeeklyReportAdminPanel
         cycles={overview.cycles}
@@ -338,6 +343,7 @@ export default async function AdminReportsPage({ searchParams }: AdminReportsPag
         templateUpdated={singleParam(query.template) === "updated"}
         templateDeleted={singleParam(query.template) === "deleted"}
         loadError={overview.error}
+        unitSlug={unitSlug}
       />
     );
   }
@@ -347,6 +353,7 @@ export default async function AdminReportsPage({ searchParams }: AdminReportsPag
       activeRole="admin"
       title="엔젤 주간 보고"
       summary="보고 요청과 제출 내용을 관리합니다."
+      unitSlug={singleParam(query.unit)}
     >
       {content}
     </RoleShell>

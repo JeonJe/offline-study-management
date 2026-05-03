@@ -24,10 +24,15 @@ import { DeleteConfirmButton } from "@/app/meetings/[meetingId]/delete-confirm-b
 import { extractHttpUrl, extractMapEmbedInfo } from "@/lib/location-utils";
 import { MapPreview } from "@/app/meetings/[meetingId]/map-preview";
 import {
-  normalizeMemberName,
   toTeamLabel,
   withTeamLabel,
 } from "@/lib/member-label-utils";
+import {
+  compareParticipantQuickAddEntries,
+  compareTeamLabels,
+  normalizeMeetingParticipantName,
+  sortRsvpsForRole,
+} from "@/lib/meeting-participants";
 import {
   PARTICIPANT_ROLE_META,
   PARTICIPANT_ROLE_ORDER,
@@ -36,7 +41,6 @@ import { PendingSubmitButton } from "@/app/pending-submit-button";
 import { QuerySelectFilter } from "@/app/query-select-filter";
 import { LeaderChipInput } from "@/app/leader-chip-input";
 import { SharedFormPasswordField } from "@/app/shared-form-password-field";
-import { compareText } from "@/lib/sort-utils";
 
 type PageProps = {
   params: Promise<{ meetingId: string }>;
@@ -111,47 +115,7 @@ function QuickAssignButton({
 }
 
 function normalizeName(value: string): string {
-  return normalizeMemberName(value);
-}
-
-function teamOrderFromLabel(teamLabel: string): number {
-  const matched = teamLabel.match(/(\d+)\s*팀/);
-  if (!matched?.[1]) return Number.POSITIVE_INFINITY;
-  const parsed = Number.parseInt(matched[1], 10);
-  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
-}
-
-function roleOrderIndex(role: ParticipantRole): number {
-  const index = PARTICIPANT_ROLE_ORDER.indexOf(role);
-  return index === -1 ? Number.POSITIVE_INFINITY : index;
-}
-
-function sortRsvpsForRole(
-  rows: RsvpRecord[],
-  role: ParticipantRole,
-  teamLabelByName: Map<string, string>
-): RsvpRecord[] {
-  const sorted = [...rows];
-  if (role === "student") {
-    sorted.sort((a, b) => {
-      const teamA = teamLabelByName.get(normalizeName(a.name)) ?? "";
-      const teamB = teamLabelByName.get(normalizeName(b.name)) ?? "";
-      const teamOrderA = teamOrderFromLabel(teamA);
-      const teamOrderB = teamOrderFromLabel(teamB);
-
-      if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-      if (teamA !== teamB) return compareText(teamA, teamB);
-
-      return compareText(normalizeName(a.name), normalizeName(b.name));
-    });
-    return sorted;
-  }
-
-  sorted.sort((a, b) => compareText(
-    withTeamLabel(a.name, teamLabelByName),
-    withTeamLabel(b.name, teamLabelByName)
-  ));
-  return sorted;
+  return normalizeMeetingParticipantName(value);
 }
 
 function LocationValue({ location }: { location: string }) {
@@ -492,12 +456,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
     studentRowsByTeam.set(teamLabel, existing);
   }
   const teamSections = Array.from(studentRowsByTeam.entries())
-    .sort(([teamA], [teamB]) => {
-      const orderA = teamOrderFromLabel(teamA);
-      const orderB = teamOrderFromLabel(teamB);
-      if (orderA !== orderB) return orderA - orderB;
-      return compareText(teamA, teamB);
-    })
+    .sort(([teamA], [teamB]) => compareTeamLabels(teamA, teamB))
     .map(([label, rows]) => ({
       key: `team-${label}`,
       role: "student" as const,
@@ -514,18 +473,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
 
   const operationEntries = operationRoleOrder.flatMap((role) =>
     (operationNamesByRole.get(role) ?? []).map((name) => ({ name, role }))
-  ).sort((a, b) => {
-    const roleDiff = roleOrderIndex(a.role) - roleOrderIndex(b.role);
-    if (roleDiff !== 0) return roleDiff;
-
-    const teamA = teamLabelByName.get(normalizeName(a.name)) ?? "";
-    const teamB = teamLabelByName.get(normalizeName(b.name)) ?? "";
-    const teamOrderA = teamOrderFromLabel(teamA);
-    const teamOrderB = teamOrderFromLabel(teamB);
-    if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-    if (teamA !== teamB) return compareText(teamA, teamB);
-    return compareText(normalizeName(a.name), normalizeName(b.name));
-  });
+  ).sort((a, b) => compareParticipantQuickAddEntries(a, b, teamLabelByName));
   const quickAddGroups = [
     ...memberPreset.teamGroups.map((team) => ({
       kind: "team" as const,
@@ -535,18 +483,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
           name,
           role: roleByName.get(normalizeName(name)) ?? ("student" as const),
         }))
-        .sort((a, b) => {
-          const roleDiff = roleOrderIndex(a.role) - roleOrderIndex(b.role);
-          if (roleDiff !== 0) return roleDiff;
-
-          const teamA = teamLabelByName.get(normalizeName(a.name)) ?? "";
-          const teamB = teamLabelByName.get(normalizeName(b.name)) ?? "";
-          const teamOrderA = teamOrderFromLabel(teamA);
-          const teamOrderB = teamOrderFromLabel(teamB);
-          if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-          if (teamA !== teamB) return compareText(teamA, teamB);
-          return compareText(normalizeName(a.name), normalizeName(b.name));
-        }),
+        .sort((a, b) => compareParticipantQuickAddEntries(a, b, teamLabelByName)),
     })),
     ...(operationEntries.length > 0
       ? [{ kind: "operation" as const, teamName: "운영진", entries: operationEntries }]
@@ -604,8 +541,8 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
-        <div className="stagger-children mx-auto w-full max-w-[920px] lg:grid lg:h-[calc(100vh-3rem)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-3">
-          <section className="card-static w-full p-4">
+        <div className="stagger-children mx-auto w-full max-w-[920px] lg:grid lg:gap-3">
+          <section className="card-static w-full p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -837,9 +774,9 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             </div>
           </section>
 
-          <section className="mt-3 card-static w-full overflow-hidden p-0 lg:mt-0 lg:min-h-0 lg:flex lg:flex-col">
+          <section className="mt-3 card-static w-full p-0 lg:mt-0">
             <div
-              className="border-b px-4 py-4"
+              className="border-b px-5 py-5 sm:px-6"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -897,7 +834,7 @@ export default async function MeetingDetailPage({ params, searchParams }: PagePr
             </div>
             {sortedParticipantRows.length > 0 ? (
               <div
-                className="m-4 rounded-2xl border p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+                className="m-4 rounded-2xl border p-4"
                 style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
               >
                 <div className="grid gap-3">

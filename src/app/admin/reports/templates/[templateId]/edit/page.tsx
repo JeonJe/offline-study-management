@@ -8,6 +8,7 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { updateWeeklyReportTemplateAction } from "@/app/weekly-report-actions";
 import { isGlobalAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -35,11 +36,12 @@ function singleParam(value: string | string[] | undefined): string {
 }
 
 async function safeLoadTemplate(
-  templateId: string
+  templateId: string,
+  unitSlug: string
 ): Promise<{ template: WeeklyReportTemplate | null; error: boolean }> {
   try {
     return {
-      template: await getWeeklyReportTemplateById(templateId),
+      template: await getWeeklyReportTemplateById(templateId, unitSlug),
       error: false,
     };
   } catch (error) {
@@ -54,9 +56,11 @@ async function safeLoadTemplate(
 function TemplateEditPanel({
   template,
   loadError,
+  unitSlug,
 }: {
   template: WeeklyReportTemplate | null;
   loadError: boolean;
+  unitSlug: string;
 }) {
   if (loadError) {
     return (
@@ -87,7 +91,7 @@ function TemplateEditPanel({
             </p>
           </div>
           <Link
-            href="/admin/reports"
+            href={cohortAwarePath(unitSlug, "/admin/reports")}
             className="btn-press rounded-full border px-4 py-2 text-sm font-bold"
             style={{
               borderColor: "var(--line)",
@@ -109,6 +113,7 @@ function TemplateEditPanel({
             prompt: section.prompt,
           }))}
           submitLabel="수정"
+          unitSlug={unitSlug}
         />
       </div>
     </section>
@@ -144,8 +149,9 @@ export default async function EditWeeklyReportTemplatePage({
       />
     );
   } else {
-    const data = await safeLoadTemplate(routeParams.templateId);
-    content = <TemplateEditPanel template={data.template} loadError={data.error} />;
+    const unitSlug = singleParam(query.unit);
+    const data = await safeLoadTemplate(routeParams.templateId, unitSlug);
+    content = <TemplateEditPanel template={data.template} loadError={data.error} unitSlug={unitSlug} />;
   }
 
   return (
@@ -153,6 +159,7 @@ export default async function EditWeeklyReportTemplatePage({
       activeRole="admin"
       title="보고 템플릿"
       summary="주간 보고 입력 양식을 관리합니다."
+      unitSlug={singleParam(query.unit)}
     >
       {content}
     </RoleShell>

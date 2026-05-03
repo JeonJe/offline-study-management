@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { query } from "@/lib/db";
 import {
-  MIGRATED_OPERATING_UNIT_SLUG,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
+  requireOperatingUnitSlug,
 } from "@/lib/operating-unit-store";
 
 export type WeeklyReportCycleStatus = "open" | "closed";
@@ -61,6 +61,7 @@ export type WeeklyReportCycleWithReports = WeeklyReportCycle & {
 };
 
 type CreateWeeklyReportCycleInput = {
+  operatingUnitSlug: string;
   templateId?: string;
   title: string;
   weekLabel: string;
@@ -74,6 +75,7 @@ type UpdateWeeklyReportCycleInput = CreateWeeklyReportCycleInput & {
 };
 
 type UpsertAngelWeeklyReportInput = {
+  operatingUnitSlug: string;
   cycleId: string;
   angelName: string;
   teamName: string;
@@ -84,6 +86,7 @@ type UpsertAngelWeeklyReportInput = {
 };
 
 type CreateWeeklyReportTemplateInput = {
+  operatingUnitSlug: string;
   name: string;
   prompt: string;
   sections?: Array<{
@@ -387,6 +390,7 @@ export async function createWeeklyReportTemplate(
 ): Promise<WeeklyReportTemplate> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(input.operatingUnitSlug);
   const name = cleanText(input.name);
   const prompt = cleanText(input.prompt);
   const sections = buildTemplateSections(input);
@@ -405,7 +409,7 @@ export async function createWeeklyReportTemplate(
        sections,
        is_default as "isDefault",
        created_at::text as "createdAt"`,
-    [randomUUID(), name, prompt, JSON.stringify(sections), MIGRATED_OPERATING_UNIT_SLUG]
+    [randomUUID(), name, prompt, JSON.stringify(sections), operatingUnitSlug]
   );
 
   if (!created) {
@@ -418,9 +422,12 @@ export async function createWeeklyReportTemplate(
   };
 }
 
-export async function listWeeklyReportTemplates(): Promise<WeeklyReportTemplate[]> {
+export async function listWeeklyReportTemplates(
+  operatingUnitSlugInput: string
+): Promise<WeeklyReportTemplate[]> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   return query<WeeklyReportTemplate>(
     `select
        id,
@@ -433,7 +440,7 @@ export async function listWeeklyReportTemplates(): Promise<WeeklyReportTemplate[
      where coalesce(operating_unit_slug, $1) = $1
      order by is_default desc, created_at desc`
     ,
-    [MIGRATED_OPERATING_UNIT_SLUG]
+    [operatingUnitSlug]
   ).then((templates) =>
     templates.map((template) => ({
       ...template,
@@ -443,10 +450,12 @@ export async function listWeeklyReportTemplates(): Promise<WeeklyReportTemplate[
 }
 
 export async function getWeeklyReportTemplateById(
-  templateId: string | null | undefined
+  templateId: string | null | undefined,
+  operatingUnitSlugInput: string
 ): Promise<WeeklyReportTemplate | null> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   const id = cleanText(templateId);
   if (!id) return null;
 
@@ -462,7 +471,7 @@ export async function getWeeklyReportTemplateById(
      where id = $1
        and coalesce(operating_unit_slug, $2) = $2
      limit 1`,
-    [id, MIGRATED_OPERATING_UNIT_SLUG]
+    [id, operatingUnitSlug]
   );
 
   return template
@@ -478,6 +487,7 @@ export async function updateWeeklyReportTemplate(
 ): Promise<WeeklyReportTemplate> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(input.operatingUnitSlug);
   const id = cleanText(input.id);
   const name = cleanText(input.name);
   const prompt = cleanText(input.prompt);
@@ -503,7 +513,7 @@ export async function updateWeeklyReportTemplate(
        sections,
        is_default as "isDefault",
        created_at::text as "createdAt"`,
-    [id, name, prompt, JSON.stringify(sections), MIGRATED_OPERATING_UNIT_SLUG]
+    [id, name, prompt, JSON.stringify(sections), operatingUnitSlug]
   );
 
   if (!updated) {
@@ -516,9 +526,13 @@ export async function updateWeeklyReportTemplate(
   };
 }
 
-export async function deleteWeeklyReportTemplate(templateId: string): Promise<void> {
+export async function deleteWeeklyReportTemplate(
+  templateId: string,
+  operatingUnitSlugInput: string
+): Promise<void> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   const id = cleanText(templateId);
   if (!id) {
     throw new Error("삭제할 템플릿을 찾을 수 없습니다.");
@@ -529,14 +543,14 @@ export async function deleteWeeklyReportTemplate(templateId: string): Promise<vo
      set template_id = null, updated_at = now()
      where template_id = $1
        and coalesce(operating_unit_slug, $2) = $2`,
-    [id, MIGRATED_OPERATING_UNIT_SLUG]
+    [id, operatingUnitSlug]
   );
 
   await query(
     `delete from public.weekly_report_templates
      where id = $1
        and coalesce(operating_unit_slug, $2) = $2`,
-    [id, MIGRATED_OPERATING_UNIT_SLUG]
+    [id, operatingUnitSlug]
   );
 }
 
@@ -545,6 +559,7 @@ export async function createWeeklyReportCycle(
 ): Promise<WeeklyReportCycle> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(input.operatingUnitSlug);
   const templateId = cleanText(input.templateId);
   const title = cleanText(input.title);
   const weekLabel = cleanText(input.weekLabel);
@@ -560,7 +575,7 @@ export async function createWeeklyReportCycle(
          where id = $1
            and coalesce(operating_unit_slug, $2) = $2
          limit 1`,
-        [templateId, MIGRATED_OPERATING_UNIT_SLUG]
+        [templateId, operatingUnitSlug]
       ))[0]?.prompt
     : "";
   const prompt = nullableText(input.prompt) ?? nullableText(templatePrompt);
@@ -589,7 +604,7 @@ export async function createWeeklyReportCycle(
       normalizeDate(input.startDate),
       normalizeDate(input.dueDate),
       prompt,
-      MIGRATED_OPERATING_UNIT_SLUG,
+      operatingUnitSlug,
     ]
   );
 
@@ -605,6 +620,7 @@ export async function updateWeeklyReportCycle(
 ): Promise<WeeklyReportCycle> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(input.operatingUnitSlug);
   const id = cleanText(input.id);
   const templateId = cleanText(input.templateId);
   const title = cleanText(input.title);
@@ -621,7 +637,7 @@ export async function updateWeeklyReportCycle(
          where id = $1
            and coalesce(operating_unit_slug, $2) = $2
          limit 1`,
-        [templateId, MIGRATED_OPERATING_UNIT_SLUG]
+        [templateId, operatingUnitSlug]
       ))[0]?.prompt
     : "";
   const prompt = nullableText(input.prompt) ?? nullableText(templatePrompt);
@@ -657,7 +673,7 @@ export async function updateWeeklyReportCycle(
       normalizeDate(input.startDate),
       normalizeDate(input.dueDate),
       prompt,
-      MIGRATED_OPERATING_UNIT_SLUG,
+      operatingUnitSlug,
     ]
   );
 
@@ -668,9 +684,12 @@ export async function updateWeeklyReportCycle(
   return updated;
 }
 
-export async function listWeeklyReportCycles(): Promise<WeeklyReportCycle[]> {
+export async function listWeeklyReportCycles(
+  operatingUnitSlugInput: string
+): Promise<WeeklyReportCycle[]> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   return query<WeeklyReportCycle>(
     `select
        c.id,
@@ -688,13 +707,16 @@ export async function listWeeklyReportCycles(): Promise<WeeklyReportCycle[]> {
      where coalesce(c.operating_unit_slug, $1) = $1
      group by c.id
      order by c.created_at desc`,
-    [MIGRATED_OPERATING_UNIT_SLUG]
+    [operatingUnitSlug]
   );
 }
 
-export async function getLatestOpenWeeklyReportCycle(): Promise<WeeklyReportCycle | null> {
+export async function getLatestOpenWeeklyReportCycle(
+  operatingUnitSlugInput: string
+): Promise<WeeklyReportCycle | null> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   const [cycle] = await query<WeeklyReportCycle>(
     `select
        c.id,
@@ -714,17 +736,19 @@ export async function getLatestOpenWeeklyReportCycle(): Promise<WeeklyReportCycl
      group by c.id
      order by c.created_at desc
      limit 1`,
-    [MIGRATED_OPERATING_UNIT_SLUG]
+    [operatingUnitSlug]
   );
 
   return cycle ?? null;
 }
 
 export async function getWeeklyReportCycleById(
-  cycleId: string
+  cycleId: string,
+  operatingUnitSlugInput: string
 ): Promise<WeeklyReportCycle | null> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   const [cycle] = await query<WeeklyReportCycle>(
     `select
        c.id,
@@ -743,43 +767,48 @@ export async function getWeeklyReportCycleById(
        and coalesce(c.operating_unit_slug, $2) = $2
      group by c.id
      limit 1`,
-    [cycleId, MIGRATED_OPERATING_UNIT_SLUG]
+    [cycleId, operatingUnitSlug]
   );
 
   return cycle ?? null;
 }
 
 export async function listAngelWeeklyReports(
-  cycleId: string
+  cycleId: string,
+  operatingUnitSlugInput: string
 ): Promise<AngelWeeklyReport[]> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   return query<AngelWeeklyReport>(
     `select
-       id,
-       cycle_id as "cycleId",
-       angel_name as "angelName",
-       team_name as "teamName",
-       summary,
-       notes,
-       requests,
-       action_items as "actionItems",
-       submitted_at::text as "submittedAt",
-       updated_at::text as "updatedAt"
-     from public.angel_weekly_reports
-     where cycle_id = $1
-     order by updated_at desc, team_name asc, angel_name asc`,
-    [cycleId]
+       r.id,
+       r.cycle_id as "cycleId",
+       r.angel_name as "angelName",
+       r.team_name as "teamName",
+       r.summary,
+       r.notes,
+       r.requests,
+       r.action_items as "actionItems",
+       r.submitted_at::text as "submittedAt",
+       r.updated_at::text as "updatedAt"
+     from public.angel_weekly_reports r
+     join public.weekly_report_cycles c on c.id = r.cycle_id
+     where r.cycle_id = $1
+       and coalesce(c.operating_unit_slug, $2) = $2
+     order by r.updated_at desc, r.team_name asc, r.angel_name asc`,
+    [cycleId, operatingUnitSlug]
   );
 }
 
 export async function listWeeklyReportOverview(
+  operatingUnitSlug: string,
   limit = 6
 ): Promise<WeeklyReportCycleWithReports[]> {
-  const cycles = await listWeeklyReportCycles();
+  const cycles = await listWeeklyReportCycles(operatingUnitSlug);
   const limitedCycles = cycles.slice(0, limit);
   const reportsByCycle = await Promise.all(
-    limitedCycles.map((cycle) => listAngelWeeklyReports(cycle.id))
+    limitedCycles.map((cycle) => listAngelWeeklyReports(cycle.id, operatingUnitSlug))
   );
 
   return limitedCycles.map((cycle, index) => ({
@@ -793,6 +822,7 @@ export async function upsertAngelWeeklyReport(
 ): Promise<AngelWeeklyReport> {
   await ensureWeeklyReportSchema();
 
+  const operatingUnitSlug = requireOperatingUnitSlug(input.operatingUnitSlug);
   const cycleId = cleanText(input.cycleId);
   const angelName = cleanText(input.angelName);
   const teamName = cleanText(input.teamName);
@@ -806,7 +836,10 @@ export async function upsertAngelWeeklyReport(
     `insert into public.angel_weekly_reports (
        id, cycle_id, angel_name, team_name, summary, notes, requests, action_items
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8)
+     select $1, c.id, $3, $4, $5, $6, $7, $8
+     from public.weekly_report_cycles c
+     where c.id = $2
+       and coalesce(c.operating_unit_slug, $9) = $9
      on conflict (cycle_id, angel_name, team_name)
      do update set
        summary = excluded.summary,
@@ -824,7 +857,7 @@ export async function upsertAngelWeeklyReport(
        requests,
        action_items as "actionItems",
        submitted_at::text as "submittedAt",
-       updated_at::text as "updatedAt"`,
+      updated_at::text as "updatedAt"`,
     [
       randomUUID(),
       cycleId,
@@ -834,6 +867,7 @@ export async function upsertAngelWeeklyReport(
       nullableText(input.notes),
       nullableText(input.requests),
       nullableText(input.actionItems),
+      operatingUnitSlug,
     ]
   );
 

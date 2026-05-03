@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR, Plus_Jakarta_Sans } from "next/font/google";
+import { APP_LANGUAGE } from "@/lib/app-config";
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -25,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang={APP_LANGUAGE}>
       <body className={`${plusJakartaSans.variable} ${notoSansKr.variable} antialiased`}>
         {children}
       </body>

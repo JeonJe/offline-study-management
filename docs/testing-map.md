@@ -29,6 +29,17 @@
 | `src/lib/cache-invalidation.test.ts` | mutation 후 cache tag 무효화 |
 | `src/lib/cohort-routes.test.ts` | cohort URL rewrite/aware path |
 | `src/lib/sort-utils.test.ts` | locale 기반 정렬 유틸 |
+| `src/lib/meeting-participants.test.ts` | 모임 상세 참여자 이름 정규화, 역할/팀 정렬, 빠른 추가 후보 정렬 |
+
+## 커버리지 결정
+
+2026-05-03 기준 정량 커버리지 리포트는 도입하지 않는다.
+
+- 현재 `vitest.config.ts`는 coverage provider를 설정하지 않는다.
+- Vitest 커버리지를 활성화하려면 일반적으로 `@vitest/coverage-v8` 같은 추가 dev dependency가 필요하다.
+- 이 레포의 현재 운영 원칙은 새 의존성을 명시 승인 없이 추가하지 않는 것이다.
+- 따라서 단기 기준은 테스트맵과 필수 게이트(`typecheck`, `lint`, `test`, `build`, 필요 시 `e2e`)로 유지한다.
+- 커버리지 도입이 필요해지면 별도 변경으로 dependency 추가, threshold 기준, CI/로컬 실행 시간을 함께 결정한다.
 
 ## E2E 맵
 

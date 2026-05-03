@@ -53,14 +53,14 @@ async function loadAngelReportPageData(
 ): Promise<AngelReportPageData> {
   try {
     const [cycle, preset] = await Promise.all([
-      getWeeklyReportCycleById(cycleId),
+      getWeeklyReportCycleById(cycleId, unitSlug),
       loadMemberPreset(unitSlug),
     ]);
 
     return {
       cycle,
       teamGroups: preset.teamGroups,
-      reports: cycle ? await listAngelWeeklyReports(cycle.id) : [],
+      reports: cycle ? await listAngelWeeklyReports(cycle.id, unitSlug) : [],
       error: false,
     };
   } catch (error) {

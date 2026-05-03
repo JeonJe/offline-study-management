@@ -20,6 +20,7 @@ type CohortSection =
   | "afterparty"
   | "members"
   | "angel/reports"
+  | "admin/reports"
   | "admin/history";
 
 export function cohortPath(

@@ -111,6 +111,7 @@ describe("weekly report store", () => {
 
   it("creates a weekly report cycle with normalized optional fields", async () => {
     await createWeeklyReportCycle({
+      operatingUnitSlug: "loop-pak-4",
       title: "  4기 3주차 엔젤 보고  ",
       weekLabel: "  3주차  ",
       startDate: "2026-04-20",
@@ -130,12 +131,13 @@ describe("weekly report store", () => {
       "2026-04-20",
       null,
       "팀 분위기 중심으로 작성",
-      "loop-pak-3",
+      "loop-pak-4",
     ]);
   });
 
   it("creates a weekly report template", async () => {
     await createWeeklyReportTemplate({
+      operatingUnitSlug: "loop-pak-4",
       name: " 기본 템플릿 ",
       prompt: " 팀 분위기 중심으로 작성 ",
       summaryTitle: " 팀 현황 ",
@@ -158,12 +160,13 @@ describe("weekly report store", () => {
           required: true,
         },
       ]),
-      "loop-pak-3",
+      "loop-pak-4",
     ]);
   });
 
   it("updates a weekly report cycle", async () => {
     await updateWeeklyReportCycle({
+      operatingUnitSlug: "loop-pak-4",
       id: "cycle-1",
       title: " 4기 4주차 엔젤 보고 ",
       weekLabel: " 4주차 ",
@@ -184,12 +187,13 @@ describe("weekly report store", () => {
       "2026-04-27",
       "2026-05-03",
       "수정된 작성 기준",
-      "loop-pak-3",
+      "loop-pak-4",
     ]);
   });
 
   it("upserts an angel weekly report", async () => {
     await upsertAngelWeeklyReport({
+      operatingUnitSlug: "loop-pak-4",
       cycleId: "cycle-1",
       angelName: " 애니 ",
       teamName: " 1팀 ",
@@ -212,6 +216,7 @@ describe("weekly report store", () => {
       null,
       "장소 안내가 필요합니다.",
       null,
+      "loop-pak-4",
     ]);
   });
 });

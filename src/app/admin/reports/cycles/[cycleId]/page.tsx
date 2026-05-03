@@ -7,6 +7,7 @@ import {
 } from "@/app/role-page-view";
 import { RoleShell } from "@/app/role-shell";
 import { isGlobalAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   type TeamMemberGroup,
   loadMemberPreset,
@@ -63,17 +64,17 @@ async function safeLoadCycleDetail(
 ): Promise<AdminReportCycleDetailData> {
   try {
     const [cycle, preset] = await Promise.all([
-      getWeeklyReportCycleById(cycleId),
+      getWeeklyReportCycleById(cycleId, unitSlug),
       loadMemberPreset(unitSlug),
     ]);
     const [reports, template] = cycle
       ? await Promise.all([
-          listAngelWeeklyReports(cycle.id),
-          getWeeklyReportTemplateById(cycle.templateId),
+          listAngelWeeklyReports(cycle.id, unitSlug),
+          getWeeklyReportTemplateById(cycle.templateId, unitSlug),
         ])
       : [[], null];
     const shareText = cycle
-      ? await buildCycleShareText(cycle.id).catch((error) => {
+      ? await buildCycleShareText(cycle.id, unitSlug).catch((error) => {
           console.error("Failed to build weekly report share text", error);
           return "";
         })
@@ -114,6 +115,7 @@ function CycleDetailPanel({
   reports,
   shareText,
   loadError,
+  unitSlug,
 }: {
   cycle: WeeklyReportCycle | null;
   template: WeeklyReportTemplate | null;
@@ -121,6 +123,7 @@ function CycleDetailPanel({
   reports: AngelWeeklyReport[];
   shareText: string;
   loadError: boolean;
+  unitSlug: string;
 }) {
   if (loadError) {
     return (
@@ -147,14 +150,14 @@ function CycleDetailPanel({
     <section className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          href="/admin/reports"
+          href={cohortAwarePath(unitSlug, "/admin/reports")}
           className="rounded-full border px-3 py-1 text-sm font-bold"
           style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
         >
           목록
         </Link>
         <Link
-          href={`/admin/reports/cycles/${cycle.id}/edit`}
+          href={cohortAwarePath(unitSlug, `/admin/reports/cycles/${cycle.id}/edit`)}
           className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white"
           style={{ backgroundColor: "var(--accent)" }}
         >
@@ -312,6 +315,7 @@ export default async function AdminReportCycleDetailPage({
         reports={data.reports}
         shareText={data.shareText}
         loadError={data.error}
+        unitSlug={unitSlug}
       />
     );
   }
@@ -321,6 +325,7 @@ export default async function AdminReportCycleDetailPage({
       activeRole="admin"
       title="주간 보고 상세"
       summary="팀별 제출 현황과 보고 내용을 확인합니다."
+      unitSlug={singleParam(query.unit)}
     >
       {content}
     </RoleShell>

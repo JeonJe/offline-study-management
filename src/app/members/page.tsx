@@ -29,8 +29,8 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-6 sm:px-6 lg:px-8 lg:pb-10">
       <DashboardHeader
-        title="멤버"
-        activeTab="members"
+        title="멤버 관리"
+        activeTab="admin"
         unitSlug={unitSlug}
       />
 

@@ -9,6 +9,8 @@ import type {
 } from "@/lib/member-store";
 import { saveMemberPresetAction } from "@/app/members/member-actions";
 import { MemberSaveToolbar } from "@/app/members/member-save-toolbar";
+import { MemberEditModal } from "@/app/members/_components/member-edit-modal";
+import { TeamEditModal } from "@/app/members/_components/team-edit-modal";
 import { PARTICIPANT_ROLE_META } from "@/lib/participant-role-utils";
 
 type MemberAdminFormProps = {
@@ -73,26 +75,6 @@ const SPECIAL_PARTICIPANT_ROLES: SpecialParticipantRole[] = [
   "manager",
 ];
 const OPERATION_ROLE_ORDER: OperationRole[] = ["angel", "mentor", "manager", "supporter", "buddy"];
-
-function RemoveChipButton({
-  onClick,
-  label,
-}: {
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[11px] leading-none transition hover:bg-black/10"
-    >
-      ×
-    </button>
-  );
-}
 
 export function MemberAdminForm({
   operatingUnitSlug,
@@ -807,122 +789,24 @@ export function MemberAdminForm({
         </div>
       ) : null}
 
-      {pendingTeamEditIndex !== null ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="team-edit-modal-title"
-            className="modal-surface w-full max-w-md p-5"
-          >
-            <h4 id="team-edit-modal-title" className="text-base font-semibold" style={{ color: "var(--ink)" }}>
-              팀 수정
-            </h4>
-            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-              팀 이름과 담당 엔젤을 수정합니다. 엔젤은 최대 2명까지 등록됩니다.
-            </p>
-
-            <div className="mt-4 grid gap-3">
-              <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
-                팀 이름
-                <input
-                  value={teamEditName}
-                  onChange={(event) => setTeamEditName(event.target.value)}
-                  className="h-10 rounded-xl border bg-white px-3 text-sm"
-                  style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                  placeholder="예: 1팀"
-                  autoFocus
-                />
-              </label>
-              <label className="grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
-                담당 엔젤
-                <div
-                  className="rounded-xl border p-2"
-                  style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-alt)" }}
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {teamEditAngels.length > 0 ? (
-                      teamEditAngels.map((angel) => (
-                        <span
-                          key={`team-edit-angel-${angel}`}
-                          className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs"
-                          style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
-                        >
-                          {angel}
-                          <RemoveChipButton
-                            label={`${angel} 담당 엔젤 제거`}
-                            onClick={() => setTeamEditAngels((prev) => prev.filter((name) => name !== angel))}
-                          />
-                        </span>
-                      ))
-                    ) : (
-                      <span className="py-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-                        담당 엔젤을 선택해주세요.
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <select
-                      value={teamEditAngelInput}
-                      onChange={(event) => setTeamEditAngelInput(event.target.value)}
-                      className="h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm"
-                      style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                      disabled={teamEditAngels.length >= 2}
-                    >
-                      <option value="">엔젤 선택</option>
-                      {fixedAngels
-                        .filter((angel) => !teamEditAngels.includes(angel))
-                        .map((angel) => (
-                          <option key={`team-edit-angel-option-${angel}`} value={angel}>
-                            {angel}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!teamEditAngelInput || teamEditAngels.length >= 2}
-                      className="btn-press h-10 rounded-xl border px-3 text-xs font-semibold disabled:cursor-not-allowed"
-                      style={{
-                        borderColor: "rgba(13, 127, 242, 0.25)",
-                        backgroundColor: "var(--accent-weak)",
-                        color: "var(--accent-strong)",
-                        opacity: teamEditAngelInput && teamEditAngels.length < 2 ? 1 : 0.45,
-                      }}
-                      onClick={addTeamEditAngel}
-                    >
-                      추가
-                    </button>
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn-press rounded-xl border bg-white px-3 py-2 text-xs font-semibold"
-                style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-                onClick={() => {
-                  setPendingTeamEditIndex(null);
-                  setTeamEditName("");
-                  setTeamEditAngels([]);
-                  setTeamEditAngelInput("");
-                }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="btn-press rounded-xl px-3 py-2 text-xs font-semibold text-white"
-                style={{ backgroundColor: "var(--accent)" }}
-                onClick={submitTeamEdit}
-              >
-                수정
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TeamEditModal
+        open={pendingTeamEditIndex !== null}
+        fixedAngels={fixedAngels}
+        teamName={teamEditName}
+        teamAngels={teamEditAngels}
+        teamAngelInput={teamEditAngelInput}
+        onTeamNameChange={setTeamEditName}
+        onTeamAngelsChange={setTeamEditAngels}
+        onTeamAngelInputChange={setTeamEditAngelInput}
+        onAddAngel={addTeamEditAngel}
+        onCancel={() => {
+          setPendingTeamEditIndex(null);
+          setTeamEditName("");
+          setTeamEditAngels([]);
+          setTeamEditAngelInput("");
+        }}
+        onSubmit={submitTeamEdit}
+      />
 
       {pendingMemberManageIndex !== null ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
@@ -976,68 +860,18 @@ export function MemberAdminForm({
         </div>
       ) : null}
 
-      {pendingMemberEdit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="member-edit-modal-title"
-            className="modal-surface w-full max-w-md p-5"
-          >
-            <h4 id="member-edit-modal-title" className="text-base font-semibold" style={{ color: "var(--ink)" }}>
-              멤버 수정
-            </h4>
-            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-              이름을 수정하거나 명단에서 제거합니다.
-            </p>
-
-            <label className="mt-4 grid gap-1 text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
-              이름
-              <input
-                value={memberEditName}
-                onChange={(event) => setMemberEditName(event.target.value)}
-                className="h-10 rounded-xl border bg-white px-3 text-sm"
-                style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                placeholder="멤버 이름"
-                autoFocus
-              />
-            </label>
-
-            <div className="mt-4 flex flex-wrap justify-between gap-2">
-              <button
-                type="button"
-                className="btn-press rounded-xl border px-3 py-2 text-xs font-semibold"
-                style={{ borderColor: "#fecaca", color: "var(--danger)", backgroundColor: "var(--danger-bg)" }}
-                onClick={deleteEditingMember}
-              >
-                명단에서 제거
-              </button>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="btn-press rounded-xl border bg-white px-3 py-2 text-xs font-semibold"
-                  style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
-                  onClick={() => {
-                    setPendingMemberEdit(null);
-                    setMemberEditName("");
-                  }}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  disabled={memberEditName.trim().length === 0}
-                  className="btn-press rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed"
-                  style={{ backgroundColor: "var(--accent)", opacity: memberEditName.trim().length > 0 ? 1 : 0.45 }}
-                  onClick={submitMemberEdit}
-                >
-                  수정
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <MemberEditModal
+        open={pendingMemberEdit !== null}
+        memberName={memberEditName}
+        canSubmit={memberEditName.trim().length > 0}
+        onMemberNameChange={setMemberEditName}
+        onCancel={() => {
+          setPendingMemberEdit(null);
+          setMemberEditName("");
+        }}
+        onDelete={deleteEditingMember}
+        onSubmit={submitMemberEdit}
+      />
 
       {pendingDeleteIndex !== null ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">

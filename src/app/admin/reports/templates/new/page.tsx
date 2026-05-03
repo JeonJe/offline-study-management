@@ -8,6 +8,7 @@ import { RoleShell } from "@/app/role-shell";
 import { createWeeklyReportTemplateAction } from "@/app/weekly-report-actions";
 import { WeeklyReportTemplateForm } from "@/app/admin/reports/templates/new/weekly-report-template-form";
 import { isGlobalAuthenticated } from "@/lib/auth";
+import { cohortAwarePath } from "@/lib/cohort-routes";
 import {
   canOpenRolePage,
   getRolePage,
@@ -29,7 +30,7 @@ function singleParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-function TemplateForm() {
+function TemplateForm({ unitSlug }: { unitSlug: string }) {
   return (
     <section className="mx-auto grid max-w-3xl gap-5">
       <div className="card-static p-5 sm:p-7">
@@ -43,7 +44,7 @@ function TemplateForm() {
             </p>
           </div>
           <Link
-            href="/admin/reports"
+            href={cohortAwarePath(unitSlug, "/admin/reports")}
             className="btn-press rounded-full border px-4 py-2 text-sm font-bold"
             style={{
               borderColor: "var(--line)",
@@ -55,7 +56,7 @@ function TemplateForm() {
           </Link>
         </div>
 
-        <WeeklyReportTemplateForm action={createWeeklyReportTemplateAction} />
+        <WeeklyReportTemplateForm action={createWeeklyReportTemplateAction} unitSlug={unitSlug} />
       </div>
     </section>
   );
@@ -88,7 +89,7 @@ export default async function NewWeeklyReportTemplatePage({
       />
     );
   } else {
-    content = <TemplateForm />;
+    content = <TemplateForm unitSlug={singleParam(query.unit)} />;
   }
 
   return (
@@ -96,6 +97,7 @@ export default async function NewWeeklyReportTemplatePage({
       activeRole="admin"
       title="보고 템플릿"
       summary="주간 보고 작성 기준을 관리합니다."
+      unitSlug={singleParam(query.unit)}
     >
       {content}
     </RoleShell>

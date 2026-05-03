@@ -85,14 +85,14 @@ async function loadAngelTeamReportPageData(
 ): Promise<AngelTeamReportPageData> {
   try {
     const [cycle, preset] = await Promise.all([
-      getWeeklyReportCycleById(cycleId),
+      getWeeklyReportCycleById(cycleId, unitSlug),
       loadMemberPreset(unitSlug),
     ]);
     const team = preset.teamGroups.find((group) => group.teamName === teamName) ?? null;
     const [reports, template] = cycle
       ? await Promise.all([
-          listAngelWeeklyReports(cycle.id),
-          getWeeklyReportTemplateById(cycle.templateId),
+          listAngelWeeklyReports(cycle.id, unitSlug),
+          getWeeklyReportTemplateById(cycle.templateId, unitSlug),
         ])
       : [[], null];
 
@@ -264,6 +264,7 @@ function TeamReportForm({
                 </div>
 
                 <form action={submitAngelWeeklyReportAction} className="grid gap-4">
+                  <input type="hidden" name="unit" value={unitSlug} />
                   <input type="hidden" name="cycleId" value={cycle.id} />
                   <input type="hidden" name="teamName" value={team.teamName} />
                   <input type="hidden" name="returnPath" value={returnPath} />

@@ -1,5 +1,5 @@
 import { loadMemberPreset } from "@/lib/member-store";
-import { MIGRATED_OPERATING_UNIT_SLUG } from "@/lib/operating-unit-store";
+import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
 import {
   type AngelWeeklyReport,
   countCommentsByReportIds,
@@ -35,18 +35,22 @@ function buildSubmittedTeamLines(report: ReportWithCommentCount): string[] {
   ].filter((line): line is string => Boolean(line));
 }
 
-export async function buildCycleShareText(cycleId: string): Promise<string> {
+export async function buildCycleShareText(
+  cycleId: string,
+  operatingUnitSlugInput: string
+): Promise<string> {
   const id = cleanCycleId(cycleId);
+  const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
   const [cycle, memberPreset] = await Promise.all([
-    getWeeklyReportCycleById(id),
-    loadMemberPreset(MIGRATED_OPERATING_UNIT_SLUG),
+    getWeeklyReportCycleById(id, operatingUnitSlug),
+    loadMemberPreset(operatingUnitSlug),
   ]);
 
   if (!cycle) {
     throw new Error("보고 주차를 찾을 수 없습니다.");
   }
 
-  const reports = await listAngelWeeklyReports(cycle.id);
+  const reports = await listAngelWeeklyReports(cycle.id, operatingUnitSlug);
   const commentCountByReportId = await countCommentsByReportIds(
     reports.map((report) => report.id)
   );

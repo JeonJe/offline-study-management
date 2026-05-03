@@ -2,7 +2,7 @@
 
 LOOPERS MEETUP은 루프팩, 스터디, 뒷풀이 운영을 한 곳에서 관리하는 내부 운영 대시보드입니다.
 
-운영자는 항목별 입장 코드로 강의/기수별 공간에 들어가고, 멤버는 모임과 뒷풀이를 확인합니다. 엔젤과 관리자는 별도 비밀번호로 전용 화면에 접근해 주간 보고, 팀 배정, 히스토리, 운영 항목 관리를 수행합니다.
+운영자는 항목별 입장 코드로 강의/기수별 공간에 들어갑니다. 기수 화면은 루프팩, 스터디, 뒷풀이, 엔젤, 관리자 탭을 한 세트로 제공하고, 엔젤과 관리자는 별도 비밀번호로 전용 화면에 접근해 주간 보고, 팀 배정, 히스토리, 운영 항목 관리를 수행합니다.
 
 ## 한눈에 보기
 
@@ -13,7 +13,6 @@ flowchart TB
   Unit --> LoopPak["루프팩<br/>정규 오프라인 수업"]
   Unit --> Study["스터디<br/>모임 카드"]
   Unit --> Afterparty["뒷풀이<br/>참석 + 정산"]
-  Unit --> Member["멤버<br/>공용 진입"]
   Unit --> Angel["엔젤<br/>주간 보고"]
   Unit --> UnitAdmin["관리자<br/>팀/보고/히스토리"]
 
@@ -21,9 +20,6 @@ flowchart TB
   GlobalAdmin --> AccessCode["항목별 입장 코드"]
   AccessCode --> Entry
 
-  Member --> LoopPak
-  Member --> Study
-  Member --> Afterparty
   Angel --> Reports["팀별 주간 보고 작성"]
   UnitAdmin --> ReportAdmin["보고 주차/제출 현황 관리"]
   UnitAdmin --> Members["멤버/팀/엔젤 배정"]
@@ -40,7 +36,7 @@ flowchart LR
   UnitCode -->|항목별 코드| UnitSession["항목 세션<br/>meetup_auth"]
   UnitCode -->|공용 코드| GlobalSession["전역 세션<br/>meetup_auth"]
 
-  UnitSession --> PublicPages["루프팩/스터디/뒷풀이/멤버"]
+  UnitSession --> PublicPages["루프팩/스터디/뒷풀이"]
   GlobalSession --> PublicPages
   GlobalSession --> GlobalAdmin["전체 관리자"]
 
@@ -63,12 +59,13 @@ flowchart LR
 | 루프팩 | `/loop-pak`, `/cohorts/{항목}/loop-pak` | 정규 오프라인 수업 카드 관리 |
 | 스터디 | `/`, `/cohorts/{항목}/study` | 스터디 모임 카드 관리 |
 | 뒷풀이 | `/afterparty`, `/cohorts/{항목}/afterparty` | 뒷풀이 참석/정산 관리 |
-| 멤버 | `/member`, `/cohorts/{항목}/member` | 멤버용 공용 진입 화면 |
 | 엔젤 | `/angel`, `/cohorts/{항목}/angel` | 엔젤 주간 보고 작성 |
 | 관리자 | `/cohorts/{항목}/admin` | 선택한 항목의 팀/보고/히스토리 관리 |
 | 전체 관리자 | `/admin` | 항목 생성, 편집, 입장 코드 관리 |
 
 `/cohorts/{항목}/{섹션}` 형태의 주소는 내부적으로 기존 화면으로 rewrite됩니다. 예를 들어 `/cohorts/loop-pak-3/afterparty`는 `loop-pak-3` 항목의 뒷풀이 화면으로 동작합니다.
+
+기존 `/cohorts/{항목}/member` 주소는 중복 허브 제거 후 `/cohorts/{항목}/study`로 리다이렉트됩니다. 멤버/팀/엔젤 배정 화면은 관리자 영역의 `/cohorts/{항목}/members`에 남아 있습니다.
 
 ## 핵심 기능
 
@@ -248,5 +245,5 @@ npm run quality:harness
 
 - DB 변경 전에는 반드시 `npm run db:backup`을 실행합니다.
 - 전체 관리자 화면과 항목 관리자 화면은 파일/경로를 분리해 권한 사고를 줄입니다.
-- 역할 홈에는 해당 역할의 고유 작업만 노출합니다. 공용 모임/뒷풀이는 멤버 화면에서 관리합니다.
+- 헤더는 기수별 `루프팩 / 스터디 / 뒷풀이 / 엔젤 / 관리자` 세트를 유지합니다. 중복 허브성 탭은 추가하지 않습니다.
 - PR 검증 기준은 typecheck, lint, test, build 통과입니다.

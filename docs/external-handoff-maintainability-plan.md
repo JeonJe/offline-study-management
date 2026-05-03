@@ -22,7 +22,7 @@
 | 앱 파일 수 | `src/app` TS/TSX 64개 | `find src/app` |
 | 도메인 파일 수 | `src/lib` TS/TSX 48개 | `find src/lib` |
 | 큰 파일 | `actions.ts` 948줄, `meetup-dashboard.tsx` 1128줄, `afterparty/[id]/page.tsx` 1122줄 | `wc -l` |
-| 단위 테스트 | 22개 파일, 186개 테스트 통과 | `npm run test` |
+| 단위 테스트 | 24개 파일, 197개 테스트 통과 | `npm run test` |
 | E2E | Playwright spec 5개 | `e2e/*.spec.ts` |
 | 정량 커버리지 | 없음 | `vitest.config.ts`에 coverage 미설정 |
 
@@ -61,6 +61,73 @@ flowchart LR
 | 실행 | 작고 독립적인 diff | 한 smell 또는 한 사용자 흐름만 수정 |
 | 검증 | lint/typecheck/test/build/E2E 결과 | 실패 시 다음 단계 금지 |
 | 효과 판단 | 목표 대비 결과 | 효과 없으면 되돌리거나 계획 수정 |
+
+### 2026-05-02 루프 기록: weekly report 운영 단위 default 제거
+
+| 단계 | 결과 |
+| --- | --- |
+| 후보 식별 | `src/lib/weekly-report-store.ts`, `src/lib/weekly-report-share-text.ts`, `src/app/weekly-report-actions.ts`가 주간 보고 조회/생성/공유에서 `loop-pak-3` 마이그레이션 상수를 직접 사용했다. |
+| 개선 계획 | 주간 보고 store API가 `operatingUnitSlug`를 명시 인자로 받게 하고, cohort URL의 `unit` 값을 page -> form/action -> store로 전달한다. |
+| 계획 리뷰 | DB 스키마 변경 없이 함수 경계와 쿼리 파라미터만 바꾸는 범위로 제한했다. 기존 cycle/report 테이블 관계는 유지하고, 보고서 목록/저장은 cycle의 운영 단위로 검증한다. |
+| 기준선 | 변경 전 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` 통과 상태를 확인했다. |
+| 실행 | weekly report template/cycle/report 조회와 저장, 공유 텍스트 생성에서 운영 단위를 필수화했다. 관리자/엔젤 보고 화면의 링크와 hidden form input에도 운영 단위를 연결했다. |
+| 검증 | `npm run typecheck`, `npm test -- weekly-report`, `npm run lint`, `npm test`, `npm run build` 통과. |
+| 효과 판단 | weekly report 관련 소스에서 `MIGRATED_OPERATING_UNIT_SLUG`/`loop-pak-3` 하드코딩이 제거됐다. 신규 보고 데이터는 명시 운영 단위 없이는 생성되지 않는다. |
+
+### 2026-05-02 루프 기록: 언어/로케일 하드코딩 정리
+
+| 단계 | 결과 |
+| --- | --- |
+| 후보 식별 | `ko-KR`, `Asia/Seoul`은 이미 `src/lib/app-config.ts`와 `src/lib/date-utils.ts`로 모여 있었고, 남은 직접값은 HTML `lang="ko"`였다. |
+| 개선 계획 | `APP_LANGUAGE`를 추가하고 루트 레이아웃과 캡처 preview HTML이 같은 앱 언어 설정을 사용하게 한다. |
+| 계획 리뷰 | 포맷 동작은 건드리지 않고 HTML 언어 속성만 상수화하는 좁은 변경으로 제한했다. |
+| 기준선 | 첫 루프 이후 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` 통과 상태. |
+| 실행 | `src/lib/app-config.ts`에 `APP_LANGUAGE`를 추가하고 `src/app/layout.tsx`, `src/app/offline-study-capture-button.tsx`에서 사용했다. |
+| 검증 | `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` 통과. |
+| 효과 판단 | 언어/로케일/타임존 직접값은 `app-config`에만 남았다. 화면/캡처 HTML의 언어 기준이 동일해졌다. |
+
+### 2026-05-03 루프 기록: 기수 헤더 UX 정리
+
+| 단계 | 결과 |
+| --- | --- |
+| 후보 식별 | `/cohorts/loop-pak-3`는 전체 탭을 노출하지만 `/cohorts/loop-pak-3/member`는 별도 역할 허브라서 헤더 노출 정책이 갈라졌다. 이후 공통 헤더 적용 과정에서 고정 헤더와 본문 카드/요약 문장이 겹치는 문제도 확인됐다. |
+| 개선 계획 | 기수 단위 상단 내비게이션을 `루프팩 / 스터디 / 뒷풀이 / 엔젤 / 관리자` 5개 세트로 고정하고, 중복 허브인 `멤버` 탭은 제거한다. 기존 `/member` 접근은 스터디로 리다이렉트해 구 URL을 깨뜨리지 않는다. |
+| 계획 리뷰 | `멤버` 탭은 실제 기능이 아니라 `루프팩/스터디/뒷풀이` 허브라 중복으로 판단했다. `엔젤`과 `관리자`는 전용 업무 진입점이므로 발견성을 위해 헤더에 유지한다. |
+| 기준선 | `DashboardHeader`, `RoleShell`, `/member`, `/members` 동작을 localhost에서 확인했다. 헤더 버튼 높이와 본문 겹침은 Playwright 좌표로 확인했다. |
+| 실행 | `DashboardHeader` 탭에서 `멤버` 제거, `RoleShell`을 공통 헤더 기반으로 정리, `/member`를 cohort-aware 스터디 경로로 리다이렉트, 헤더 버튼/로그아웃 버튼의 최소 높이와 패딩을 확대했다. |
+| 검증 | `npm run typecheck`, `npm run lint` 통과. Playwright로 헤더 링크 5개 노출, `/cohorts/loop-pak-3/member` -> `/cohorts/loop-pak-3/study` 리다이렉트, 모바일 헤더와 첫 카드 간격 확보를 확인했다. |
+| 효과 판단 | 기수별 기본 네비게이션이 한 세트로 고정됐고, 중복 탭과 헤더/본문 겹침이 제거됐다. `/members`는 관리자 내부의 "멤버 관리" 화면으로 남겨 책임을 분리했다. |
+
+### 2026-05-03 루프 기록: 외부 인수인계 유지보수성 정리
+
+| 단계 | 결과 |
+| --- | --- |
+| 후보 식별 | README의 첫 진입 정보, E2E URL 상수, `actions.ts` 서버 액션, 모임 상세 참여자 정렬 로직, cold 성능 후보가 외부 인수인계 비용을 높이는 지점으로 남아 있었다. |
+| 개선 계획 | 온보딩/DB/테스트 문서를 README 중심으로 연결하고, E2E URL 설정을 확장하고, 서버 액션은 도메인별 파일로 분리하며, 모임 상세 참여자 정렬은 순수 함수로 추출한다. |
+| 계획 리뷰 | 공개 import 경로와 기존 URL은 유지한다. GitHub PR/푸시는 Vercel 자동 배포와 rate limit 위험 때문에 하지 않는다. |
+| 기준선 | `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, localhost 성능 측정을 기준 검증으로 사용했다. |
+| 실행 | README와 인수인계 문서를 갱신하고, `e2e/support/test-config.ts`에 보고 섹션 경로를 추가하고, `src/app/actions.ts`를 facade로 줄이고, `auth/meeting/afterparty` 액션 파일과 `meeting-participants` 도메인 함수를 추가했다. |
+| 검증 | `npm run typecheck`, `npm run lint`, `npm test` 24개 파일/197개 테스트, `npm run build`, `PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run e2e` 13개 통과. |
+| 효과 판단 | 신규 개발자는 README에서 실행/DB/테스트/코드 진입점을 따라갈 수 있고, 서버 액션과 참여자 정렬 수정 범위가 도메인별 파일로 좁아졌다. cold 성능 후보는 로컬 기준 목표 내로 재측정됐다. |
+
+## 4.1 2026-05-03 기준 남은 작업 현황
+
+| 상태 | 항목 | 비고 |
+| --- | --- | --- |
+| 완료 | 운영 단위 default 제거 및 `loop-pak-3` 마이그레이션 정책 정리 | 신규 write path는 운영 단위 명시를 전제로 한다. |
+| 완료 | weekly report 운영 단위 하드코딩 제거 | 주간 보고 조회/저장/공유가 운영 단위를 명시적으로 전달한다. |
+| 완료 | 언어/로케일 설정 중앙화 1차 | `APP_LANGUAGE`, `APP_LOCALE`, `APP_TIME_ZONE` 경계 정리. |
+| 완료 | URL/성능 루프 1차 | 캐시 정합성, 히스토리 캐시, 멤버 저장 Server Action 전환, 로컬 성능 측정 기록. |
+| 완료 | 기수 헤더 UX 정리 | 헤더 탭 5개 세트 고정, `멤버` 탭 제거, `/member` 리다이렉트. |
+| 완료 | 외부 개발자 온보딩 문서 보강 | README에서 실행, DB, 테스트, 외부 인수인계 문서 경로를 한 흐름으로 연결했다. |
+| 완료 | E2E URL/날짜/운영 단위 상수 분리 | `e2e/support/test-config.ts`에 cohort 경로와 보고 섹션 경로를 모았다. |
+| 완료 | `actions.ts` 도메인별 분리 | facade + `auth-actions`, `meeting-actions`, `afterparty-actions`로 분리했다. |
+| 부분 완료 | 큰 페이지 컴포넌트/순수 함수 분리 | 모임 상세 참여자 정렬, 뒷풀이 상세 참여자/정산 파생 상태, 대시보드 모임 생성 FAB, 멤버 수정/팀 수정 모달을 분리했다. 뒷풀이 상세 action panel과 대시보드 목록 전체 분리는 후속 대형 리팩터링으로 남긴다. |
+| 완료 | DB 스키마/마이그레이션 기준 문서화 | README와 개발/테스트 문서에서 `docs/db/01_init_schema.sql`, `apply-schema`, `db:backup`, `db:ping` 기준을 연결했다. |
+| 완료 | 테스트 체계/커버리지 가시화 | `docs/testing-map.md`와 README 검증 명령을 기준으로 테스트 영역과 실행 게이트를 문서화했다. |
+| 완료 | cold 성능 병목 재측정 | 2026-05-03 로컬 curl 기준 `/afterparty`, `/angel/reports`, `/admin/reports` 모두 cold/warm 목표 내. |
+| 완료 | 날짜/시간 포맷 유틸 2차 점검 | 앱 코드의 `toLocale`/`Intl.DateTimeFormat` 직접 사용은 `src/lib/date-utils.ts` 경계에만 남았다. |
+| 완료 | 커버리지 도입 여부 결정 | 새 dependency가 필요하므로 도입 보류. `docs/testing-map.md`에 결정 근거를 기록했다. |
 
 ## 5. 우선순위 1: 외부 개발자 온보딩 문서
 

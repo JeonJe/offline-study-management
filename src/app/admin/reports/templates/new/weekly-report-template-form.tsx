@@ -18,6 +18,7 @@ type WeeklyReportTemplateFormProps = {
     prompt: string;
   }>;
   submitLabel?: string;
+  unitSlug: string;
 };
 
 const FIELD_CLASS = "h-12 w-full rounded-xl border bg-white px-3 text-sm";
@@ -50,6 +51,7 @@ export function WeeklyReportTemplateForm({
   initialPrompt = "",
   initialSections,
   submitLabel = "저장",
+  unitSlug,
 }: WeeklyReportTemplateFormProps) {
   const [sections, setSections] = useState<TemplateSectionDraft[]>([
     ...(initialSections?.length
@@ -89,6 +91,7 @@ export function WeeklyReportTemplateForm({
 
   return (
     <form action={action} className="mt-6 grid gap-5">
+      <input type="hidden" name="unit" value={unitSlug} />
       {templateId ? <input type="hidden" name="templateId" value={templateId} /> : null}
 
       <label className="grid gap-2 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>

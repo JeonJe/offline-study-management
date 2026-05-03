@@ -10,6 +10,8 @@ const PAGES = [
   { name: "대시보드", url: cohortPath("study", { date: CACHE_TEST_DATE }) },
   { name: "뒤풀이", url: cohortPath("afterparty", { date: CACHE_TEST_DATE }) },
   { name: "멤버", url: cohortPath("members") },
+  { name: "엔젤 보고", url: cohortPath("angel/reports") },
+  { name: "관리자 보고", url: cohortPath("admin/reports") },
 ] as const;
 
 const VISITS_PER_PAGE = 3;

@@ -10,11 +10,7 @@ import {
   updateAfterpartySettlementAction,
 } from "@/app/actions";
 import { isAuthenticated } from "@/lib/auth";
-import {
-  normalizeMemberName,
-  toTeamLabel,
-  withTeamLabel,
-} from "@/lib/member-label-utils";
+import { withTeamLabel } from "@/lib/member-label-utils";
 import {
   type AfterpartyParticipant,
   type AfterpartySettlement,
@@ -33,12 +29,11 @@ import { SettlementToggle } from "@/app/afterparty/[afterpartyId]/settlement-tog
 import {
   normalizeParticipantName,
   PARTICIPANT_ROLE_META,
-  PARTICIPANT_ROLE_ORDER,
 } from "@/lib/participant-role-utils";
 import { PendingSubmitButton } from "@/app/pending-submit-button";
 import { QuerySelectFilter } from "@/app/query-select-filter";
 import { SharedFormPasswordField } from "@/app/shared-form-password-field";
-import { compareText } from "@/lib/sort-utils";
+import { buildAfterpartyParticipantState } from "@/lib/afterparty-participants";
 
 type PageProps = {
   params: Promise<{ afterpartyId: string }>;
@@ -189,46 +184,6 @@ function settlementProgressText(settlement: AfterpartySettlement): string {
   return `${settlement.settledCount}/${settlement.participantCount}`;
 }
 
-function teamOrderFromLabel(teamLabel: string): number {
-  const matched = teamLabel.match(/(\d+)\s*팀/);
-  if (!matched?.[1]) return Number.POSITIVE_INFINITY;
-  const parsed = Number.parseInt(matched[1], 10);
-  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
-}
-
-function roleOrderIndex(role: ParticipantRole): number {
-  const index = PARTICIPANT_ROLE_ORDER.indexOf(role);
-  return index === -1 ? Number.POSITIVE_INFINITY : index;
-}
-
-function sortParticipantsForRole(
-  rows: AfterpartyParticipant[],
-  role: ParticipantRole,
-  teamLabelByMemberName: Map<string, string>
-): AfterpartyParticipant[] {
-  const sorted = [...rows];
-  if (role === "student") {
-    sorted.sort((a, b) => {
-      const teamA = teamLabelByMemberName.get(normalizeMemberName(a.name)) ?? "";
-      const teamB = teamLabelByMemberName.get(normalizeMemberName(b.name)) ?? "";
-      const teamOrderA = teamOrderFromLabel(teamA);
-      const teamOrderB = teamOrderFromLabel(teamB);
-
-      if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-      if (teamA !== teamB) return compareText(teamA, teamB);
-
-      return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
-    });
-    return sorted;
-  }
-
-  sorted.sort((a, b) => compareText(
-    withTeamLabel(a.name, teamLabelByMemberName),
-    withTeamLabel(b.name, teamLabelByMemberName)
-  ));
-  return sorted;
-}
-
 type ParticipantFeedbackTone = "error" | "notice";
 
 type ParticipantFeedback = {
@@ -345,165 +300,18 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
   const manualParticipantDraft = participantSource === "manual" ? participantDraft : "";
 
   const participants = await cachedListParticipantsForSettlement(selectedSettlement.id, "");
-  const settledCount = participants.filter((row) => row.isSettled).length;
-  const unsettledCount = Math.max(participants.length - settledCount, 0);
-  const teamLabelByMemberName = new Map<string, string>();
-  for (const group of memberPreset.teamGroups) {
-    const teamLabel = toTeamLabel(group.teamName);
-    if (!teamLabel) continue;
-
-    for (const angel of group.angels) {
-      const normalizedAngelName = normalizeMemberName(angel);
-      if (!teamLabelByMemberName.has(normalizedAngelName)) {
-        teamLabelByMemberName.set(normalizedAngelName, teamLabel);
-      }
-    }
-
-    for (const member of group.members) {
-      const normalizedMemberName = normalizeMemberName(member);
-      if (!teamLabelByMemberName.has(normalizedMemberName)) {
-        teamLabelByMemberName.set(normalizedMemberName, teamLabel);
-      }
-    }
-  }
-
-  const operationRoleOrder = PARTICIPANT_ROLE_ORDER.filter(
-    (role): role is Exclude<ParticipantRole, "student"> => role !== "student"
-  );
-  const operationNamesByRole = new Map<Exclude<ParticipantRole, "student">, string[]>();
-  for (const role of operationRoleOrder) {
-    operationNamesByRole.set(role, []);
-  }
-  const roleByName = new Map<string, Exclude<ParticipantRole, "student">>();
-  const seenOperationNames = new Set<string>();
-  for (const role of operationRoleOrder) {
-    const candidates =
-      role === "angel"
-        ? [...memberPreset.teamGroups.flatMap((group) => group.angels), ...memberPreset.fixedAngels]
-        : memberPreset.specialRoles[role] ?? [];
-    for (const rawName of candidates) {
-      const name = rawName.trim();
-      if (!name) continue;
-      const normalized = normalizeName(name);
-      if (!roleByName.has(normalized)) {
-        roleByName.set(normalized, role);
-      }
-      if (seenOperationNames.has(normalized)) continue;
-      seenOperationNames.add(normalized);
-      const bucket = operationNamesByRole.get(role) ?? [];
-      bucket.push(name);
-      operationNamesByRole.set(role, bucket);
-    }
-  }
-
-  const operationEntries = operationRoleOrder.flatMap((role) =>
-    (operationNamesByRole.get(role) ?? []).map((name) => ({ name, role }))
-  ).sort((a, b) => {
-    const roleDiff = roleOrderIndex(a.role) - roleOrderIndex(b.role);
-    if (roleDiff !== 0) return roleDiff;
-
-    const teamA = teamLabelByMemberName.get(normalizeMemberName(a.name)) ?? "";
-    const teamB = teamLabelByMemberName.get(normalizeMemberName(b.name)) ?? "";
-    const teamOrderA = teamOrderFromLabel(teamA);
-    const teamOrderB = teamOrderFromLabel(teamB);
-
-    if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-    if (teamA !== teamB) return compareText(teamA, teamB);
-
-    return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
-  });
-  const currentSettlementNames = new Set(participants.map((row) => normalizeName(row.name)));
-  const displayParticipants = participants.map((participant) => {
-    const resolvedRole = roleByName.get(normalizeName(participant.name));
-    if (participant.role === "student" && resolvedRole) {
-      return {
-        ...participant,
-        role: resolvedRole,
-      };
-    }
-    return participant;
-  });
-  const participantsByRole = new Map<ParticipantRole, AfterpartyParticipant[]>();
-  for (const role of PARTICIPANT_ROLE_ORDER) {
-    participantsByRole.set(role, []);
-  }
-  for (const participant of displayParticipants) {
-    const existing = participantsByRole.get(participant.role) ?? [];
-    existing.push(participant);
-    participantsByRole.set(participant.role, existing);
-  }
-  for (const role of PARTICIPANT_ROLE_ORDER) {
-    participantsByRole.set(
-      role,
-      sortParticipantsForRole(participantsByRole.get(role) ?? [], role, teamLabelByMemberName)
-    );
-  }
-  const sortedParticipantRows = PARTICIPANT_ROLE_ORDER.flatMap(
-    (role) => participantsByRole.get(role) ?? []
-  );
-
-  const quickAddGroups = [
-    ...memberPreset.teamGroups.map((team) => ({
-      kind: "team" as const,
-      teamName: team.teamName,
-      entries: team.members
-        .map((name) => ({
-          name,
-          role: roleByName.get(normalizeName(name)) ?? ("student" as const),
-        }))
-        .sort((a, b) => {
-          const roleDiff = roleOrderIndex(a.role) - roleOrderIndex(b.role);
-          if (roleDiff !== 0) return roleDiff;
-
-          const teamA = teamLabelByMemberName.get(normalizeMemberName(a.name)) ?? "";
-          const teamB = teamLabelByMemberName.get(normalizeMemberName(b.name)) ?? "";
-          const teamOrderA = teamOrderFromLabel(teamA);
-          const teamOrderB = teamOrderFromLabel(teamB);
-
-          if (teamOrderA !== teamOrderB) return teamOrderA - teamOrderB;
-          if (teamA !== teamB) return compareText(teamA, teamB);
-
-          return compareText(normalizeMemberName(a.name), normalizeMemberName(b.name));
-        }),
-    })),
-    ...(operationEntries.length > 0
-      ? [
-          {
-            kind: "operation" as const,
-            teamName: "운영진",
-            entries: operationEntries,
-          },
-        ]
-      : []),
-  ];
-  const normalizedParticipantSearch = normalizeName(participantSearch);
-  const quickAddGroupsByFilter = teamFilter
-    ? quickAddGroups.filter((group) => group.teamName === teamFilter)
-    : quickAddGroups;
-  const visibleQuickAddGroups = quickAddGroupsByFilter
-    .map((group) => ({
-      ...group,
-      entries: group.entries.filter((entry) => {
-        if (!normalizedParticipantSearch) return true;
-        const displayName = withTeamLabel(entry.name, teamLabelByMemberName);
-        return (
-          normalizeName(entry.name).includes(normalizedParticipantSearch) ||
-          normalizeName(displayName).includes(normalizedParticipantSearch)
-        );
-      }),
-    }))
-    .filter((group) => group.entries.length > 0);
-
-  const totalAssignableCount = visibleQuickAddGroups.reduce(
-    (sum, group) => sum + group.entries.length,
-    0
-  );
-  const assignedCount = visibleQuickAddGroups.reduce(
-    (sum, group) =>
-      sum + group.entries.filter((entry) => currentSettlementNames.has(normalizeName(entry.name))).length,
-    0
-  );
-  const assignRate = totalAssignableCount > 0 ? Math.round((assignedCount / totalAssignableCount) * 100) : 0;
+  const {
+    settledCount,
+    unsettledCount,
+    teamLabelByMemberName,
+    currentSettlementNames,
+    sortedParticipantRows,
+    quickAddGroups,
+    visibleQuickAddGroups,
+    totalAssignableCount,
+    assignedCount,
+    assignRate,
+  } = buildAfterpartyParticipantState(participants, memberPreset, participantSearch, teamFilter);
 
   const returnParams = new URLSearchParams();
   if (date) returnParams.set("date", date);
