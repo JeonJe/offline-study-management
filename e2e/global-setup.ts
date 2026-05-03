@@ -1,12 +1,18 @@
 import { chromium } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { AUTH_STATE, BASE_URL, CACHE_TEST_DATE } from "./support/test-config";
+import {
+  AUTH_STATE,
+  BASE_URL,
+  CACHE_TEST_DATE,
+  TEST_OPERATING_UNIT_SLUG,
+} from "./support/test-config";
 
 export default async function globalSetup() {
-  const password = process.env.APP_PASSWORD;
+  const password =
+    process.env.E2E_OPERATING_UNIT_PASSWORD ?? process.env.APP_PASSWORD;
   if (!password) {
-    throw new Error("APP_PASSWORD 환경변수가 설정되지 않았습니다.");
+    throw new Error("E2E_OPERATING_UNIT_PASSWORD 또는 APP_PASSWORD 환경변수가 설정되지 않았습니다.");
   }
 
   fs.mkdirSync(path.dirname(AUTH_STATE), { recursive: true });
@@ -14,7 +20,10 @@ export default async function globalSetup() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  await page.goto(`${BASE_URL}/?date=${CACHE_TEST_DATE}`);
+  const returnPath = `/cohorts/${TEST_OPERATING_UNIT_SLUG}/loop-pak?date=${CACHE_TEST_DATE}`;
+  await page.goto(
+    `${BASE_URL}/cohorts/${TEST_OPERATING_UNIT_SLUG}/entry?returnPath=${encodeURIComponent(returnPath)}`
+  );
 
   await page.getByLabel("입장 코드").fill(password);
   await page.locator('form:has(input[name="authScope"][value="unit"]) button.login-submit').click();

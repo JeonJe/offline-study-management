@@ -67,20 +67,28 @@ test.describe("페이지 성능", () => {
   // ---------- 시나리오 9: 뮤테이션 후 응답 속도 ----------
 
   test("시나리오 9: 뮤테이션 후 응답 속도", async ({ page }) => {
+    const title = `E2E성능테스트모임-${Date.now()}`;
     // 1. 캐시 워밍
-    await page.goto(cohortPath("study", { date: "" }), { waitUntil: "load" });
+    await page.goto(cohortPath("study", { date: CACHE_TEST_DATE }), {
+      waitUntil: "load",
+    });
 
     // 2. 모임 생성 (캐시 무효화 트리거)
     const fab = page.locator("details:has(summary.fab-pulse)");
     await fab.locator("summary").click();
-    await fab.locator('input[name="title"]').fill("E2E성능테스트모임");
+    await fab.locator('input[name="title"]').fill(title);
     await fab.locator('input[name="location"]').fill("성능테스트장소");
+    await fab.locator('input[name="meetingDate"]').fill(CACHE_TEST_DATE);
+    await fab.locator('input[data-leader-input="true"]').fill("E2E성능방장");
+    await fab.locator('button[type="button"]:has-text("추가")').click();
 
     const startTime = Date.now();
-    await fab.locator('button[type="submit"]:has-text("생성")').click();
+    await fab
+      .locator("form")
+      .evaluate((form) => (form as HTMLFormElement).requestSubmit());
+    await page.waitForURL(waitForCohortDateUrl("study"));
 
     // 3. 리다이렉트 후 페이지 로드 완료까지 측정
-    await page.waitForURL(waitForCohortDateUrl("study"));
     await page.waitForLoadState("domcontentloaded");
     const elapsed = Date.now() - startTime;
 
@@ -91,11 +99,11 @@ test.describe("페이지 성능", () => {
 
     // 5. 생성한 모임 확인 후 삭제
     await expect(
-      page.locator('article:has-text("E2E성능테스트모임")').first(),
-    ).toBeVisible();
+      page.locator(`a[aria-label="${title} 상세 보기"]`).first(),
+    ).toBeVisible({ timeout: 10_000 });
 
     const link = page
-      .locator('a[aria-label="E2E성능테스트모임 상세 보기"]')
+      .locator(`a[aria-label="${title} 상세 보기"]`)
       .first();
     const detailUrl = await link.getAttribute("href");
     if (detailUrl) {

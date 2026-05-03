@@ -69,7 +69,7 @@ async function getMeetingParticipantCount(
   page: import("@playwright/test").Page,
 ): Promise<number> {
   const summary = page
-    .locator("dt", { hasText: "총원" })
+    .locator("dt", { hasText: /^(전체 확정|확정|총원)$/ })
     .first()
     .locator("xpath=following-sibling::dd[1]");
   await expect(summary).toBeVisible();
@@ -122,10 +122,10 @@ test.describe.serial("캐시 정합성", () => {
     }
 
     // 제출
-    await fab.locator('button[type="submit"]:has-text("생성")').click();
-
-    // 대시보드 리다이렉트 대기
-    await page.waitForURL(waitForCohortDateUrl("study"));
+    await Promise.all([
+      page.waitForURL(waitForCohortDateUrl("study")),
+      fab.getByRole("button", { name: "생성", exact: true }).click(),
+    ]);
 
     // 생성된 모임 확인
     await expect(
@@ -180,7 +180,7 @@ test.describe.serial("캐시 정합성", () => {
     // 대시보드에서 참석자 수 반영 확인
     await page.goto(DASHBOARD);
     const card = page.locator('article:has-text("E2E테스트모임")').first();
-    await expect(card.getByText(`총참여 ${afterCount}`)).toBeVisible();
+    await expect(card.getByText(`전체 확정 ${afterCount}`)).toBeVisible();
   });
 
   // ---- 시나리오 3 ----
@@ -210,10 +210,10 @@ test.describe.serial("캐시 정합성", () => {
     await fab.locator('input[name="location"]').fill("테스트장소");
 
     // 제출
-    await fab.locator('button[type="submit"]:has-text("생성")').click();
-
-    // 리다이렉트 대기
-    await page.waitForURL(waitForCohortDateUrl("afterparty"));
+    await Promise.all([
+      page.waitForURL(waitForCohortDateUrl("afterparty")),
+      fab.getByRole("button", { name: "생성", exact: true }).click(),
+    ]);
 
     // 생성된 뒤풀이 확인
     await expect(
@@ -296,10 +296,14 @@ test.describe.serial("캐시 정합성", () => {
     await meetingFab.locator("summary").click();
     await meetingFab.locator('input[name="title"]').fill("E2E크로스모임");
     await meetingFab.locator('input[name="location"]').fill("크로스장소");
+    await meetingFab.locator('input[data-leader-input="true"]').fill("E2E크로스방장");
+    await meetingFab.locator('button[type="button"]:has-text("추가")').click();
     await meetingFab
-      .locator('button[type="submit"]:has-text("생성")')
-      .click();
-    await page.waitForURL(waitForCohortDateUrl("study"));
+      .locator("form")
+      .evaluate((form) => (form as HTMLFormElement).requestSubmit());
+    await expect(
+      page.locator('a[aria-label="E2E크로스모임 상세 보기"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
 
     const crossMeetingUrl =
       (await page
@@ -316,9 +320,11 @@ test.describe.serial("캐시 정합성", () => {
       .fill("E2E크로스뒤풀이");
     await afterpartyFab.locator('input[name="location"]').fill("크로스장소");
     await afterpartyFab
-      .locator('button[type="submit"]:has-text("생성")')
-      .click();
-    await page.waitForURL(waitForCohortDateUrl("afterparty"));
+      .locator("form")
+      .evaluate((form) => (form as HTMLFormElement).requestSubmit());
+    await expect(
+      page.locator('a[aria-label="E2E크로스뒤풀이 상세 보기"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
 
     const crossAfterpartyUrl =
       (await page
