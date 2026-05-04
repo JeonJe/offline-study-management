@@ -44,8 +44,8 @@ describe("saveMemberPresetAction", () => {
 
     const result = await saveMemberPresetAction({
       operatingUnitSlug: "loop-pak-3",
-      fixedAngels: ["오현직"],
-      teamGroups: [{ teamName: "1팀", angels: ["오현직"], members: ["김루퍼"] }],
+      fixedAngels: ["이순신"],
+      teamGroups: [{ teamName: "1팀", angels: ["이순신"], members: ["세종대왕"] }],
     });
 
     expect(result).toEqual({ ok: false, error: "unauthorized" });
@@ -60,20 +60,20 @@ describe("saveMemberPresetAction", () => {
 
     const result = await saveMemberPresetAction({
       operatingUnitSlug: "loop-pak-3",
-      fixedAngels: ["오현직"],
+      fixedAngels: ["이순신"],
       teamGroups: [
         {
           teamName: "1팀",
-          angels: ["오현직"],
+          angels: ["이순신"],
           memberEntries: [
-            { id: "member-a", name: "김루퍼", order: 0 },
-            { id: "member-b", name: "김루퍼", order: 1 },
+            { id: "member-a", name: "세종대왕", order: 0 },
+            { id: "member-b", name: "세종대왕", order: 1 },
           ],
-          members: ["김루퍼", "김루퍼"],
+          members: ["세종대왕", "세종대왕"],
         },
       ],
       specialRoles: {
-        mentor: ["alen"],
+        mentor: ["장영실"],
       },
     });
 
@@ -83,16 +83,16 @@ describe("saveMemberPresetAction", () => {
       [
         {
           teamName: "1팀",
-          angels: ["오현직"],
-          members: ["김루퍼", "김루퍼"],
+          angels: ["이순신"],
+          members: ["세종대왕", "세종대왕"],
           memberEntries: [
-            { id: "member-a", name: "김루퍼", order: 0 },
-            { id: "member-b", name: "김루퍼", order: 1 },
+            { id: "member-a", name: "세종대왕", order: 0 },
+            { id: "member-b", name: "세종대왕", order: 1 },
           ],
         },
       ],
-      ["오현직"],
-      { mentor: ["alen"] }
+      ["이순신"],
+      { mentor: ["장영실"] }
     );
     expect(revalidateMemberDataMock).toHaveBeenCalledOnce();
   });
@@ -117,8 +117,8 @@ describe("saveMemberPresetAction", () => {
 
     const result = await saveMemberPresetAction({
       operatingUnitSlug: "loop-pak-3",
-      fixedAngels: ["오현직"],
-      teamGroups: [{ teamName: "1팀", angels: ["오현직"], members: ["김루퍼"] }],
+      fixedAngels: ["이순신"],
+      teamGroups: [{ teamName: "1팀", angels: ["이순신"], members: ["세종대왕"] }],
     });
 
     expect(result).toEqual({ ok: false, error: "unauthorized" });

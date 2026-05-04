@@ -257,16 +257,16 @@ test.describe.serial("회귀: 정원 초과 대기 → 승격", () => {
     await expect(page.getByText("확정 0/1 · 대기 0")).toBeVisible();
 
     const manualAdd = page.locator('form:has(input[name="mutationSource"][value="manual-add"])');
-    await manualAdd.locator('input[name="names"]').fill("대기확정, 대기후보");
+    await manualAdd.locator('input[name="names"]').fill("이황, 이이");
     await manualAdd.locator('button[type="submit"]:has-text("추가")').click();
     await expect(page.getByText("확정 1/1 · 대기 1")).toBeVisible();
-    await expect(page.getByText("대기후보")).toBeVisible();
+    await expect(page.getByText("이이")).toBeVisible();
 
     page.once("dialog", (d) => d.accept());
     await page.locator('button[aria-label="참여자 제거"]').first().click();
     await expect(page.getByText("확정 0/1 · 대기 1")).toBeVisible();
 
-    await page.locator('li:has-text("대기후보") button:has-text("승격")').click();
+    await page.locator('li:has-text("이이") button:has-text("승격")').click();
     await expect(page.getByText("확정 1/1 · 대기 0")).toBeVisible();
     await expect(page.locator("section").filter({ hasText: "대기 인원" }).getByText("대기 중인 인원이 없습니다.")).toBeVisible();
 

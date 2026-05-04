@@ -771,7 +771,7 @@ export default async function AfterpartyDetailPage({ params, searchParams }: Pag
               name="names"
               defaultValue={manualParticipantDraft}
               className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
-              placeholder="예: 김민수 또는 김민수, 박서준"
+              placeholder="예: 장영실 또는 장영실, 이순신"
             />
             <PendingSubmitButton
               idleLabel="추가"

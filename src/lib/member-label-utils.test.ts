@@ -8,7 +8,7 @@ import {
 describe("member-label-utils", () => {
   it("normalizes member names for key matching", () => {
     expect(normalizeMemberName(" 2팀  홍길동 (신규) ")).toBe("2팀 홍길동");
-    expect(normalizeMemberName(" Alice   Kim ")).toBe("alice kim");
+    expect(normalizeMemberName(" Grace   Hopper ")).toBe("grace hopper");
   });
 
   it("extracts team labels from names", () => {
@@ -22,6 +22,6 @@ describe("member-label-utils", () => {
     const map = new Map<string, string>([["홍길동", "2팀"]]);
     expect(withTeamLabel("홍길동", map)).toBe("2팀 홍길동");
     expect(withTeamLabel("2팀 홍길동", map)).toBe("2팀 홍길동");
-    expect(withTeamLabel("김철수", map)).toBe("김철수");
+    expect(withTeamLabel("이황", map)).toBe("이황");
   });
 });

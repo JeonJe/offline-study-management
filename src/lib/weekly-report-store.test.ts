@@ -87,7 +87,7 @@ describe("weekly report store", () => {
           {
             id: "report-1",
             cycleId: "cycle-1",
-            angelName: "애니",
+            angelName: "유관순",
             teamName: "1팀",
             summary: "참여 흐름이 안정적입니다.",
             notes: null,
@@ -189,7 +189,7 @@ describe("weekly report store", () => {
     await upsertAngelWeeklyReport({
       operatingUnitSlug: "loop-pak-4",
       cycleId: "cycle-1",
-      angelName: " 애니 ",
+      angelName: " 유관순 ",
       teamName: " 1팀 ",
       summary: " 참여 흐름이 안정적입니다. ",
       notes: "",
@@ -204,7 +204,7 @@ describe("weekly report store", () => {
     expect(insertCall?.[1]).toEqual([
       expect.any(String),
       "cycle-1",
-      "애니",
+      "유관순",
       "1팀",
       "참여 흐름이 안정적입니다.",
       null,

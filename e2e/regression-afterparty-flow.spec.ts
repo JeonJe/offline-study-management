@@ -13,7 +13,7 @@ const AFTERPARTY_PAGE = cohortPath("afterparty", { date: REGRESSION_TEST_DATE })
 // 회귀 테스트 전용 라벨 prefix — 다른 spec의 E2E 데이터와 구분
 const TEST_LABEL = "R회귀뒷풀이";
 // 참여자 이름 — 정산 토글 검증용
-const TEST_PARTICIPANT = "R회귀참석자";
+const TEST_PARTICIPANT = "유관순";
 
 // ---------- helpers ----------
 

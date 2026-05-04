@@ -36,8 +36,8 @@ const cycle = {
 
 const memberPreset = {
   teamGroups: [
-    { teamName: "1팀", angels: ["애니"], members: ["민수"] },
-    { teamName: "2팀", angels: ["보라"], members: ["지수"] },
+    { teamName: "1팀", angels: ["유관순"], members: ["장영실"] },
+    { teamName: "2팀", angels: ["허준"], members: ["신사임당"] },
   ],
   fixedAngels: [],
   specialRoles: {
@@ -53,7 +53,7 @@ function report(teamName: string, id = `${teamName}-report`) {
   return {
     id,
     cycleId: "cycle-1",
-    angelName: teamName === "1팀" ? "애니" : "보라",
+    angelName: teamName === "1팀" ? "유관순" : "허준",
     teamName,
     summary: `${teamName} 참여 흐름 안정`,
     notes: null,
@@ -87,9 +87,9 @@ describe("buildCycleShareText", () => {
 
     expect(text).toContain("[주간 보고] 4기 3주차 엔젤 보고");
     expect(text).toContain("제출 2/2팀");
-    expect(text).toContain("- 1팀: 제출 (애니)");
+    expect(text).toContain("- 1팀: 제출 (유관순)");
     expect(text).toContain("  - 도움 요청: 장소 안내 필요");
-    expect(text).toContain("- 2팀: 제출 (보라)");
+    expect(text).toContain("- 2팀: 제출 (허준)");
     expect(getCycleMock).toHaveBeenCalledWith("cycle-1", "loop-pak-4");
     expect(loadMemberPresetMock).toHaveBeenCalledWith("loop-pak-4");
     expect(listReportsMock).toHaveBeenCalledWith("cycle-1", "loop-pak-4");
@@ -103,8 +103,8 @@ describe("buildCycleShareText", () => {
     const text = await buildCycleShareText("cycle-1", "loop-pak-4");
 
     expect(text).toContain("제출 0/2팀");
-    expect(text).toContain("- 1팀: 미제출 / 엔젤 애니");
-    expect(text).toContain("- 2팀: 미제출 / 엔젤 보라");
+    expect(text).toContain("- 1팀: 미제출 / 엔젤 유관순");
+    expect(text).toContain("- 2팀: 미제출 / 엔젤 허준");
   });
 
   it("일부 미제출 사이클은 제출 팀과 미제출 팀을 함께 표시한다", async () => {
@@ -115,7 +115,7 @@ describe("buildCycleShareText", () => {
     const text = await buildCycleShareText("cycle-1", "loop-pak-4");
 
     expect(text).toContain("제출 1/2팀");
-    expect(text).toContain("- 1팀: 제출 (애니)");
-    expect(text).toContain("- 2팀: 미제출 / 엔젤 보라");
+    expect(text).toContain("- 1팀: 제출 (유관순)");
+    expect(text).toContain("- 2팀: 미제출 / 엔젤 허준");
   });
 });

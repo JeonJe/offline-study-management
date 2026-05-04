@@ -27,8 +27,8 @@ function memberPreset(): MemberPreset {
   return {
     source: "db",
     teamGroups: [
-      { teamName: "2팀", members: ["alpha", "beta"], angels: ["angel-b"], memberEntries: undefined },
-      { teamName: "10팀", members: ["gamma"], angels: ["angel-a"], memberEntries: undefined },
+      { teamName: "2팀", members: ["장영실", "정약용"], angels: ["유관순"], memberEntries: undefined },
+      { teamName: "10팀", members: ["이황"], angels: ["이순신"], memberEntries: undefined },
     ],
     fixedAngels: ["fixed"],
     specialRoles: {
@@ -48,30 +48,30 @@ describe("afterparty participant helpers", () => {
 
   it("sorts students by team label and normalized name", () => {
     const teamLabelByMemberName = new Map([
-      ["alpha", "2팀"],
-      ["bravo", "2팀"],
-      ["zulu", "10팀"],
+      ["장영실", "2팀"],
+      ["허준", "2팀"],
+      ["정조", "10팀"],
     ]);
 
     const sorted = sortAfterpartyParticipantsForRole(
-      [participant("zulu"), participant("bravo"), participant("alpha")],
+      [participant("정조"), participant("허준"), participant("장영실")],
       "student",
       teamLabelByMemberName
     );
 
-    expect(sorted.map((row) => row.name)).toEqual(["alpha", "bravo", "zulu"]);
+    expect(sorted.map((row) => row.name)).toEqual(["장영실", "허준", "정조"]);
   });
 
   it("builds participant state with resolved roles and filtered quick-add counts", () => {
     const state = buildAfterpartyParticipantState(
       [
-        participant("alpha"),
-        participant("gamma"),
+        participant("장영실"),
+        participant("이황"),
         participant("mentor"),
         participant("manager", "student", true),
       ],
       memberPreset(),
-      "alp",
+      "장",
       "2팀"
     );
 
@@ -80,12 +80,12 @@ describe("afterparty participant helpers", () => {
     expect(state.sortedParticipantRows.map((row) => `${row.role}:${row.name}`)).toEqual([
       "mentor:mentor",
       "manager:manager",
-      "student:alpha",
-      "student:gamma",
+      "student:장영실",
+      "student:이황",
     ]);
     expect(state.visibleQuickAddGroups).toHaveLength(1);
     expect(state.visibleQuickAddGroups[0]?.teamName).toBe("2팀");
-    expect(state.visibleQuickAddGroups[0]?.entries.map((entry) => entry.name)).toEqual(["alpha"]);
+    expect(state.visibleQuickAddGroups[0]?.entries.map((entry) => entry.name)).toEqual(["장영실"]);
     expect(state.assignedCount).toBe(1);
     expect(state.totalAssignableCount).toBe(1);
     expect(state.assignRate).toBe(100);
@@ -93,15 +93,15 @@ describe("afterparty participant helpers", () => {
 
   it("sorts quick-add entries by role, team, and name", () => {
     const teamLabelByMemberName = new Map([
-      ["angel-a", "10팀"],
-      ["angel-b", "2팀"],
+      ["이순신", "10팀"],
+      ["유관순", "2팀"],
       ["manager", "2팀"],
     ]);
 
     const entries = [
-      { name: "angel-a", role: "angel" as const },
+      { name: "이순신", role: "angel" as const },
       { name: "manager", role: "manager" as const },
-      { name: "angel-b", role: "angel" as const },
+      { name: "유관순", role: "angel" as const },
     ];
 
     expect(
@@ -110,8 +110,8 @@ describe("afterparty participant helpers", () => {
       )
     ).toEqual([
       { name: "manager", role: "manager" },
-      { name: "angel-b", role: "angel" },
-      { name: "angel-a", role: "angel" },
+      { name: "유관순", role: "angel" },
+      { name: "이순신", role: "angel" },
     ]);
   });
 });

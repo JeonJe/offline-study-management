@@ -37,24 +37,6 @@ psql -d "$RESTORE_DATABASE_URL" -f backups/saturday-meetup-20260501-120000.sql
 node -e "console.table(require('./backups/saturday-meetup-20260501-120000.counts.json').rowCounts)"
 ```
 
-## 정기 백업 가이드
-
-### 수동 (권장 — 사이드 프로젝트 규모)
-
-작업 시작 전 + 주 1회 권장.
-
-### cron (선택)
-
-```cron
-# 매일 오전 9시
-0 9 * * * cd ~/IdeaProjects/saturday-meetup && /opt/homebrew/bin/npm run db:backup >> backups/cron.log 2>&1
-```
-
-### 보존 정책
-
-- 권장: 최근 7개 + 매주 1회 보관 + 매월 1회 보관
-- 자동 정리 스크립트는 후속 백로그 항목으로 분리 (수동 정리 우선)
-
 ## 보안
 
 - `backups/*.sql`은 운영 데이터 포함 — git 추적 금지 (`.gitignore` 처리됨)
@@ -63,5 +45,4 @@ node -e "console.table(require('./backups/saturday-meetup-20260501-120000.counts
 
 ## 관련 산출물
 
-- 자율 워크플로우 위치 결정: `~/command-center/context/saturday-meetup/workflow-location-analysis.md`
 - 백업 스크립트: `scripts/backup-db.mjs`

@@ -132,7 +132,7 @@ export function ParticipantAddModal({
                       defaultValue={defaultNames}
                       className="min-h-28 rounded-xl border bg-white px-3 py-3 text-sm outline-none"
                       style={{ borderColor: feedback ? feedbackPalette.borderColor : "var(--line)", color: "var(--ink)" }}
-                      placeholder="예: 김민수 또는 김민수, 박서준"
+                      placeholder="예: 장영실 또는 장영실, 이순신"
                       autoFocus
                     />
                   </label>

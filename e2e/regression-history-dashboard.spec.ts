@@ -5,23 +5,24 @@ import {
   DEFAULT_HISTORY_START_DATE,
   HISTORY_FILTER_END_DATE,
   HISTORY_FILTER_START_DATE,
+  TEST_OPERATING_UNIT_SLUG,
   cohortPath,
 } from "./support/test-config";
 
 test.describe("회귀: 히스토리 대시보드", () => {
   test("기간 변경 시 팀/멤버 히스토리 표 URL과 화면이 갱신된다", async ({ page }) => {
-    const adminPassword = process.env.ADMIN_PAGE_PASSWORD;
+    const adminPassword = process.env.E2E_ADMIN_PASSWORD;
     if (!adminPassword) {
-      throw new Error("ADMIN_PAGE_PASSWORD 환경변수가 설정되지 않았습니다.");
+      throw new Error("E2E_ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.");
     }
 
     const token = createHash("sha256")
-      .update(`saturday-meetup:admin:${adminPassword}`)
+      .update(`saturday-meetup:operating-unit:${TEST_OPERATING_UNIT_SLUG}:admin:${adminPassword}`)
       .digest("hex");
     await page.context().addCookies([
       {
         name: "meetup_role_access",
-        value: `admin.${token}`,
+        value: `admin.${encodeURIComponent(TEST_OPERATING_UNIT_SLUG)}.${token}`,
         domain: "localhost",
         path: "/",
         httpOnly: true,

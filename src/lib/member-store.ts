@@ -60,17 +60,8 @@ type DbSpecialRoleRow = {
   memberName: string;
 };
 
-type CountRow = {
-  count: string;
-};
-
-type LegacyTableRow = {
-  name: string | null;
-};
-
 let schemaReady = false;
 let schemaPromise: Promise<void> | null = null;
-let legacyMigrationChecked = false;
 const runtimeMigrationsEnabled =
   process.env.DB_RUNTIME_MIGRATIONS === "1" ||
   process.env.DB_RUNTIME_MIGRATIONS === "true";
@@ -428,81 +419,10 @@ async function ensureMemberIdentityColumns(): Promise<void> {
        alter column member_id set not null`
     );
   }
-
-}
-
-async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
-  if (legacyMigrationChecked) {
-    return;
-  }
-
-  const memberCountRows = await query<CountRow>(
-    `select count(*)::text as count from public.member_teams`
-  );
-  const memberCount = Number.parseInt(memberCountRows[0]?.count ?? "0", 10);
-  if (memberCount > 0) {
-    legacyMigrationChecked = true;
-    return;
-  }
-
-  const legacyTables = await query<LegacyTableRow>(
-    `select to_regclass('public.roster_teams')::text as name
-     union all
-     select to_regclass('public.roster_team_students')::text as name
-     union all
-     select to_regclass('public.roster_angels')::text as name`
-  );
-
-  const allLegacyPresent = legacyTables.every((row) => row.name !== null);
-  if (!allLegacyPresent) {
-    legacyMigrationChecked = true;
-    return;
-  }
-
-  await query(
-    `insert into public.member_teams (team_name, angel_name, angel_names, team_order, operating_unit_slug)
-     select team_name, angel_name, array[angel_name], team_order, $1
-     from public.roster_teams
-     on conflict (operating_unit_slug, team_name)
-     do update set
-       angel_name = excluded.angel_name,
-       angel_names = excluded.angel_names,
-       team_order = excluded.team_order,
-       updated_at = now()`,
-    [MIGRATED_OPERATING_UNIT_SLUG]
-  );
-
-  await query(
-    `insert into public.member_team_members (team_name, member_name, member_id, member_order, operating_unit_slug)
-     select
-       team_name,
-       student_name as member_name,
-       'legacy-' || md5($1 || ':' || team_name || ':' || student_name),
-       student_order as member_order,
-       $1
-     from public.roster_team_students
-     on conflict (operating_unit_slug, member_id)
-     do update set
-       member_name = excluded.member_name,
-       member_order = excluded.member_order`,
-    [MIGRATED_OPERATING_UNIT_SLUG]
-  );
-
-  await query(
-    `insert into public.member_angels (angel_name, angel_order, operating_unit_slug)
-     select angel_name, angel_order, $1
-     from public.roster_angels
-     on conflict (operating_unit_slug, angel_name)
-     do update set angel_order = excluded.angel_order`,
-    [MIGRATED_OPERATING_UNIT_SLUG]
-  );
-
-  legacyMigrationChecked = true;
 }
 
 export async function loadMemberPreset(operatingUnitSlugInput: string): Promise<MemberPreset> {
   await ensureMemberSchema();
-  await migrateLegacyRosterDataIfNeeded();
   const operatingUnitSlug = requireOperatingUnitSlug(operatingUnitSlugInput);
 
   const teamRows = await query<DbTeamRow>(

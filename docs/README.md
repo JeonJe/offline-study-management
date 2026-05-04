@@ -35,7 +35,7 @@
 
 | 문서/폴더 | 목적 |
 | --- | --- |
-| `qa/feature-flag-matrix.md` | Feature flag ON/OFF 기대 동작을 확인합니다. |
+| `qa/feature-flag-matrix.md` | 현재 feature flag 상태와 신규 flag 추가 기준을 확인합니다. |
 | `qa/mobile-checklist.md` | 모바일 화면과 접근성 점검 기준을 확인합니다. |
 | `readme-screenshot-guide.md` | 인계용 스크린샷 갱신 방법을 확인합니다. |
 | `screenshots/handoff/` | `user-guide.md`에서 사용하는 가데이터 기반 화면 이미지입니다. |

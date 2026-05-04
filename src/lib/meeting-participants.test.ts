@@ -31,36 +31,36 @@ describe("meeting participant helpers", () => {
 
   it("sorts students by team order and normalized name", () => {
     const teamLabelByName = new Map([
-      ["공명선", "2팀"],
-      ["김루프", "1팀"],
+      ["정약용", "2팀"],
+      ["장보고", "1팀"],
       ["홍길동", "1팀"],
     ]);
 
     const sorted = sortRsvpsForRole(
-      [rsvp("공명선"), rsvp("홍길동"), rsvp("김루프")],
+      [rsvp("정약용"), rsvp("홍길동"), rsvp("장보고")],
       "student",
       teamLabelByName
     );
 
-    expect(sorted.map((row) => row.name)).toEqual(["김루프", "홍길동", "공명선"]);
+    expect(sorted.map((row) => row.name)).toEqual(["장보고", "홍길동", "정약용"]);
   });
 
   it("sorts quick-add entries by role, team, and name", () => {
     const teamLabelByName = new Map([
-      ["엔젤가", "2팀"],
-      ["엔젤나", "1팀"],
-      ["학생가", "1팀"],
+      ["정약용", "2팀"],
+      ["이순신", "1팀"],
+      ["이황", "1팀"],
     ]);
     const entries = [
-      { name: "학생가", role: "student" as const },
-      { name: "엔젤가", role: "angel" as const },
-      { name: "엔젤나", role: "angel" as const },
+      { name: "이황", role: "student" as const },
+      { name: "정약용", role: "angel" as const },
+      { name: "이순신", role: "angel" as const },
     ];
 
     expect([...entries].sort((a, b) => compareParticipantQuickAddEntries(a, b, teamLabelByName))).toEqual([
-      { name: "엔젤나", role: "angel" },
-      { name: "엔젤가", role: "angel" },
-      { name: "학생가", role: "student" },
+      { name: "이순신", role: "angel" },
+      { name: "정약용", role: "angel" },
+      { name: "이황", role: "student" },
     ]);
   });
 });

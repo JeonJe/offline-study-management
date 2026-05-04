@@ -646,7 +646,7 @@ export function MemberAdminForm({
                   onChange={(event) => setNewTeamMembers(event.target.value)}
                   className="min-h-28 rounded-xl border bg-white px-3 py-3 text-sm"
                   style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                  placeholder="예: 김민수, 박서준"
+                  placeholder="예: 장영실, 이순신"
                 />
               </label>
             </div>

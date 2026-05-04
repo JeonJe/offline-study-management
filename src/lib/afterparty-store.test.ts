@@ -82,7 +82,7 @@ describe("afterparty-store settlement flows", () => {
 
     const inserted = await createAfterpartyParticipantsBulk(
       "afterparty-1",
-      ["Alice", "Bob", "Alice"],
+      ["장영실", "정약용", "장영실"],
       "settle-1"
     );
 
@@ -94,7 +94,7 @@ describe("afterparty-store settlement flows", () => {
     );
     expect(participantInsertCalls).toHaveLength(1);
     const [firstInsertCall] = participantInsertCalls;
-    expect(firstInsertCall?.params?.[0]).toEqual(["Alice", "Bob"]);
+    expect(firstInsertCall?.params?.[0]).toEqual(["장영실", "정약용"]);
   });
 
   it("stores participant role when explicit role input is provided", async () => {
@@ -129,13 +129,13 @@ describe("afterparty-store settlement flows", () => {
 
     const inserted = await createAfterpartyParticipantsBulk(
       "afterparty-1",
-      [{ name: "annie", role: "manager" }],
+      [{ name: "세종대왕", role: "manager" }],
       "settle-1"
     );
 
     expect(inserted).toBe(1);
     expect(participantInsertParams).toHaveLength(1);
-    expect(participantInsertParams[0]?.[0]).toEqual(["annie"]);
+    expect(participantInsertParams[0]?.[0]).toEqual(["세종대왕"]);
     expect(participantInsertParams[0]?.[1]).toEqual(["manager"]);
   });
 
@@ -193,7 +193,7 @@ describe("afterparty-store settlement flows", () => {
             startTime: "19:00",
             location: "홍대입구",
             description: "2차 가능",
-            settlementManager: "제니",
+            settlementManager: "신사임당",
             settlementAccount: "3333-12-1234567",
             hasPassword: true,
             participantCount: 0,
@@ -214,7 +214,7 @@ describe("afterparty-store settlement flows", () => {
       startTime: "19:00",
       location: "홍대입구",
       description: "2차 가능",
-      settlementManager: "제니",
+      settlementManager: "신사임당",
       settlementAccount: "3333-12-1234567",
       password: "late-secret",
     });

@@ -79,11 +79,11 @@ describe("history-store", () => {
 
       // 2) 팀원 목록 쿼리
       queryMock.mockResolvedValueOnce([
-        { teamName: "팀A", memberName: "alice" },
-        { teamName: "팀B", memberName: "bob" },
+        { teamName: "팀A", memberName: "장영실" },
+        { teamName: "팀B", memberName: "정약용" },
       ]);
       // 3) 기간 내 RSVP 목록 쿼리
-      queryMock.mockResolvedValueOnce([{ meetingId, name: "alice" }]);
+      queryMock.mockResolvedValueOnce([{ meetingId, name: "장영실" }]);
 
       const result = await getTeamAttendanceByPeriod("2026-03-01", "2026-03-31", "loop-pak-3");
 
@@ -112,12 +112,12 @@ describe("history-store", () => {
 
       // 2) 팀원 목록 쿼리
       queryMock.mockResolvedValueOnce([
-        { teamName: "팀A", memberName: "alice" },
+        { teamName: "팀A", memberName: "장영실" },
       ]);
       // 3) 기간 내 RSVP 목록 쿼리
       queryMock.mockResolvedValueOnce([
-        { meetingId: ids[0], name: "alice" },
-        { meetingId: ids[1], name: "alice" },
+        { meetingId: ids[0], name: "장영실" },
+        { meetingId: ids[1], name: "장영실" },
       ]);
 
       const result = await getTeamAttendanceByPeriod("2026-01-01", "2026-03-31", "loop-pak-3");
@@ -137,9 +137,9 @@ describe("history-store", () => {
       // 1) meetings 쿼리 → 1건
       queryMock.mockResolvedValueOnce([{ id: meetingId }]);
       // 2) 팀원 목록 쿼리
-      queryMock.mockResolvedValueOnce([{ teamName: "팀A", memberName: "alice" }]);
+      queryMock.mockResolvedValueOnce([{ teamName: "팀A", memberName: "장영실" }]);
       // 3) 기간 내 RSVP 목록 쿼리
-      queryMock.mockResolvedValueOnce([{ meetingId, name: "alice" }]);
+      queryMock.mockResolvedValueOnce([{ meetingId, name: "장영실" }]);
 
       await getTeamAttendanceByPeriod("2026-03-01", "2026-03-31", customSlug);
 
@@ -174,8 +174,8 @@ describe("history-store", () => {
 
     it("팀원과 모임별 참석자를 기간과 목록 기준으로 반환한다", async () => {
       queryMock.mockResolvedValueOnce([
-        { memberName: "김민수" },
-        { memberName: "이지수" },
+        { memberName: "장영실" },
+        { memberName: "신사임당" },
       ]);
       queryMock.mockResolvedValueOnce([
         {
@@ -192,8 +192,8 @@ describe("history-store", () => {
         },
       ]);
       queryMock.mockResolvedValueOnce([
-        { meetingId: "meeting-1", name: "김민수" },
-        { meetingId: "meeting-1", name: "이지수" },
+        { meetingId: "meeting-1", name: "장영실" },
+        { meetingId: "meeting-1", name: "신사임당" },
       ]);
 
       const result = await getTeamAttendanceDetailByPeriod(
@@ -212,13 +212,13 @@ describe("history-store", () => {
       ]);
       expect(queryMock.mock.calls[2][1]).toEqual([
         ["meeting-2", "meeting-1"],
-        ["김민수".toLowerCase(), "이지수".toLowerCase()],
+        ["장영실".toLowerCase(), "신사임당".toLowerCase()],
       ]);
-      expect(result.members).toEqual(["김민수", "이지수"]);
+      expect(result.members).toEqual(["장영실", "신사임당"]);
       expect(result.meetings).toBe(2);
       expect(result.attended).toBe(1);
       expect(result.rate).toBe(0.5);
-      expect(result.items[1].attendees).toEqual(["김민수", "이지수"]);
+      expect(result.items[1].attendees).toEqual(["신사임당", "장영실"]);
     });
   });
 
@@ -237,8 +237,8 @@ describe("history-store", () => {
     it("#2 단일 모임 + rsvp 2명, 뒷풀이 없음", async () => {
       // 모임 참석 쿼리 → 2명
       queryMock.mockResolvedValueOnce([
-        { name: "alice", meetings: "1" },
-        { name: "bob", meetings: "1" },
+        { name: "장영실", meetings: "1" },
+        { name: "정약용", meetings: "1" },
       ]);
       // 뒷풀이 참석 쿼리 → 빈 배열
       queryMock.mockResolvedValueOnce([]);
@@ -246,51 +246,51 @@ describe("history-store", () => {
       const result = await getMemberAttendanceByPeriod("2026-03-01", "2026-03-31", "loop-pak-3");
 
       expect(result).toHaveLength(2);
-      expect(result.find((r) => r.name === "alice")).toEqual({
-        name: "alice",
+      expect(result.find((r) => r.name === "장영실")).toEqual({
+        name: "장영실",
         meetings: 1,
         afterparties: 0,
       });
-      expect(result.find((r) => r.name === "bob")).toEqual({
-        name: "bob",
+      expect(result.find((r) => r.name === "정약용")).toEqual({
+        name: "정약용",
         meetings: 1,
         afterparties: 0,
       });
     });
 
     it("#3 다중 모임 + 뒷풀이 — afterparties 카운트 정확성 및 Map merge", async () => {
-      // 모임 참석 쿼리 → 3명 (alice 3회, bob 2회, carol 1회)
+      // 모임 참석 쿼리 → 3명
       queryMock.mockResolvedValueOnce([
-        { name: "alice", meetings: "3" },
-        { name: "bob", meetings: "2" },
-        { name: "carol", meetings: "1" },
+        { name: "장영실", meetings: "3" },
+        { name: "정약용", meetings: "2" },
+        { name: "이황", meetings: "1" },
       ]);
-      // 뒷풀이 참석 쿼리 → alice 2회, dave 1회 (dave는 모임 미참석)
+      // 뒷풀이 참석 쿼리 → 모임 참석자 1명 + 뒷풀이 전용 참석자 1명
       queryMock.mockResolvedValueOnce([
-        { name: "alice", afterparties: "2" },
-        { name: "dave", afterparties: "1" },
+        { name: "장영실", afterparties: "2" },
+        { name: "이이", afterparties: "1" },
       ]);
 
       const result = await getMemberAttendanceByPeriod("2026-01-01", "2026-03-31", "loop-pak-3");
 
       expect(result).toHaveLength(4);
 
-      const alice = result.find((r) => r.name === "alice")!;
-      expect(alice.meetings).toBe(3);
-      expect(alice.afterparties).toBe(2);
+      const jang = result.find((r) => r.name === "장영실")!;
+      expect(jang.meetings).toBe(3);
+      expect(jang.afterparties).toBe(2);
 
-      const bob = result.find((r) => r.name === "bob")!;
-      expect(bob.meetings).toBe(2);
-      expect(bob.afterparties).toBe(0);
+      const jeong = result.find((r) => r.name === "정약용")!;
+      expect(jeong.meetings).toBe(2);
+      expect(jeong.afterparties).toBe(0);
 
-      const carol = result.find((r) => r.name === "carol")!;
-      expect(carol.meetings).toBe(1);
-      expect(carol.afterparties).toBe(0);
+      const hwang = result.find((r) => r.name === "이황")!;
+      expect(hwang.meetings).toBe(1);
+      expect(hwang.afterparties).toBe(0);
 
-      // dave는 모임 미참석이지만 뒷풀이만 참석 → merge되어야 함
-      const dave = result.find((r) => r.name === "dave")!;
-      expect(dave.meetings).toBe(0);
-      expect(dave.afterparties).toBe(1);
+      // 이이는 모임 미참석이지만 뒷풀이만 참석 → merge되어야 함
+      const yi = result.find((r) => r.name === "이이")!;
+      expect(yi.meetings).toBe(0);
+      expect(yi.afterparties).toBe(1);
     });
   });
 
@@ -334,7 +334,7 @@ describe("history-store", () => {
       queryMock.mockResolvedValueOnce([{ count: "2" }]);
 
       const result = await getMemberAttendanceDetailByPeriod(
-        " Alice ",
+        " 장영실 ",
         "2026-04-01",
         "2026-04-30",
         "loop-pak-4"
@@ -342,13 +342,13 @@ describe("history-store", () => {
 
       expect(queryMock).toHaveBeenCalledTimes(4);
       expect(queryMock.mock.calls[0][1]).toEqual([
-        "alice",
+        "장영실",
         "2026-04-01",
         "2026-04-30",
         "loop-pak-4",
       ]);
       expect(queryMock.mock.calls[1][1]).toEqual([
-        "alice",
+        "장영실",
         "2026-04-01",
         "2026-04-30",
         "loop-pak-4",
@@ -448,13 +448,13 @@ describe("history-store", () => {
       queryMock.mockResolvedValueOnce([{ count: "0" }]);
       queryMock.mockResolvedValueOnce([{ count: "0" }]);
 
-      await cachedGetMemberAttendanceDetailByPeriod("공명선", "2026-04-01", "2026-04-30", "loop-pak-3");
+      await cachedGetMemberAttendanceDetailByPeriod("정약용", "2026-04-01", "2026-04-30", "loop-pak-3");
 
       const lastCall =
         unstableCacheMock.mock.calls[unstableCacheMock.mock.calls.length - 1];
       expect(lastCall[1]).toEqual([
         "getMemberAttendanceDetailByPeriod",
-        "공명선",
+        "정약용",
         "2026-04-01",
         "2026-04-30",
         "loop-pak-3",

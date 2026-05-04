@@ -73,7 +73,7 @@ describe("meetup-store meeting password flows", () => {
           startTime: "14:00",
           location: "강남역",
           description: null,
-          leaders: ["유진"],
+          leaders: ["정약용"],
           hasPassword: true,
           studentCount: 0,
           operationCount: 0,
@@ -87,7 +87,7 @@ describe("meetup-store meeting password flows", () => {
       meetingDate: "2026-03-12",
       startTime: "14:00",
       location: "강남역",
-      leaders: ["유진"],
+      leaders: ["정약용"],
       password: "room-secret",
     });
 
@@ -95,7 +95,7 @@ describe("meetup-store meeting password flows", () => {
 
     const [sql, params] = queryMock.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain("password_hash");
-    expect(params[6]).toEqual(["유진"]);
+    expect(params[6]).toEqual(["정약용"]);
     expect(params[7]).toBe(hashMeetingPassword("room-secret"));
   });
 
@@ -198,7 +198,7 @@ describe("meetup-store meeting password flows", () => {
   it("promotes existing student rows to the selected role when adding participants in bulk", async () => {
     queryMock.mockResolvedValueOnce([{ changedCount: 1 }]);
 
-    const changedCount = await createRsvpsBulk("meeting-1", "angel", ["이전제"], "11주차 오프라인");
+    const changedCount = await createRsvpsBulk("meeting-1", "angel", ["이순신"], "11주차 오프라인");
 
     expect(changedCount).toBe(1);
 
@@ -206,7 +206,7 @@ describe("meetup-store meeting password flows", () => {
     expect(sql).toContain("update public.rsvps r");
     expect(sql).toContain("and r.role = 'student'");
     expect(sql).toContain("and i.role <> 'student'");
-    expect(params[0]).toEqual(["이전제"]);
+    expect(params[0]).toEqual(["이순신"]);
     expect(params[1]).toEqual(["angel"]);
   });
 
@@ -223,7 +223,7 @@ describe("meetup-store meeting password flows", () => {
   it("locks the meeting and confirms only the remaining capacity when capacity is set", async () => {
     queryMock.mockResolvedValueOnce([{ changedCount: 2 }]);
 
-    await createRsvpsBulk("meeting-1", "student", ["민수", "지수"], "정원 테스트");
+    await createRsvpsBulk("meeting-1", "student", ["장영실", "신사임당"], "정원 테스트");
 
     const [sql] = queryMock.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("for update");

@@ -98,7 +98,7 @@ node scripts/migrate-data.mjs \
   --source-counts backups/saturday-meetup-YYYYMMDD-HHmmss.counts.json
 ```
 
-스크립트는 백업 SQL 전체를 그대로 복원하지 않고, `docs/db/01_init_schema.sql`에 선언된 앱용 `public` 테이블의 `COPY` 데이터만 추출합니다. Supabase 내부 스키마나 legacy 테이블 충돌을 피하기 위한 동작입니다.
+스크립트는 백업 SQL 전체를 그대로 복원하지 않고, `docs/db/01_init_schema.sql`에 선언된 앱용 `public` 테이블의 `COPY` 데이터만 추출합니다. Supabase 내부 스키마나 과거 테이블 충돌을 피하기 위한 동작입니다.
 
 성공 기준:
 

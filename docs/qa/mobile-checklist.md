@@ -9,7 +9,17 @@ node scripts/capture-mobile-screenshots.mjs --base-url http://localhost:3102
 - viewport: `390x844`
 - screenshot output: `test-results/mobile-screenshots/*.png`
 - summary output: `test-results/mobile-screenshots/summary.json`
-- 인증: 테스트용 접근 세션을 브라우저 context에 주입
+- 인증: `APP_PASSWORD`와 `TEST_OPERATING_UNIT_*_CODE` 값으로 테스트용 접근 세션을 브라우저 context에 주입
+
+필요한 환경변수:
+
+| 변수 | 용도 |
+|------|------|
+| `APP_PASSWORD` | 전체관리자 화면 캡처 |
+| `TEST_OPERATING_UNIT_ACCESS_CODE` | 기수 입장 세션 |
+| `TEST_OPERATING_UNIT_ADMIN_CODE` | 기수 관리자 세션 |
+| `TEST_OPERATING_UNIT_ANGEL_CODE` | 기수 엔젤 세션 |
+| `TEST_OPERATING_UNIT_SLUG` | 캡처 대상 기수 slug. 기본값 `loop-pak-3` |
 
 ## 체크리스트
 
@@ -26,13 +36,15 @@ node scripts/capture-mobile-screenshots.mjs --base-url http://localhost:3102
 
 | 화면 | 경로 | 스크린샷 | 라벨 누락 | alt 누락 | 인터랙티브 겹침 | 가로폭 | 판정 |
 |------|------|----------|-----------|----------|----------------|--------|------|
-| 스터디 | `/` | `home.png` | 0 | 0 | 1 | 390/390 | ✅ PASS |
-| 멤버 | `/member` | `member.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
-| 엔젤 | `/angel` | `angel.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
-| 관리자 | `/admin` | `admin.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 첫 화면 | `/` | `home.png` | 0 | 0 | 1 | 390/390 | ✅ PASS |
+| 기수 입장 | `/cohorts/{unit}/entry` | `cohort-entry.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 스터디 | `/cohorts/{unit}/study` | `study.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 엔젤 | `/cohorts/{unit}/angel` | `angel.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 관리자 | `/cohorts/{unit}/admin` | `admin.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 멤버 | `/cohorts/{unit}/members` | `members.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
 | 기수 관리 | `/admin/operating-units` | `admin-operating-units.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
-| 주간 보고 | `/admin/reports` | `admin-reports.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
-| 히스토리 | `/admin/history` | `admin-history.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 주간 보고 | `/cohorts/{unit}/admin/reports` | `admin-reports.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
+| 히스토리 | `/cohorts/{unit}/admin/history` | `admin-history.png` | 0 | 0 | 0 | 390/390 | ✅ PASS |
 
 `/`의 인터랙티브 겹침 1건은 모바일 고정 FAB와 하단 fixed/dev 보조 UI가 같은 viewport에 잡힌 heuristic 경고다. 캡처 수동 확인 기준으로 주요 텍스트, 날짜 선택, 공유/이미지 버튼, 모임 카드 CTA는 조작 가능하다.
 

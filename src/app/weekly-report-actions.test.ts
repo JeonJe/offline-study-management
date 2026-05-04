@@ -125,7 +125,7 @@ function baseReportForm(): FormData {
   const formData = new FormData();
   formData.set("unit", "loop-pak-4");
   formData.set("cycleId", "cycle-1");
-  formData.set("angelName", "오현직");
+  formData.set("angelName", "이순신");
   formData.set("teamName", "1팀");
   formData.set("summary", "팀 현황");
   formData.set("notes", "특이사항");

@@ -147,7 +147,7 @@ test.describe.serial("캐시 정합성", () => {
     const leadersInput = fab.locator('input[data-leader-input="true"]');
     leadersSupported = (await leadersInput.count()) > 0;
     if (leadersSupported) {
-      await leadersInput.fill("E2E방장A, E2E방장B");
+      await leadersInput.fill("이순신, 유관순");
       await fab.locator('button[type="button"]:has-text("추가")').click();
     }
 
@@ -162,8 +162,8 @@ test.describe.serial("캐시 정합성", () => {
     if (leadersSupported) {
       const card = page.locator('article:has-text("E2E테스트모임")').first();
       await expect(card.getByText("방장:")).toBeVisible();
-      await expect(card.getByText("E2E방장A")).toBeVisible();
-      await expect(card.getByText("E2E방장B")).toBeVisible();
+      await expect(card.getByText("이순신")).toBeVisible();
+      await expect(card.getByText("유관순")).toBeVisible();
     }
 
     // 상세 URL 저장
@@ -181,8 +181,8 @@ test.describe.serial("캐시 정합성", () => {
     await page.goto(meetingDetailUrl);
     if (leadersSupported) {
       await expect(page.getByText("방장:")).toBeVisible();
-      await expect(page.getByText("E2E방장A")).toBeVisible();
-      await expect(page.getByText("E2E방장B")).toBeVisible();
+      await expect(page.getByText("이순신")).toBeVisible();
+      await expect(page.getByText("유관순")).toBeVisible();
     }
 
     // 현재 참여자 수 기록
@@ -268,14 +268,14 @@ test.describe.serial("캐시 정합성", () => {
     );
     await participantForm
       .locator('input[name="names"]')
-      .fill("E2E테스트참석자");
+      .fill("장영실");
     await submitServerActionAndFollowRedirect(page, () =>
       participantForm.locator('button[type="submit"]:has-text("추가")').click(),
     );
 
     // 참석자 표시 확인
     await expect(
-      page.getByText("E2E테스트참석자", { exact: false }).first(),
+      page.getByText("장영실", { exact: false }).first(),
     ).toBeVisible();
 
     // 정산 섹션 표시 확인
@@ -305,10 +305,11 @@ test.describe.serial("캐시 정합성", () => {
     // 현재 페이지 텍스트 스냅샷 (주요 영역)
     const contentBefore = normalizeVisibleText(await page.locator("main").innerText());
     expect(contentBefore.length).toBeGreaterThan(0);
-    const stableSnippets = ["멤버 명단", "7팀 / 51명", "오현직", "김대진"];
+    const stableSnippets = ["멤버 명단", "운영진"];
     for (const snippet of stableSnippets) {
       expect(contentBefore).toContain(snippet);
     }
+    expect(contentBefore).toMatch(/\d+팀\s*\/\s*\d+명/);
 
     // 새로고침
     await page.reload();
@@ -319,6 +320,7 @@ test.describe.serial("캐시 정합성", () => {
     for (const snippet of stableSnippets) {
       expect(contentAfter).toContain(snippet);
     }
+    expect(contentAfter).toMatch(/\d+팀\s*\/\s*\d+명/);
   });
 
   // ---- 시나리오 7 ----
@@ -329,7 +331,7 @@ test.describe.serial("캐시 정합성", () => {
     await meetingFab.locator("summary").click();
     await meetingFab.locator('input[name="title"]').fill("E2E크로스모임");
     await meetingFab.locator('input[name="location"]').fill("크로스장소");
-    await meetingFab.locator('input[data-leader-input="true"]').fill("E2E크로스방장");
+    await meetingFab.locator('input[data-leader-input="true"]').fill("정약용");
     await meetingFab.locator('button[type="button"]:has-text("추가")').click();
     await submitServerActionAndFollowRedirect(page, () =>
       meetingFab.locator("form").evaluate((form) => {

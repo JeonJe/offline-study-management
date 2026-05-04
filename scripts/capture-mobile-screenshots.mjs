@@ -7,15 +7,6 @@ import { chromium } from "@playwright/test";
 
 const VIEWPORT = { width: 390, height: 844 };
 const DEFAULT_OUTPUT_DIR = "test-results/mobile-screenshots";
-const ROUTES = [
-  { name: "home", path: "/" },
-  { name: "member", path: "/member" },
-  { name: "angel", path: "/angel", role: "angel" },
-  { name: "admin", path: "/admin", role: "admin" },
-  { name: "admin-operating-units", path: "/admin/operating-units", role: "admin" },
-  { name: "admin-reports", path: "/admin/reports", role: "admin" },
-  { name: "admin-history", path: "/admin/history", role: "admin" },
-];
 
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -41,9 +32,15 @@ function authToken(password) {
     .digest("hex");
 }
 
-function roleToken(role, password) {
+function unitAuthToken(slug, password) {
   return createHash("sha256")
-    .update(`saturday-meetup:${role}:${password}`)
+    .update(`saturday-meetup:operating-unit:${slug}:${password}`)
+    .digest("hex");
+}
+
+function unitRoleToken(slug, role, password) {
+  return createHash("sha256")
+    .update(`saturday-meetup:operating-unit:${slug}:${role}:${password}`)
     .digest("hex");
 }
 
@@ -130,18 +127,32 @@ async function collectSignals(page) {
 async function main() {
   loadEnvFile(path.join(process.cwd(), ".env"));
   loadEnvFile(path.join(process.cwd(), ".env.local"));
-  loadEnvFile("/Users/green/IdeaProjects/saturday-meetup/.env");
-  loadEnvFile("/Users/green/IdeaProjects/saturday-meetup/.env.local");
 
   const baseUrl = argValue("--base-url", process.env.PLAYWRIGHT_BASE_URL ?? "https://offline-study-management.vercel.app");
   const outputDir = argValue("--output-dir", DEFAULT_OUTPUT_DIR);
+  const unitSlug = argValue("--unit", process.env.TEST_OPERATING_UNIT_SLUG ?? "loop-pak-3");
   const appPassword = process.env.APP_PASSWORD;
-  const adminPassword = process.env.ADMIN_PAGE_PASSWORD;
-  const angelPassword = process.env.ANGEL_PAGE_PASSWORD;
+  const unitAccessCode = process.env.TEST_OPERATING_UNIT_ACCESS_CODE;
+  const unitAdminCode = process.env.TEST_OPERATING_UNIT_ADMIN_CODE;
+  const unitAngelCode = process.env.TEST_OPERATING_UNIT_ANGEL_CODE;
 
-  if (!appPassword || !adminPassword || !angelPassword) {
-    throw new Error("APP_PASSWORD, ADMIN_PAGE_PASSWORD, ANGEL_PAGE_PASSWORD 환경변수가 필요합니다.");
+  if (!appPassword || !unitAccessCode || !unitAdminCode || !unitAngelCode) {
+    throw new Error(
+      "APP_PASSWORD, TEST_OPERATING_UNIT_ACCESS_CODE, TEST_OPERATING_UNIT_ADMIN_CODE, TEST_OPERATING_UNIT_ANGEL_CODE 환경변수가 필요합니다."
+    );
   }
+
+  const routes = [
+    { name: "home", path: "/" },
+    { name: "cohort-entry", path: `/cohorts/${unitSlug}/entry` },
+    { name: "study", path: `/cohorts/${unitSlug}/study`, unit: true },
+    { name: "angel", path: `/cohorts/${unitSlug}/angel`, unit: true, role: "angel" },
+    { name: "admin", path: `/cohorts/${unitSlug}/admin`, unit: true, role: "admin" },
+    { name: "members", path: `/cohorts/${unitSlug}/members`, unit: true, role: "admin" },
+    { name: "admin-reports", path: `/cohorts/${unitSlug}/admin/reports`, unit: true, role: "admin" },
+    { name: "admin-history", path: `/cohorts/${unitSlug}/admin/history`, unit: true, role: "admin" },
+    { name: "admin-operating-units", path: "/admin/operating-units", globalAdmin: true },
+  ];
 
   fs.mkdirSync(outputDir, { recursive: true });
   const { domain, secure } = cookieDomain(baseUrl);
@@ -153,36 +164,46 @@ async function main() {
     isMobile: true,
   });
 
-  await context.addCookies([
-    {
-      name: "meetup_auth",
-      value: authToken(appPassword),
-      domain,
-      path: "/",
-      httpOnly: true,
-      sameSite: "Lax",
-      secure,
-    }
-  ]);
-
   const page = await context.newPage();
   const results = [];
 
-  for (const route of ROUTES) {
-    if (route.role) {
-      const password = route.role === "admin" ? adminPassword : angelPassword;
-      await context.addCookies([
-        {
-          name: "meetup_role_access",
-          value: `${route.role}.${roleToken(route.role, password)}`,
-          domain,
-          path: "/",
-          httpOnly: true,
-          sameSite: "Lax",
-          secure,
-        },
-      ]);
+  for (const route of routes) {
+    const cookies = [];
+    if (route.globalAdmin) {
+      cookies.push({
+        name: "meetup_auth",
+        value: authToken(appPassword),
+        domain,
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+        secure,
+      });
     }
+    if (route.unit) {
+      cookies.push({
+        name: "meetup_auth",
+        value: `unit:${encodeURIComponent(unitSlug)}:${unitAuthToken(unitSlug, unitAccessCode)}`,
+        domain,
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+        secure,
+      });
+    }
+    if (route.role) {
+      const password = route.role === "admin" ? unitAdminCode : unitAngelCode;
+      cookies.push({
+        name: "meetup_role_access",
+        value: `${route.role}.${encodeURIComponent(unitSlug)}.${unitRoleToken(unitSlug, route.role, password)}`,
+        domain,
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+        secure,
+      });
+    }
+    if (cookies.length > 0) await context.addCookies(cookies);
     await page.goto(route.path, { waitUntil: "networkidle" });
     const screenshotPath = path.join(outputDir, `${route.name}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });

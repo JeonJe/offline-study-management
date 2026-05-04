@@ -29,15 +29,15 @@ describe("member-store stable member identity", () => {
       [
         {
           teamName: "1팀",
-          angels: ["오현직"],
-          members: ["김루퍼", "김루퍼"],
+          angels: ["이순신"],
+          members: ["세종대왕", "세종대왕"],
           memberEntries: [
-            { id: "member-a", name: "김루퍼", order: 0 },
-            { id: "member-b", name: "김루퍼", order: 1 },
+            { id: "member-a", name: "세종대왕", order: 0 },
+            { id: "member-b", name: "세종대왕", order: 1 },
           ],
         },
       ],
-      ["오현직"]
+      ["이순신"]
     );
 
     const memberInsertCalls = transactionQueryMock.mock.calls.filter(([sql]) =>
@@ -48,14 +48,14 @@ describe("member-store stable member identity", () => {
     expect(memberInsertCalls[0]?.[1]).toEqual([
       "1팀",
       "member-a",
-      "김루퍼",
+      "세종대왕",
       0,
       "loop-pak-3",
     ]);
     expect(memberInsertCalls[1]?.[1]).toEqual([
       "1팀",
       "member-b",
-      "김루퍼",
+      "세종대왕",
       1,
       "loop-pak-3",
     ]);
@@ -67,12 +67,12 @@ describe("member-store stable member identity", () => {
       [
         {
           teamName: "공통팀",
-          angels: ["오현직"],
-          members: ["김루퍼"],
-          memberEntries: [{ id: "member-a", name: "김루퍼", order: 0 }],
+          angels: ["이순신"],
+          members: ["세종대왕"],
+          memberEntries: [{ id: "member-a", name: "세종대왕", order: 0 }],
         },
       ],
-      ["오현직"],
+      ["이순신"],
       { mentor: ["멘토"] }
     );
 

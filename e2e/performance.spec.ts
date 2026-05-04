@@ -89,7 +89,7 @@ test.describe("페이지 성능", () => {
     await fab.locator('input[name="title"]').fill(title);
     await fab.locator('input[name="location"]').fill("성능테스트장소");
     await fab.locator('input[name="meetingDate"]').fill(CACHE_TEST_DATE);
-    await fab.locator('input[data-leader-input="true"]').fill("E2E성능방장");
+    await fab.locator('input[data-leader-input="true"]').fill("장영실");
     await fab.locator('button[type="button"]:has-text("추가")').click();
 
     const startTime = Date.now();

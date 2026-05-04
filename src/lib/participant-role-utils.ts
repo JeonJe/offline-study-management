@@ -4,10 +4,10 @@ export const SPECIAL_ROLE_PRESET: Record<
   Extract<ParticipantRole, "supporter" | "buddy" | "mentor" | "manager">,
   readonly string[]
 > = {
-  supporter: ["엄준서", "박기현"],
-  buddy: ["김지웅", "변상일"],
-  mentor: ["alen", "devin", "len", "kev"],
-  manager: ["annie"],
+  supporter: ["유관순", "신사임당"],
+  buddy: ["허준", "장보고"],
+  mentor: ["장영실", "정약용", "이황", "이이"],
+  manager: ["세종대왕"],
 } as const;
 
 export type SpecialRolePresetInput = Partial<
