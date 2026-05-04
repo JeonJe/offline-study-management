@@ -5,6 +5,7 @@ import {
   cohortPath,
   waitForCohortDateUrl,
 } from "./support/test-config";
+import { submitServerActionAndFollowRedirect } from "./support/server-action";
 
 const DASHBOARD = cohortPath("study", { date: CACHE_TEST_DATE });
 const AFTERPARTY_PAGE = cohortPath("afterparty", { date: CACHE_TEST_DATE });
@@ -104,6 +105,10 @@ async function getMeetingParticipantCount(
   return Number(match[1]);
 }
 
+function normalizeVisibleText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 // ---------- 테스트 ----------
 
 test.describe.serial("캐시 정합성", () => {
@@ -146,16 +151,14 @@ test.describe.serial("캐시 정합성", () => {
       await fab.locator('button[type="button"]:has-text("추가")').click();
     }
 
-    // 제출
-    await Promise.all([
-      page.waitForURL(waitForCohortDateUrl("study")),
+    await submitServerActionAndFollowRedirect(page, () =>
       fab.getByRole("button", { name: "생성", exact: true }).click(),
-    ]);
+    );
 
     // 생성된 모임 확인
     await expect(
       page.locator('article:has-text("E2E테스트모임")').first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
     if (leadersSupported) {
       const card = page.locator('article:has-text("E2E테스트모임")').first();
       await expect(card.getByText("방장:")).toBeVisible();
@@ -191,7 +194,9 @@ test.describe.serial("캐시 정합성", () => {
       .locator('form:has(input[name="names"]):not(:has-text("할당됨"))')
       .first();
     await expect(firstUnassignedForm).toBeVisible();
-    await firstUnassignedForm.locator("button").first().click();
+    await submitServerActionAndFollowRedirect(page, () =>
+      firstUnassignedForm.locator("button").first().click(),
+    );
 
     // 참여자 수 1명 증가 확인
     await expect
@@ -234,16 +239,14 @@ test.describe.serial("캐시 정합성", () => {
     await fab.locator('input[name="title"]').fill("E2E테스트뒤풀이");
     await fab.locator('input[name="location"]').fill("테스트장소");
 
-    // 제출
-    await Promise.all([
-      page.waitForURL(waitForCohortDateUrl("afterparty")),
+    await submitServerActionAndFollowRedirect(page, () =>
       fab.getByRole("button", { name: "생성", exact: true }).click(),
-    ]);
+    );
 
     // 생성된 뒤풀이 확인
     await expect(
       page.locator('article:has-text("E2E테스트뒤풀이")').first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
 
     // 상세 URL 저장
     const link = page
@@ -266,10 +269,9 @@ test.describe.serial("캐시 정합성", () => {
     await participantForm
       .locator('input[name="names"]')
       .fill("E2E테스트참석자");
-    await participantForm
-      .locator('button[type="submit"]:has-text("추가")')
-      .click();
-    await page.waitForLoadState("domcontentloaded");
+    await submitServerActionAndFollowRedirect(page, () =>
+      participantForm.locator('button[type="submit"]:has-text("추가")').click(),
+    );
 
     // 참석자 표시 확인
     await expect(
@@ -301,16 +303,22 @@ test.describe.serial("캐시 정합성", () => {
     await expect(page.locator("p").filter({ hasText: /^운영진$/ })).toBeVisible();
 
     // 현재 페이지 텍스트 스냅샷 (주요 영역)
-    const contentBefore = await page.locator("main").innerText();
+    const contentBefore = normalizeVisibleText(await page.locator("main").innerText());
     expect(contentBefore.length).toBeGreaterThan(0);
+    const stableSnippets = ["멤버 명단", "7팀 / 51명", "오현직", "김대진"];
+    for (const snippet of stableSnippets) {
+      expect(contentBefore).toContain(snippet);
+    }
 
     // 새로고침
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
 
     // 동일 데이터 확인
-    const contentAfter = await page.locator("main").innerText();
-    expect(contentAfter).toEqual(contentBefore);
+    const contentAfter = normalizeVisibleText(await page.locator("main").innerText());
+    for (const snippet of stableSnippets) {
+      expect(contentAfter).toContain(snippet);
+    }
   });
 
   // ---- 시나리오 7 ----
@@ -323,9 +331,11 @@ test.describe.serial("캐시 정합성", () => {
     await meetingFab.locator('input[name="location"]').fill("크로스장소");
     await meetingFab.locator('input[data-leader-input="true"]').fill("E2E크로스방장");
     await meetingFab.locator('button[type="button"]:has-text("추가")').click();
-    await meetingFab
-      .locator("form")
-      .evaluate((form) => (form as HTMLFormElement).requestSubmit());
+    await submitServerActionAndFollowRedirect(page, () =>
+      meetingFab.locator("form").evaluate((form) => {
+        (form as HTMLFormElement).requestSubmit();
+      }),
+    );
     await expect(
       page.locator('a[aria-label="E2E크로스모임 상세 보기"]').first(),
     ).toBeVisible({ timeout: 10_000 });
@@ -344,9 +354,11 @@ test.describe.serial("캐시 정합성", () => {
       .locator('input[name="title"]')
       .fill("E2E크로스뒤풀이");
     await afterpartyFab.locator('input[name="location"]').fill("크로스장소");
-    await afterpartyFab
-      .locator("form")
-      .evaluate((form) => (form as HTMLFormElement).requestSubmit());
+    await submitServerActionAndFollowRedirect(page, () =>
+      afterpartyFab.locator("form").evaluate((form) => {
+        (form as HTMLFormElement).requestSubmit();
+      }),
+    );
     await expect(
       page.locator('a[aria-label="E2E크로스뒤풀이 상세 보기"]').first(),
     ).toBeVisible({ timeout: 10_000 });

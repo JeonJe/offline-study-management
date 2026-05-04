@@ -241,6 +241,12 @@ export function withUpdatedSearchParams(
   return `${pathname}${query ? `?${query}` : ""}${hashPart ? `#${hashPart}` : ""}`;
 }
 
+export function mutationRedirectPath(path: string, mutationId: string): string {
+  return withUpdatedSearchParams(path, {
+    mutation: mutationId,
+  });
+}
+
 export function meetingManagePath(meetingId: string, returnPath: string | null, status: string): string {
   return withUpdatedSearchParams(returnPath ?? `/meetings/${meetingId}`, {
     manage: status,
@@ -330,4 +336,3 @@ export function revalidateAfterpartyViews(
     revalidatePath(returnPathname);
   }
 }
-

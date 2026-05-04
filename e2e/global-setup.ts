@@ -7,6 +7,7 @@ import {
   CACHE_TEST_DATE,
   TEST_OPERATING_UNIT_SLUG,
 } from "./support/test-config";
+import { submitServerActionAndFollowRedirect } from "./support/server-action";
 
 export default async function globalSetup() {
   const password =
@@ -41,12 +42,9 @@ export default async function globalSetup() {
     const adminPath = `/cohorts/${TEST_OPERATING_UNIT_SLUG}/admin`;
     await page.goto(`${BASE_URL}${adminPath}`);
     await page.getByLabel("비밀번호").fill(adminPassword);
-    await Promise.all([
-      page.waitForURL((url) => url.pathname === adminPath && !url.searchParams.has("access"), {
-        timeout: 15_000,
-      }),
+    await submitServerActionAndFollowRedirect(page, () =>
       page.getByRole("button", { name: "열기" }).click(),
-    ]);
+    );
     await page.waitForSelector("text=멤버/팀/엔젤 배정", { timeout: 15_000 });
   }
 

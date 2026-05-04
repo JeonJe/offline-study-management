@@ -1,10 +1,21 @@
 import { redirect } from "next/navigation";
+import {
+  RoleAccessRequired,
+  RoleNotConfigured,
+} from "@/app/role-page-view";
+import { RoleShell } from "@/app/role-shell";
 import { isAuthenticatedForUnit } from "@/lib/auth";
 import { cachedLoadMemberPreset } from "@/lib/cached-queries";
 import { MemberAdminForm } from "@/app/members/member-admin-form";
-import { DashboardHeader } from "@/app/dashboard-header";
 import { cohortAwarePath, cohortEntryLoginPath } from "@/lib/cohort-routes";
-import { getCurrentRolePageRole } from "@/lib/role-session";
+import {
+  canOpenRolePage,
+  getRolePage,
+} from "@/lib/role-page";
+import {
+  getConfiguredRolePages,
+  getCurrentRolePageRole,
+} from "@/lib/role-session";
 
 type MembersPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,21 +36,27 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
   if (!authenticated) {
     redirect(cohortEntryLoginPath(unitSlug, { auth: "required", returnPath: cohortAwarePath(unitSlug, "/members") }));
   }
+
   const currentRole = await getCurrentRolePageRole(unitSlug);
-  if (currentRole !== "admin") {
-    redirect(`${cohortAwarePath(unitSlug, "/members")}?access=required`);
-  }
+  const page = getRolePage("admin");
+  const access = canOpenRolePage("admin", currentRole, getConfiguredRolePages());
 
-  const preset = await cachedLoadMemberPreset(unitSlug);
-
-  return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-6 sm:px-6 lg:px-8 lg:pb-10">
-      <DashboardHeader
-        title="멤버 관리"
-        activeTab="admin"
+  let content;
+  if (access === "role-not-configured") {
+    content = <RoleNotConfigured label={page.label} />;
+  } else if (access === "role-required") {
+    content = (
+      <RoleAccessRequired
+        role="admin"
+        label={page.label}
+        invalid={singleParam(params.access) === "invalid"}
+        returnPath={cohortAwarePath(unitSlug, "/members")}
         unitSlug={unitSlug}
       />
-
+    );
+  } else {
+    const preset = await cachedLoadMemberPreset(unitSlug);
+    content = (
       <section className="fade-in">
         <MemberAdminForm
           operatingUnitSlug={unitSlug}
@@ -48,6 +65,17 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
           initialSpecialRoles={preset.specialRoles}
         />
       </section>
-    </main>
+    );
+  }
+
+  return (
+    <RoleShell
+      activeRole="admin"
+      title="멤버 관리"
+      summary="팀과 멤버, 운영진 역할을 관리합니다."
+      unitSlug={unitSlug}
+    >
+      {content}
+    </RoleShell>
   );
 }

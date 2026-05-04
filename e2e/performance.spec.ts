@@ -3,8 +3,8 @@ import {
   AUTH_STATE,
   CACHE_TEST_DATE,
   cohortPath,
-  waitForCohortDateUrl,
 } from "./support/test-config";
+import { submitServerActionAndFollowRedirect } from "./support/server-action";
 
 const PAGES = [
   { name: "대시보드", url: cohortPath("study", { date: CACHE_TEST_DATE }) },
@@ -19,12 +19,21 @@ const VISITS_PER_PAGE = 3;
 async function measureTTFB(
   page: import("@playwright/test").Page,
 ): Promise<number> {
-  return page.evaluate(() => {
-    const [entry] = performance.getEntriesByType(
-      "navigation",
-    ) as PerformanceNavigationTiming[];
-    return entry.responseStart - entry.fetchStart;
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await page.evaluate(() => {
+        const [entry] = performance.getEntriesByType(
+          "navigation",
+        ) as PerformanceNavigationTiming[];
+        return entry.responseStart - entry.fetchStart;
+      });
+    } catch (error) {
+      if (attempt === 2) throw error;
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
+    }
+  }
+
+  throw new Error("TTFB 측정 실패");
 }
 
 // ---------- 시나리오 8: 페이지별 TTFB 측정 ----------
@@ -41,7 +50,8 @@ test.describe("페이지 성능", () => {
         });
         const page = await context.newPage();
 
-        await page.goto(url, { waitUntil: "load" });
+        await page.goto(url, { waitUntil: "domcontentloaded" });
+        await page.waitForLoadState("load").catch(() => {});
         const ttfb = await measureTTFB(page);
         ttfbs.push(ttfb);
 
@@ -83,24 +93,22 @@ test.describe("페이지 성능", () => {
     await fab.locator('button[type="button"]:has-text("추가")').click();
 
     const startTime = Date.now();
-    await fab
-      .locator("form")
-      .evaluate((form) => (form as HTMLFormElement).requestSubmit());
-    await page.waitForURL(waitForCohortDateUrl("study"));
+    await submitServerActionAndFollowRedirect(page, () =>
+      fab.locator("form").evaluate((form) => {
+        (form as HTMLFormElement).requestSubmit();
+      }),
+    );
 
-    // 3. 리다이렉트 후 페이지 로드 완료까지 측정
-    await page.waitForLoadState("domcontentloaded");
+    // 생성 결과가 실제 목록에 나타나는 시점을 뮤테이션 완료 기준으로 삼는다.
+    await expect(
+      page.locator(`a[aria-label="${title} 상세 보기"]`).first(),
+    ).toBeVisible({ timeout: 20_000 });
     const elapsed = Date.now() - startTime;
 
     console.log(`[뮤테이션 후 로드] ${elapsed}ms`);
 
     // 4. 1500ms 이내
     expect(elapsed).toBeLessThan(1500);
-
-    // 5. 생성한 모임 확인. 정리는 afterAll에서 일괄 처리한다.
-    await expect(
-      page.locator(`a[aria-label="${title} 상세 보기"]`).first(),
-    ).toBeVisible({ timeout: 10_000 });
   });
 
   // 이전 실행 잔여 데이터 정리

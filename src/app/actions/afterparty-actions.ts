@@ -23,6 +23,7 @@ import {
   afterpartyManagePath,
   afterpartyPath,
   type DashboardState,
+  mutationRedirectPath,
   parseDelimitedNames,
   parseDirectParticipantNames,
   participantFeedbackPath,
@@ -75,11 +76,10 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
   });
 
   revalidateAfterpartyViews(created.id, returnPath);
-  redirect(
-    returnPath
-      ? withUpdatedSearchParams(returnPath, { date: created.eventDate })
-      : afterpartyPath({ date: created.eventDate })
-  );
+  const listPath = returnPath
+    ? withUpdatedSearchParams(returnPath, { date: created.eventDate })
+    : afterpartyPath({ date: created.eventDate });
+  redirect(mutationRedirectPath(listPath, created.id));
 }
 
 export async function bulkCreateAfterpartyParticipantsAction(formData: FormData): Promise<void> {

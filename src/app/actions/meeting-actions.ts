@@ -26,6 +26,7 @@ import {
   dashboardPath,
   type DashboardState,
   meetingManagePath,
+  mutationRedirectPath,
   parseDelimitedNames,
   parseDelimitedPeople,
   parseDirectParticipantNames,
@@ -83,7 +84,7 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
 
   revalidateMeetupViews(created.id, returnPath);
   revalidatePath("/loop-pak");
-  redirect(returnPath ?? dashboardPath({ date: created.meetingDate }));
+  redirect(mutationRedirectPath(returnPath ?? dashboardPath({ date: created.meetingDate }), created.id));
 }
 
 export async function createRsvpAction(formData: FormData): Promise<void> {
