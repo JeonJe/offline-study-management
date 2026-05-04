@@ -9,6 +9,10 @@ type OfflineStudyCaptureButtonProps = {
 
 type CaptureState = "idle" | "capturing" | "downloaded";
 const DEFAULT_CAPTURE_BUTTON_LABEL = "이미지 다운로드";
+const HTML2CANVAS_CDN_URL = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+const HTML2CANVAS_CDN_INTEGRITY = "sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H";
+const HTML_TO_IMAGE_CDN_URL = "https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js";
+const HTML_TO_IMAGE_CDN_INTEGRITY = "sha384-Tha/42qsYmpYmQ07pX+nJzkKumO0BzKJxK/uzVc7xyBQxVCUgQBhQIG8L7vXK+9C";
 
 type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
 type HtmlToImageNamespace = {
@@ -52,7 +56,10 @@ async function loadHtml2CanvasFromCdn(): Promise<Html2CanvasFn> {
 
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+    script.src = HTML2CANVAS_CDN_URL;
+    script.integrity = HTML2CANVAS_CDN_INTEGRITY;
+    script.crossOrigin = "anonymous";
+    script.referrerPolicy = "no-referrer";
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("html2canvas 스크립트 로드에 실패했습니다."));
@@ -73,7 +80,10 @@ async function loadHtmlToImageFromCdn(): Promise<HtmlToImageNamespace> {
 
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js";
+    script.src = HTML_TO_IMAGE_CDN_URL;
+    script.integrity = HTML_TO_IMAGE_CDN_INTEGRITY;
+    script.crossOrigin = "anonymous";
+    script.referrerPolicy = "no-referrer";
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("html-to-image 스크립트 로드에 실패했습니다."));

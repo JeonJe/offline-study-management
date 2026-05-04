@@ -73,13 +73,33 @@ function getNormalizedDatabaseUrl(): string {
   return normalizedDatabaseUrl;
 }
 
+function databaseSslConfig(): false | { rejectUnauthorized: boolean } {
+  const normalizedUrl = getNormalizedDatabaseUrl();
+  const sslMode = new URL(normalizedUrl).searchParams.get("sslmode")?.toLowerCase();
+  const rejectUnauthorizedOverride = process.env.DB_SSL_REJECT_UNAUTHORIZED?.toLowerCase();
+
+  if (sslMode === "disable") {
+    return false;
+  }
+
+  if (
+    sslMode === "no-verify" ||
+    rejectUnauthorizedOverride === "0" ||
+    rejectUnauthorizedOverride === "false"
+  ) {
+    return { rejectUnauthorized: false };
+  }
+
+  return { rejectUnauthorized: true };
+}
+
 async function getPool(): Promise<PgPool> {
   if (pool) return pool;
 
   const { Pool } = await import("pg");
   const nextPool = new Pool({
     connectionString: getNormalizedDatabaseUrl(),
-    ssl: { rejectUnauthorized: false },
+    ssl: databaseSslConfig(),
     max: 2,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
