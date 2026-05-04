@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { isAuthenticated, isAuthenticatedForUnit } from "@/lib/auth";
+import { isAuthenticatedForUnit } from "@/lib/auth";
 import {
   revalidateAfterpartyData,
   revalidateMeetupData,
@@ -331,9 +331,3 @@ export function revalidateAfterpartyViews(
   }
 }
 
-export async function requireAuthOrRedirect(): Promise<void> {
-  const authenticated = await isAuthenticated();
-  if (!authenticated) {
-    redirect("/?auth=required");
-  }
-}

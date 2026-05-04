@@ -6,7 +6,7 @@ const {
   deleteAngelWeeklyReportMock,
   deleteWeeklyReportTemplateMock,
   getCurrentRolePageRoleMock,
-  isAuthenticatedMock,
+  isAuthenticatedForUnitMock,
   redirectMock,
   revalidatePathMock,
   updateWeeklyReportCycleMock,
@@ -18,7 +18,7 @@ const {
   deleteAngelWeeklyReportMock: vi.fn(),
   deleteWeeklyReportTemplateMock: vi.fn(),
   getCurrentRolePageRoleMock: vi.fn(),
-  isAuthenticatedMock: vi.fn(),
+  isAuthenticatedForUnitMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -37,7 +37,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  isAuthenticated: isAuthenticatedMock,
+  isAuthenticatedForUnit: isAuthenticatedForUnitMock,
 }));
 
 vi.mock("@/lib/role-session", () => ({
@@ -66,7 +66,7 @@ describe("weekly-report-actions", () => {
     deleteAngelWeeklyReportMock.mockReset();
     deleteWeeklyReportTemplateMock.mockReset();
     getCurrentRolePageRoleMock.mockReset();
-    isAuthenticatedMock.mockReset();
+    isAuthenticatedForUnitMock.mockReset();
     redirectMock.mockClear();
     revalidatePathMock.mockClear();
     updateWeeklyReportCycleMock.mockReset();
@@ -75,7 +75,7 @@ describe("weekly-report-actions", () => {
   });
 
   it("redirects unauthenticated report submissions to the cohort entry page", async () => {
-    isAuthenticatedMock.mockResolvedValue(false);
+    isAuthenticatedForUnitMock.mockResolvedValue(false);
     const formData = baseReportForm();
     formData.set("returnPath", "/cohorts/loop-pak-4/angel/reports/cycle-1?team=1");
 
@@ -87,7 +87,7 @@ describe("weekly-report-actions", () => {
   });
 
   it("appends submitted status to the provided return path", async () => {
-    isAuthenticatedMock.mockResolvedValue(true);
+    isAuthenticatedForUnitMock.mockResolvedValue(true);
     getCurrentRolePageRoleMock.mockResolvedValue("angel");
     const formData = baseReportForm();
     formData.set("returnPath", "/cohorts/loop-pak-4/angel/reports/cycle-1?team=1");
@@ -106,7 +106,7 @@ describe("weekly-report-actions", () => {
   });
 
   it("appends unsubmitted status after deleting a report", async () => {
-    isAuthenticatedMock.mockResolvedValue(true);
+    isAuthenticatedForUnitMock.mockResolvedValue(true);
     getCurrentRolePageRoleMock.mockResolvedValue("admin");
     const formData = baseReportForm();
     formData.set("reportId", "report-1");

@@ -139,13 +139,14 @@ create index if not exists idx_afterparty_settlement_participants_participant
   on public.afterparty_settlement_participants (participant_id);
 
 create table if not exists public.member_teams (
-  team_name text primary key,
+  team_name text not null,
   angel_name text not null,
   angel_names text[] not null default '{}'::text[],
   team_order integer not null default 0,
   operating_unit_slug text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (operating_unit_slug, team_name)
 );
 
 create index if not exists idx_member_teams_order
@@ -155,13 +156,15 @@ create index if not exists idx_member_teams_operating_unit
   on public.member_teams (operating_unit_slug);
 
 create table if not exists public.member_team_members (
-  team_name text not null references public.member_teams(team_name) on delete cascade,
+  team_name text not null,
   member_name text not null,
   member_id text not null,
   member_order integer not null default 0,
   operating_unit_slug text not null,
   created_at timestamptz not null default now(),
-  primary key (member_id)
+  primary key (operating_unit_slug, member_id),
+  foreign key (operating_unit_slug, team_name)
+    references public.member_teams(operating_unit_slug, team_name) on delete cascade
 );
 
 create index if not exists idx_member_team_members_order
@@ -171,10 +174,11 @@ create index if not exists idx_member_team_members_operating_unit
   on public.member_team_members (operating_unit_slug);
 
 create table if not exists public.member_angels (
-  angel_name text primary key,
+  angel_name text not null,
   angel_order integer not null default 0,
   operating_unit_slug text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  primary key (operating_unit_slug, angel_name)
 );
 
 create index if not exists idx_member_angels_order
@@ -189,7 +193,7 @@ create table if not exists public.member_special_roles (
   member_order integer not null default 0,
   operating_unit_slug text not null,
   created_at timestamptz not null default now(),
-  primary key (role, member_name)
+  primary key (operating_unit_slug, role, member_name)
 );
 
 create index if not exists idx_member_special_roles_order

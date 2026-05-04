@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticatedForUnit } from "@/lib/auth";
 import { cohortAwarePath, cohortEntryLoginPath } from "@/lib/cohort-routes";
 import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
 import {
@@ -50,7 +50,7 @@ async function requireRole(
   allowedRoles: RolePageRole[],
   fallbackPath: string
 ): Promise<void> {
-  const authenticated = await isAuthenticated();
+  const authenticated = await isAuthenticatedForUnit(unitSlug);
   if (!authenticated) {
     redirect(cohortEntryLoginPath(unitSlug, { auth: "required", returnPath: fallbackPath }));
   }

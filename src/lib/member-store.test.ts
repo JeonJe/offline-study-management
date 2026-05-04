@@ -60,4 +60,38 @@ describe("member-store stable member identity", () => {
       "loop-pak-3",
     ]);
   });
+
+  it("scopes roster upserts by operating unit to avoid cross-unit overwrites", async () => {
+    await saveMemberPresetToDb(
+      "loop-pak-3",
+      [
+        {
+          teamName: "공통팀",
+          angels: ["오현직"],
+          members: ["김루퍼"],
+          memberEntries: [{ id: "member-a", name: "김루퍼", order: 0 }],
+        },
+      ],
+      ["오현직"],
+      { mentor: ["멘토"] }
+    );
+
+    const teamUpsert = transactionQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("insert into public.member_teams")
+    );
+    expect(String(teamUpsert?.[0])).toContain("on conflict (operating_unit_slug, team_name)");
+
+    const angelUpsert = transactionQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("insert into public.member_angels")
+    );
+    expect(String(angelUpsert?.[0])).toContain("on conflict (operating_unit_slug, angel_name)");
+
+    const specialRoleUpsert = transactionQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("insert into public.member_special_roles")
+    );
+    expect(String(specialRoleUpsert?.[0])).toContain(
+      "on conflict (operating_unit_slug, role, member_name)"
+    );
+  });
+
 });

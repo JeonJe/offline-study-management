@@ -182,6 +182,7 @@ async function ensureMemberSchema(): Promise<void> {
     if (schemaExists && !runtimeMigrationsEnabled) {
       await ensureMemberOperatingUnitColumns();
       await ensureMemberIdentityColumns();
+      await ensureMemberCompositeKeys();
       await ensureMemberQueryIndexes();
       schemaReady = true;
       return;
@@ -189,13 +190,14 @@ async function ensureMemberSchema(): Promise<void> {
 
     await query(
       `create table if not exists public.member_teams (
-         team_name text primary key,
+         team_name text not null,
          angel_name text not null,
          angel_names text[] not null default '{}'::text[],
          team_order integer not null default 0,
          operating_unit_slug text not null,
          created_at timestamptz not null default now(),
-         updated_at timestamptz not null default now()
+         updated_at timestamptz not null default now(),
+         primary key (operating_unit_slug, team_name)
        )`
     );
 
@@ -220,13 +222,15 @@ async function ensureMemberSchema(): Promise<void> {
 
     await query(
       `create table if not exists public.member_team_members (
-         team_name text not null references public.member_teams(team_name) on delete cascade,
+         team_name text not null,
          member_name text not null,
          member_id text not null,
          member_order integer not null default 0,
          operating_unit_slug text not null,
          created_at timestamptz not null default now(),
-         primary key (member_id)
+         primary key (operating_unit_slug, member_id),
+         foreign key (operating_unit_slug, team_name)
+           references public.member_teams(operating_unit_slug, team_name) on delete cascade
        )`
     );
 
@@ -239,10 +243,11 @@ async function ensureMemberSchema(): Promise<void> {
 
     await query(
       `create table if not exists public.member_angels (
-         angel_name text primary key,
+         angel_name text not null,
          angel_order integer not null default 0,
          operating_unit_slug text not null,
-         created_at timestamptz not null default now()
+         created_at timestamptz not null default now(),
+         primary key (operating_unit_slug, angel_name)
        )`
     );
 
@@ -258,7 +263,7 @@ async function ensureMemberSchema(): Promise<void> {
          member_order integer not null default 0,
          operating_unit_slug text not null,
          created_at timestamptz not null default now(),
-         primary key (role, member_name)
+         primary key (operating_unit_slug, role, member_name)
        )`
     );
 
@@ -268,6 +273,7 @@ async function ensureMemberSchema(): Promise<void> {
     );
 
     await ensureMemberOperatingUnitColumns();
+    await ensureMemberCompositeKeys();
     await ensureMemberQueryIndexes();
 
     schemaReady = true;
@@ -283,6 +289,89 @@ async function ensureMemberOperatingUnitColumns(): Promise<void> {
   await ensureOperatingUnitColumn("member_team_members", "idx_member_team_members_operating_unit");
   await ensureOperatingUnitColumn("member_angels", "idx_member_angels_operating_unit");
   await ensureOperatingUnitColumn("member_special_roles", "idx_member_special_roles_operating_unit");
+}
+
+function pgLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+async function dropMemberConstraints(
+  tableName: string,
+  constraintTypes: string[],
+  namePattern?: string
+): Promise<void> {
+  const typeList = constraintTypes.map(pgLiteral).join(", ");
+  const patternClause = namePattern
+    ? `and conname like ${pgLiteral(namePattern)}`
+    : "";
+
+  await query(
+    `do $$
+     declare
+       item record;
+     begin
+       for item in
+         select conname
+         from pg_constraint
+         where conrelid = ${pgLiteral(`public.${tableName}`)}::regclass
+           and contype::text in (${typeList})
+           ${patternClause}
+       loop
+         execute format('alter table public.%I drop constraint if exists %I', ${pgLiteral(tableName)}, item.conname);
+       end loop;
+     end
+     $$`
+  );
+}
+
+async function ensureMemberCompositeKeys(): Promise<void> {
+  await dropMemberConstraints("member_team_members", ["f"], "%team_name%");
+  await dropMemberConstraints("member_team_members", ["p", "u"]);
+  await dropMemberConstraints("member_teams", ["p", "u"]);
+  await dropMemberConstraints("member_angels", ["p", "u"]);
+  await dropMemberConstraints("member_special_roles", ["p", "u"]);
+
+  await query(`drop index if exists public.idx_member_team_members_member_id`);
+
+  await query(
+    `create unique index if not exists idx_member_teams_unit_team
+     on public.member_teams (operating_unit_slug, team_name)`
+  );
+  await query(
+    `create unique index if not exists idx_member_team_members_unit_member_id
+     on public.member_team_members (operating_unit_slug, member_id)`
+  );
+  await query(
+    `create unique index if not exists idx_member_angels_unit_angel
+     on public.member_angels (operating_unit_slug, angel_name)`
+  );
+  await query(
+    `create unique index if not exists idx_member_special_roles_unit_role_member
+     on public.member_special_roles (operating_unit_slug, role, member_name)`
+  );
+
+  await query(
+    `create index if not exists idx_member_team_members_member_id
+     on public.member_team_members (member_id)`
+  );
+
+  await query(
+    `do $$
+     begin
+       if not exists (
+         select 1 from pg_constraint
+         where conrelid = 'public.member_team_members'::regclass
+           and conname = 'member_team_members_unit_team_fkey'
+       ) then
+         alter table public.member_team_members
+           add constraint member_team_members_unit_team_fkey
+           foreign key (operating_unit_slug, team_name)
+           references public.member_teams(operating_unit_slug, team_name)
+           on delete cascade;
+       end if;
+     end
+     $$`
+  );
 }
 
 async function ensureMemberQueryIndexes(): Promise<void> {
@@ -317,15 +406,6 @@ async function hasMemberColumn(columnName: string): Promise<boolean> {
   return Boolean(row?.exists);
 }
 
-async function hasIndex(indexName: string): Promise<boolean> {
-  const [row] = await query<{ exists: boolean }>(
-    `select to_regclass($1)::text is not null as exists`,
-    [`public.${indexName}`]
-  );
-
-  return Boolean(row?.exists);
-}
-
 async function ensureMemberIdentityColumns(): Promise<void> {
   const hasColumn = await hasMemberColumn("member_id");
   if (!hasColumn) {
@@ -349,29 +429,6 @@ async function ensureMemberIdentityColumns(): Promise<void> {
     );
   }
 
-  if (await hasIndex("idx_member_team_members_member_id")) return;
-
-  await query(
-    `do $$
-     declare
-       item record;
-     begin
-       for item in
-         select conname
-         from pg_constraint
-         where conrelid = 'public.member_team_members'::regclass
-           and contype in ('p', 'u')
-       loop
-         execute format('alter table public.member_team_members drop constraint if exists %I', item.conname);
-       end loop;
-     end
-     $$`
-  );
-
-  await query(
-    `create unique index if not exists idx_member_team_members_member_id
-     on public.member_team_members (member_id)`
-  );
 }
 
 async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
@@ -403,31 +460,41 @@ async function migrateLegacyRosterDataIfNeeded(): Promise<void> {
   }
 
   await query(
-    `insert into public.member_teams (team_name, angel_name, angel_names, team_order)
-     select team_name, angel_name, array[angel_name], team_order
+    `insert into public.member_teams (team_name, angel_name, angel_names, team_order, operating_unit_slug)
+     select team_name, angel_name, array[angel_name], team_order, $1
      from public.roster_teams
-     on conflict (team_name)
+     on conflict (operating_unit_slug, team_name)
      do update set
        angel_name = excluded.angel_name,
        angel_names = excluded.angel_names,
        team_order = excluded.team_order,
-       updated_at = now()`
+       updated_at = now()`,
+    [MIGRATED_OPERATING_UNIT_SLUG]
   );
 
   await query(
-    `insert into public.member_team_members (team_name, member_name, member_order)
-     select team_name, student_name as member_name, student_order as member_order
+    `insert into public.member_team_members (team_name, member_name, member_id, member_order, operating_unit_slug)
+     select
+       team_name,
+       student_name as member_name,
+       'legacy-' || md5($1 || ':' || team_name || ':' || student_name),
+       student_order as member_order,
+       $1
      from public.roster_team_students
-     on conflict (team_name, member_name)
-     do update set member_order = excluded.member_order`
+     on conflict (operating_unit_slug, member_id)
+     do update set
+       member_name = excluded.member_name,
+       member_order = excluded.member_order`,
+    [MIGRATED_OPERATING_UNIT_SLUG]
   );
 
   await query(
-    `insert into public.member_angels (angel_name, angel_order)
-     select angel_name, angel_order
+    `insert into public.member_angels (angel_name, angel_order, operating_unit_slug)
+     select angel_name, angel_order, $1
      from public.roster_angels
-     on conflict (angel_name)
-     do update set angel_order = excluded.angel_order`
+     on conflict (operating_unit_slug, angel_name)
+     do update set angel_order = excluded.angel_order`,
+    [MIGRATED_OPERATING_UNIT_SLUG]
   );
 
   legacyMigrationChecked = true;
@@ -549,12 +616,11 @@ export async function saveMemberPresetToDb(
       await tq(
         `insert into public.member_teams (team_name, angel_name, angel_names, team_order, operating_unit_slug)
          values ($1, $2, $3::text[], $4, $5)
-         on conflict (team_name)
+         on conflict (operating_unit_slug, team_name)
          do update set
            angel_name = excluded.angel_name,
            angel_names = excluded.angel_names,
            team_order = excluded.team_order,
-           operating_unit_slug = excluded.operating_unit_slug,
            updated_at = now()`,
         [group.teamName, group.angels[0] ?? "", group.angels, teamOrder, operatingUnitSlug]
       );
@@ -593,10 +659,9 @@ export async function saveMemberPresetToDb(
       await tq(
         `insert into public.member_angels (angel_name, angel_order, operating_unit_slug)
          values ($1, $2, $3)
-         on conflict (angel_name)
+         on conflict (operating_unit_slug, angel_name)
          do update set
-           angel_order = excluded.angel_order,
-           operating_unit_slug = excluded.operating_unit_slug`,
+           angel_order = excluded.angel_order`,
         [angelName, angelOrder, operatingUnitSlug]
       );
     }
@@ -616,10 +681,9 @@ export async function saveMemberPresetToDb(
           await tq(
             `insert into public.member_special_roles (role, member_name, member_order, operating_unit_slug)
              values ($1, $2, $3, $4)
-             on conflict (role, member_name)
+             on conflict (operating_unit_slug, role, member_name)
              do update set
-               member_order = excluded.member_order,
-               operating_unit_slug = excluded.operating_unit_slug`,
+               member_order = excluded.member_order`,
             [role, memberName, memberOrder, operatingUnitSlug]
           );
         }
