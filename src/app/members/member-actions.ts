@@ -65,7 +65,15 @@ function parsePayload(
   teamGroups: TeamMemberGroup[];
   specialRoles: Partial<Record<SpecialParticipantRole, string[]>>;
 } | null {
-  const fixedAngels = Array.isArray(input.fixedAngels)
+  const hasPayloadShape =
+    Array.isArray(input.fixedAngels) ||
+    Array.isArray(input.teamGroups) ||
+    Boolean(input.specialRoles && typeof input.specialRoles === "object" && !Array.isArray(input.specialRoles));
+  if (!hasPayloadShape) {
+    return null;
+  }
+
+  const fixedAngelsFromInput = Array.isArray(input.fixedAngels)
     ? input.fixedAngels
         .filter((item): item is string => typeof item === "string")
         .map((value) => value.trim())
@@ -108,10 +116,6 @@ function parsePayload(
         .filter((row): row is TeamMemberGroup => row !== null)
     : [];
 
-  if (fixedAngels.length === 0 || teamGroups.length === 0) {
-    return null;
-  }
-
   const specialRoles: Partial<Record<SpecialParticipantRole, string[]>> = {};
   if (input.specialRoles && typeof input.specialRoles === "object" && !Array.isArray(input.specialRoles)) {
     const source = input.specialRoles as Partial<Record<SpecialParticipantRole, unknown>>;
@@ -124,6 +128,11 @@ function parsePayload(
         .filter(Boolean);
     }
   }
+
+  const fixedAngels = uniq([
+    ...fixedAngelsFromInput,
+    ...teamGroups.flatMap((team) => team.angels),
+  ]);
 
   return { fixedAngels, teamGroups, specialRoles };
 }

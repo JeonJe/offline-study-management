@@ -15,7 +15,7 @@ vi.mock("@/lib/db", () => ({
 
 import { saveMemberPresetToDb } from "@/lib/member-store";
 
-describe("member-store stable member identity", () => {
+describe("멤버 명단 저장소", () => {
   beforeEach(() => {
     process.env.SKIP_SCHEMA_CHECK = "1";
     queryMock.mockReset();
@@ -23,7 +23,7 @@ describe("member-store stable member identity", () => {
     withTransactionMock.mockClear();
   });
 
-  it("saves same-name members in one team as distinct member ids", async () => {
+  it("한 팀에 같은 이름의 멤버가 있어도 각 멤버 id를 보존한다", async () => {
     await saveMemberPresetToDb(
       "loop-pak-3",
       [
@@ -61,7 +61,7 @@ describe("member-store stable member identity", () => {
     ]);
   });
 
-  it("scopes roster upserts by operating unit to avoid cross-unit overwrites", async () => {
+  it("기수별 명단 저장은 다른 기수 데이터를 덮어쓰지 않도록 기수 범위로 upsert한다", async () => {
     await saveMemberPresetToDb(
       "loop-pak-3",
       [
@@ -92,6 +92,65 @@ describe("member-store stable member identity", () => {
     expect(String(specialRoleUpsert?.[0])).toContain(
       "on conflict (operating_unit_slug, role, member_name)"
     );
+  });
+
+  it("팀이 아직 없어도 엔젤·멘토·매니저·서포터·버디 명단을 저장한다", async () => {
+    await saveMemberPresetToDb(
+      "loop-pak-3",
+      [],
+      ["유관순"],
+      {
+        mentor: ["장영실"],
+        manager: ["허준"],
+        supporter: ["정약용"],
+        buddy: ["신사임당"],
+      }
+    );
+
+    const teamDelete = transactionQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("delete from public.member_teams")
+    );
+    expect(teamDelete?.[1]).toEqual([[], "loop-pak-3"]);
+
+    const angelInsertCalls = transactionQueryMock.mock.calls.filter(([sql]) =>
+      String(sql).includes("insert into public.member_angels")
+    );
+    expect(angelInsertCalls).toHaveLength(1);
+    expect(angelInsertCalls[0]?.[1]).toEqual(["유관순", 0, "loop-pak-3"]);
+
+    const specialRoleInsertCalls = transactionQueryMock.mock.calls.filter(([sql]) =>
+      String(sql).includes("insert into public.member_special_roles")
+    );
+    expect(specialRoleInsertCalls.map(([, params]) => params)).toEqual([
+      ["supporter", "정약용", 0, "loop-pak-3"],
+      ["buddy", "신사임당", 0, "loop-pak-3"],
+      ["mentor", "장영실", 0, "loop-pak-3"],
+      ["manager", "허준", 0, "loop-pak-3"],
+    ]);
+  });
+
+  it("빈 명단 저장은 팀과 운영진 명단을 모두 비우는 동작으로 처리한다", async () => {
+    await saveMemberPresetToDb("loop-pak-3", [], [], {});
+
+    const teamDelete = transactionQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("delete from public.member_teams")
+    );
+    expect(teamDelete?.[1]).toEqual([[], "loop-pak-3"]);
+
+    const angelDelete = transactionQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("delete from public.member_angels")
+    );
+    expect(angelDelete?.[1]).toEqual([[], "loop-pak-3"]);
+
+    const specialRoleDeleteCalls = transactionQueryMock.mock.calls.filter(([sql]) =>
+      String(sql).includes("delete from public.member_special_roles")
+    );
+    expect(specialRoleDeleteCalls.map(([, params]) => params)).toEqual([
+      ["supporter", [], "loop-pak-3"],
+      ["buddy", [], "loop-pak-3"],
+      ["mentor", [], "loop-pak-3"],
+      ["manager", [], "loop-pak-3"],
+    ]);
   });
 
 });

@@ -172,11 +172,6 @@ export function MemberAdminForm({
     successMessage: string
   ) => {
     const nextPayload = buildMemberPayload(nextFixedAngels, nextTeams, nextSpecialRoles);
-    if (nextPayload.teamGroups.length === 0 || nextPayload.teamGroups.some((team) => !team.teamName || team.angels.length === 0)) {
-      showToast("저장 실패", "danger");
-      return false;
-    }
-
     setSaving(true);
 
     try {

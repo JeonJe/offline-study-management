@@ -525,10 +525,6 @@ export async function saveMemberPresetToDb(
     ? normalizeSpecialRoles(specialRolesInput)
     : null;
 
-  if (normalizedGroups.length === 0 || normalizedAngels.length === 0) {
-    throw new Error("팀 그룹 또는 엔젤 목록이 비어 있어 저장할 수 없습니다.");
-  }
-
   const teamNames = normalizedGroups.map((group) => group.teamName);
 
   await withTransaction(async (tq) => {
