@@ -7,6 +7,11 @@ create table if not exists public.operating_units (
   is_default boolean not null default false,
   is_active boolean not null default true,
   access_password_hash text,
+  access_password_plaintext text,
+  angel_password_hash text,
+  angel_password_plaintext text,
+  admin_password_hash text,
+  admin_password_plaintext text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -35,6 +40,7 @@ create table if not exists public.meetings (
   capacity integer,
   constraint chk_meetings_capacity check (capacity is null or capacity >= 0),
   operating_unit_slug text not null,
+  meeting_kind text not null default 'study' check (meeting_kind in ('study', 'loop-pak')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -44,6 +50,9 @@ create index if not exists idx_meetings_meeting_date
 
 create index if not exists idx_meetings_operating_unit
   on public.meetings (operating_unit_slug);
+
+create index if not exists idx_meetings_kind_date
+  on public.meetings (operating_unit_slug, meeting_kind, meeting_date desc, start_time desc);
 
 create table if not exists public.rsvps (
   id uuid primary key default gen_random_uuid(),
@@ -148,10 +157,11 @@ create index if not exists idx_member_teams_operating_unit
 create table if not exists public.member_team_members (
   team_name text not null references public.member_teams(team_name) on delete cascade,
   member_name text not null,
+  member_id text not null,
   member_order integer not null default 0,
   operating_unit_slug text not null,
   created_at timestamptz not null default now(),
-  primary key (team_name, member_name)
+  primary key (member_id)
 );
 
 create index if not exists idx_member_team_members_order

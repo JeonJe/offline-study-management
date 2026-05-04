@@ -1,5 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PendingSubmitButton } from "@/app/pending-submit-button";
+import {
+  BackToOperatingUnitDetailLink,
+  codeDisplayText,
+  OperatingUnitLoadError,
+  OperatingUnitNotFound,
+  safeGetOperatingUnit,
+  singleParam,
+} from "@/app/admin/operating-units/operating-unit-page-utils";
+import { operatingUnitDetailPath } from "@/app/admin/operating-units/operating-unit-routes";
 import {
   updateOperatingUnitAccessCodeAction,
   updateOperatingUnitAdminCodeAction,
@@ -9,35 +19,12 @@ import {
 import { RoleShell } from "@/app/role-shell";
 import { ToastNotice } from "@/app/toast-notice";
 import { isGlobalAuthenticated } from "@/lib/auth";
-import {
-  type OperatingUnit,
-  getOperatingUnit,
-} from "@/lib/operating-unit-store";
+import { type OperatingUnit } from "@/lib/operating-unit-store";
 
 type EditOperatingUnitPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-function singleParam(value: string | string[] | undefined): string {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
-
-  return value ?? "";
-}
-
-async function safeGetOperatingUnit(slug: string): Promise<{
-  unit: OperatingUnit | null;
-  error: boolean;
-}> {
-  try {
-    return { unit: await getOperatingUnit(slug), error: false };
-  } catch (error) {
-    console.error("[operating-units] getOperatingUnit 실패:", error);
-    return { unit: null, error: true };
-  }
-}
 
 function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
   return (
@@ -90,33 +77,20 @@ function EditOperatingUnitForm({ unit }: { unit: OperatingUnit }) {
 
       <div className="flex flex-wrap justify-end gap-2">
         <Link
-          href="/admin/operating-units"
+          href={operatingUnitDetailPath(unit.slug)}
           className="rounded-full border px-4 py-2 text-sm font-bold"
           style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
         >
           취소
         </Link>
-        <button
-          type="submit"
-          className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white"
+        <PendingSubmitButton
+          idleLabel="저장"
+          pendingLabel="저장 중"
+          className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70"
           style={{ backgroundColor: "var(--accent)" }}
-        >
-          저장
-        </button>
+        />
       </div>
     </form>
-  );
-}
-
-function BackToOperatingUnitsLink() {
-  return (
-    <Link
-      href="/admin/operating-units"
-      className="btn-press inline-flex w-fit rounded-full border px-4 py-2 text-sm font-bold"
-      style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)", color: "var(--ink-soft)" }}
-    >
-      기수 목록
-    </Link>
   );
 }
 
@@ -148,9 +122,7 @@ function CodeFormRow({
         {label}
       </div>
       <input
-        value={
-          currentCode ?? (hasCode ? "확인 불가" : "미설정")
-        }
+        value={codeDisplayText(currentCode, hasCode)}
         readOnly
         aria-label={`${label} 현재 코드`}
         className="h-10 rounded-xl border px-3 text-sm outline-none"
@@ -171,13 +143,12 @@ function CodeFormRow({
         className="h-10 rounded-xl border px-3 text-sm outline-none"
         style={{ borderColor: "var(--line)", backgroundColor: "var(--surface)" }}
       />
-      <button
-        type="submit"
-        className="btn-press h-10 rounded-full px-4 text-sm font-bold text-white"
+      <PendingSubmitButton
+        idleLabel="변경"
+        pendingLabel="변경 중"
+        className="btn-press h-10 rounded-full px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70"
         style={{ backgroundColor: "var(--accent)" }}
-      >
-        변경
-      </button>
+      />
     </form>
   );
 }
@@ -262,22 +233,14 @@ export default async function EditOperatingUnitPage({
   let content;
   const { unit, error } = await safeGetOperatingUnit(routeParams.id);
   if (error) {
-    content = (
-      <section className="card-static p-5 text-sm" style={{ color: "var(--ink-muted)" }}>
-        데이터를 불러오지 못했습니다.
-      </section>
-    );
+    content = <OperatingUnitLoadError />;
   } else if (!unit) {
-    content = (
-      <section className="card-static p-5 text-sm" style={{ color: "var(--ink-muted)" }}>
-        항목을 찾을 수 없습니다.
-      </section>
-    );
+    content = <OperatingUnitNotFound />;
   } else {
     const toast = editToastMessage(status);
     content = (
       <div className="grid gap-4">
-        <BackToOperatingUnitsLink />
+        <BackToOperatingUnitDetailLink unit={unit} />
         {toast ? <ToastNotice message={toast.message} tone={toast.tone} /> : null}
         <EditOperatingUnitForm unit={unit} />
         <CodeManagementPanel unit={unit} />

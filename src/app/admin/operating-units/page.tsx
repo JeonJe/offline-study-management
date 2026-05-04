@@ -1,21 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import {
+  OPERATING_UNITS_PATH,
+  operatingUnitDetailPath,
+} from "@/app/admin/operating-units/operating-unit-routes";
 import { RoleShell } from "@/app/role-shell";
 import { ToastNotice } from "@/app/toast-notice";
 import { isGlobalAuthenticated } from "@/lib/auth";
 import { type OperatingUnit, listOperatingUnits } from "@/lib/operating-unit-store";
-
-type OperatingUnitsPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-function singleParam(value: string | string[] | undefined): string {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
-
-  return value ?? "";
-}
+import { codeDisplayText, singleParam } from "@/app/admin/operating-units/operating-unit-page-utils";
 
 async function safeListOperatingUnits(): Promise<{ units: OperatingUnit[]; error: boolean }> {
   try {
@@ -57,6 +50,8 @@ function OperatingUnitsPanel({
       ? "생성 완료"
       : status === "updated"
         ? "수정 완료"
+        : status === "deleted"
+          ? "삭제 완료"
         : "";
 
   return (
@@ -72,7 +67,7 @@ function OperatingUnitsPanel({
           </p>
         </div>
         <Link
-          href="/admin/operating-units/new"
+          href={`${OPERATING_UNITS_PATH}/new`}
           className="btn-press rounded-full px-4 py-2 text-sm font-bold text-white"
           style={{ backgroundColor: "var(--accent)" }}
         >
@@ -102,57 +97,11 @@ function OperatingUnitsPanel({
               >
                 입장 코드
               </th>
-              <th className="px-5 py-3 text-right font-bold" style={{ color: "var(--ink-muted)" }}>
-                <span className="sr-only">관리</span>
-              </th>
             </tr>
           </thead>
           <tbody>
             {units.map((unit) => (
-              <tr
-                key={unit.slug}
-                style={{ borderBottom: "1px solid var(--line)" }}
-              >
-                <td
-                  className="px-5 py-3 font-mono text-xs"
-                  style={{ color: "var(--ink-soft)" }}
-                >
-                  {unit.slug}
-                </td>
-                <td className="px-5 py-3 font-bold" style={{ color: "var(--ink)" }}>
-                  {unit.name}
-                  {unit.isDefault ? (
-                    <span
-                      className="ml-2 rounded-full border px-2 py-0.5 text-[11px] font-bold"
-                      style={{
-                        borderColor: "rgba(13, 127, 242, 0.25)",
-                        backgroundColor: "var(--accent-weak)",
-                        color: "var(--accent-strong)",
-                      }}
-                    >
-                      기본
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-5 py-3 font-mono text-xs" style={{ color: "var(--ink-soft)" }}>
-                  {unit.accessPassword ? (
-                    unit.accessPassword
-                  ) : (
-                    <span style={{ color: "var(--ink-muted)" }}>
-                      {unit.hasAccessPassword ? "확인 불가" : "미설정"}
-                    </span>
-                  )}
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <Link
-                    href={`/admin/operating-units/${encodeURIComponent(unit.slug)}/edit`}
-                    className="rounded-full border px-3 py-1.5 text-xs font-bold"
-                    style={{ borderColor: "var(--line)", color: "var(--accent)" }}
-                  >
-                    편집
-                  </Link>
-                </td>
-              </tr>
+              <OperatingUnitRow key={unit.slug} unit={unit} />
             ))}
           </tbody>
         </table>
@@ -161,9 +110,55 @@ function OperatingUnitsPanel({
   );
 }
 
+function OperatingUnitRow({ unit }: { unit: OperatingUnit }) {
+  const detailPath = operatingUnitDetailPath(unit.slug);
+  const linkClassName = "block px-5 py-3";
+
+  return (
+    <tr
+      className="cursor-pointer transition-colors hover:bg-[color:var(--surface-alt)]"
+      style={{ borderBottom: "1px solid var(--line)" }}
+    >
+      <td className="font-mono text-xs" style={{ color: "var(--ink-soft)" }}>
+        <Link href={detailPath} className={linkClassName} aria-label={`${unit.name} 상세 보기`}>
+          {unit.slug}
+        </Link>
+      </td>
+      <td className="font-bold" style={{ color: "var(--ink)" }}>
+        <Link href={detailPath} className={linkClassName}>
+          {unit.name}
+          {unit.isDefault ? (
+            <span
+              className="ml-2 rounded-full border px-2 py-0.5 text-[11px] font-bold"
+              style={{
+                borderColor: "rgba(13, 127, 242, 0.25)",
+                backgroundColor: "var(--accent-weak)",
+                color: "var(--accent-strong)",
+              }}
+            >
+              기본
+            </span>
+          ) : null}
+        </Link>
+      </td>
+      <td className="font-mono text-xs" style={{ color: "var(--ink-soft)" }}>
+        <Link href={detailPath} className={linkClassName}>
+          {unit.accessPassword ? unit.accessPassword : (
+            <span style={{ color: "var(--ink-muted)" }}>
+              {codeDisplayText(unit.accessPassword, unit.hasAccessPassword)}
+            </span>
+          )}
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
 export default async function OperatingUnitsPage({
   searchParams,
-}: OperatingUnitsPageProps) {
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const authenticated = await isGlobalAuthenticated();
   if (!authenticated) {
     redirect("/?auth=required");

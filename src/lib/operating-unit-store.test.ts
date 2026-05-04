@@ -42,6 +42,7 @@ vi.mock("@/lib/role-session", () => ({
 
 import {
   createOperatingUnitAction,
+  deleteOperatingUnitAction,
   updateOperatingUnitAccessCodeAction,
   updateOperatingUnitAction,
 } from "@/app/admin/operating-units/operating-unit-actions";
@@ -51,6 +52,7 @@ import {
   createOperatingUnitAccessToken,
   createOperatingUnitRoleAccessToken,
   createOperatingUnit,
+  deleteOperatingUnit,
   getOperatingUnit,
   ensureOperatingUnitColumn,
   ensureOperatingUnitSchema,
@@ -178,6 +180,7 @@ describe("operating-unit-store", () => {
       const lastCall = queryMock.mock.calls.at(-1) as [string];
       expect(lastCall[0]).toContain("from public.operating_units");
       expect(lastCall[0]).toContain("where slug <> $1");
+      expect(lastCall[0]).toContain("and is_active");
     });
   });
 
@@ -320,6 +323,34 @@ describe("operating-unit-store", () => {
       expect(sql).not.toContain("set is_default");
       expect(sql).not.toContain("is_active =");
       expect(params).toEqual(["loop-pak-4", "4기", "수정됨"]);
+    });
+  });
+
+  it("soft-deletes non-protected operating units", async () => {
+    await withSkipSchemaCheck(async () => {
+      queryMock.mockResolvedValueOnce([{ slug: "loop-pak-4" }]);
+
+      await deleteOperatingUnit("loop-pak-4");
+
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("set is_active = false");
+      expect(sql).toContain("where slug = $1");
+      expect(sql).toContain("and slug <> $2");
+      expect(sql).toContain("and slug <> $3");
+      expect(params).toEqual(["loop-pak-4", "default", "loop-pak-3"]);
+    });
+  });
+
+  it("does not delete protected operating units", async () => {
+    await withSkipSchemaCheck(async () => {
+      await expect(deleteOperatingUnit("loop-pak-3")).rejects.toThrow(
+        "보호된 기수는 삭제할 수 없습니다."
+      );
+      expect(
+        queryMock.mock.calls.some(([sql]) =>
+          String(sql).includes("set is_active = false")
+        )
+      ).toBe(false);
     });
   });
 
@@ -551,9 +582,49 @@ describe("operating-unit-store", () => {
       formData.set("name", "4기");
 
       await expect(updateOperatingUnitAction(formData)).rejects.toThrow(
-        "redirect:/admin/operating-units?unit=updated"
+        "redirect:/admin/operating-units/loop-pak-4?unit=updated"
       );
       expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units/loop-pak-4");
+    });
+  });
+
+  it("deleteOperatingUnitAction soft-deletes after global admin authentication", async () => {
+    await withSkipSchemaCheck(async () => {
+      isAuthenticatedMock.mockResolvedValue(true);
+      queryMock.mockResolvedValueOnce([{ slug: "loop-pak-4" }]);
+
+      const formData = new FormData();
+      formData.set("slug", "loop-pak-4");
+
+      await expect(deleteOperatingUnitAction(formData)).rejects.toThrow(
+        "redirect:/admin/operating-units?unit=deleted"
+      );
+
+      const [sql, params] = queryMock.mock.calls.at(-1) as [string, unknown[]];
+      expect(sql).toContain("set is_active = false");
+      expect(params[0]).toBe("loop-pak-4");
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units");
+      expect(revalidatePathMock).toHaveBeenCalledWith("/admin/operating-units/loop-pak-4");
+    });
+  });
+
+  it("deleteOperatingUnitAction redirects protected deletes back to detail", async () => {
+    await withSkipSchemaCheck(async () => {
+      isAuthenticatedMock.mockResolvedValue(true);
+
+      const formData = new FormData();
+      formData.set("slug", "loop-pak-3");
+
+      await expect(deleteOperatingUnitAction(formData)).rejects.toThrow(
+        "redirect:/admin/operating-units/loop-pak-3?unit=delete-protected"
+      );
+      expect(
+        queryMock.mock.calls.some(([sql]) =>
+          String(sql).includes("set is_active = false")
+        )
+      ).toBe(false);
     });
   });
 

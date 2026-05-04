@@ -2,9 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  NEW_OPERATING_UNIT_PATH,
+  OPERATING_UNITS_PATH,
+  operatingUnitDetailPath,
+  operatingUnitEditPath,
+  withUnitStatus,
+} from "@/app/admin/operating-units/operating-unit-routes";
 import { isGlobalAuthenticated } from "@/lib/auth";
 import {
   createOperatingUnit,
+  deleteOperatingUnit,
+  isProtectedOperatingUnitSlug,
   setOperatingUnitAccessCode,
   setOperatingUnitRoleCode,
   updateOperatingUnit,
@@ -22,6 +31,15 @@ async function requireAdminMutation(): Promise<void> {
   }
 }
 
+function revalidateOperatingUnitAdminViews(slug?: string): void {
+  revalidatePath("/admin");
+  revalidatePath(OPERATING_UNITS_PATH);
+  if (!slug) return;
+
+  revalidatePath(operatingUnitDetailPath(slug));
+  revalidatePath(operatingUnitEditPath(slug));
+}
+
 export async function createOperatingUnitAction(formData: FormData): Promise<void> {
   await requireAdminMutation();
 
@@ -29,13 +47,13 @@ export async function createOperatingUnitAction(formData: FormData): Promise<voi
   const angelPassword = textFrom(formData, "angelPassword").trim();
   const adminPassword = textFrom(formData, "adminPassword").trim();
   if (!accessPassword) {
-    redirect("/admin/operating-units/new?unit=access-code-required");
+    redirect(withUnitStatus(NEW_OPERATING_UNIT_PATH, "access-code-required"));
   }
   if (!angelPassword) {
-    redirect("/admin/operating-units/new?unit=angel-code-required");
+    redirect(withUnitStatus(NEW_OPERATING_UNIT_PATH, "angel-code-required"));
   }
   if (!adminPassword) {
-    redirect("/admin/operating-units/new?unit=admin-code-required");
+    redirect(withUnitStatus(NEW_OPERATING_UNIT_PATH, "admin-code-required"));
   }
 
   await createOperatingUnit({
@@ -47,9 +65,8 @@ export async function createOperatingUnitAction(formData: FormData): Promise<voi
     adminPassword,
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/operating-units");
-  redirect("/admin/operating-units?unit=created");
+  revalidateOperatingUnitAdminViews();
+  redirect(withUnitStatus(OPERATING_UNITS_PATH, "created"));
 }
 
 export async function updateOperatingUnitAction(formData: FormData): Promise<void> {
@@ -62,23 +79,37 @@ export async function updateOperatingUnitAction(formData: FormData): Promise<voi
     description: textFrom(formData, "description"),
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/operating-units");
-  revalidatePath(`/admin/operating-units/${encodeURIComponent(slug)}/edit`);
-  redirect("/admin/operating-units?unit=updated");
+  revalidateOperatingUnitAdminViews(slug);
+  redirect(withUnitStatus(operatingUnitDetailPath(slug), "updated"));
+}
+
+export async function deleteOperatingUnitAction(formData: FormData): Promise<void> {
+  const slug = textFrom(formData, "slug");
+  const detailPath = operatingUnitDetailPath(slug);
+
+  await requireAdminMutation();
+
+  if (isProtectedOperatingUnitSlug(slug)) {
+    redirect(withUnitStatus(detailPath, "delete-protected"));
+  }
+
+  await deleteOperatingUnit(slug);
+
+  revalidateOperatingUnitAdminViews(slug);
+  redirect(withUnitStatus(OPERATING_UNITS_PATH, "deleted"));
 }
 
 export async function updateOperatingUnitAccessCodeAction(
   formData: FormData
 ): Promise<void> {
   const slug = textFrom(formData, "slug");
-  const editPath = `/admin/operating-units/${encodeURIComponent(slug)}/edit`;
+  const editPath = operatingUnitEditPath(slug);
 
   await requireAdminMutation();
 
   const password = textFrom(formData, "accessPassword").trim();
   if (!password) {
-    redirect(`${editPath}?unit=access-code-required`);
+    redirect(withUnitStatus(editPath, "access-code-required"));
   }
 
   await setOperatingUnitAccessCode({
@@ -86,23 +117,21 @@ export async function updateOperatingUnitAccessCodeAction(
     password,
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/operating-units");
-  revalidatePath(editPath);
-  redirect(`${editPath}?unit=access-code-updated`);
+  revalidateOperatingUnitAdminViews(slug);
+  redirect(withUnitStatus(editPath, "access-code-updated"));
 }
 
 export async function updateOperatingUnitAngelCodeAction(
   formData: FormData
 ): Promise<void> {
   const slug = textFrom(formData, "slug");
-  const editPath = `/admin/operating-units/${encodeURIComponent(slug)}/edit`;
+  const editPath = operatingUnitEditPath(slug);
 
   await requireAdminMutation();
 
   const password = textFrom(formData, "angelPassword").trim();
   if (!password) {
-    redirect(`${editPath}?unit=angel-code-required`);
+    redirect(withUnitStatus(editPath, "angel-code-required"));
   }
 
   await setOperatingUnitRoleCode({
@@ -111,23 +140,21 @@ export async function updateOperatingUnitAngelCodeAction(
     password,
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/operating-units");
-  revalidatePath(editPath);
-  redirect(`${editPath}?unit=angel-code-updated`);
+  revalidateOperatingUnitAdminViews(slug);
+  redirect(withUnitStatus(editPath, "angel-code-updated"));
 }
 
 export async function updateOperatingUnitAdminCodeAction(
   formData: FormData
 ): Promise<void> {
   const slug = textFrom(formData, "slug");
-  const editPath = `/admin/operating-units/${encodeURIComponent(slug)}/edit`;
+  const editPath = operatingUnitEditPath(slug);
 
   await requireAdminMutation();
 
   const password = textFrom(formData, "adminPassword").trim();
   if (!password) {
-    redirect(`${editPath}?unit=admin-code-required`);
+    redirect(withUnitStatus(editPath, "admin-code-required"));
   }
 
   await setOperatingUnitRoleCode({
@@ -136,8 +163,6 @@ export async function updateOperatingUnitAdminCodeAction(
     password,
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/operating-units");
-  revalidatePath(editPath);
-  redirect(`${editPath}?unit=admin-code-updated`);
+  revalidateOperatingUnitAdminViews(slug);
+  redirect(withUnitStatus(editPath, "admin-code-updated"));
 }

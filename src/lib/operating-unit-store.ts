@@ -228,6 +228,7 @@ export async function listOperatingUnits(): Promise<OperatingUnit[]> {
        updated_at::text as "updatedAt"
      from public.operating_units
      where slug <> $1
+       and is_active
      order by is_default desc, is_active desc, created_at asc, slug asc`,
     [LEGACY_OPERATING_UNIT_SLUG]
   );
@@ -380,6 +381,34 @@ export async function updateOperatingUnit(input: {
     throw new Error("항목을 수정하지 못했습니다.");
   }
   return normalizeOperatingUnitRow(updated);
+}
+
+export async function deleteOperatingUnit(slug: string): Promise<void> {
+  await ensureOperatingUnitSchema();
+
+  const normalizedSlug = normalizeOperatingUnitSlug(slug);
+  if (!normalizedSlug) {
+    throw new Error("삭제할 기수가 필요합니다.");
+  }
+  if (isProtectedOperatingUnitSlug(normalizedSlug)) {
+    throw new Error("보호된 기수는 삭제할 수 없습니다.");
+  }
+
+  const [deleted] = await query<{ slug: string }>(
+    `update public.operating_units
+     set is_active = false,
+         updated_at = now()
+     where slug = $1
+       and slug <> $2
+       and slug <> $3
+       and is_active
+     returning slug`,
+    [normalizedSlug, LEGACY_OPERATING_UNIT_SLUG, MIGRATED_OPERATING_UNIT_SLUG]
+  );
+
+  if (!deleted) {
+    throw new Error("기수를 삭제하지 못했습니다.");
+  }
 }
 
 export type OperatingUnitRoleCode = "angel" | "admin";
