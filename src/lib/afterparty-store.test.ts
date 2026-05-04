@@ -265,22 +265,22 @@ describe("afterparty-store settlement flows", () => {
     expect(params[6]).toBeNull();
   });
 
-  it("allows afterparty updates with the master password override", async () => {
-    queryMock
-      .mockResolvedValueOnce([{ passwordHash: hashAfterpartyPassword("late-secret") }])
-      .mockResolvedValueOnce([]);
+  it("rejects the removed hardcoded master password override for afterparty updates", async () => {
+    queryMock.mockResolvedValueOnce([{ passwordHash: hashAfterpartyPassword("late-secret") }]);
 
-    await updateAfterparty({
-      id: "after-1",
-      title: "홍대 뒷풀이",
-      eventDate: "2026-03-12",
-      startTime: "19:00",
-      location: "홍대입구",
-      description: "메모",
-      accessPassword: "갈!",
-    });
+    await expect(
+      updateAfterparty({
+        id: "after-1",
+        title: "홍대 뒷풀이",
+        eventDate: "2026-03-12",
+        startTime: "19:00",
+        location: "홍대입구",
+        description: "메모",
+        accessPassword: "갈!",
+      })
+    ).rejects.toMatchObject({ code: "password-invalid" });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects settlement deletion when a protected password is missing", async () => {
@@ -304,15 +304,15 @@ describe("afterparty-store settlement flows", () => {
     ).rejects.toMatchObject({ code: "password-invalid" });
   });
 
-  it("allows afterparty deletion with the master password override", async () => {
-    queryMock
-      .mockResolvedValueOnce([
-        { passwordHash: hashAfterpartyPassword("late-secret") },
-      ])
-      .mockResolvedValueOnce([]);
+  it("rejects the removed hardcoded master password override for afterparty deletion", async () => {
+    queryMock.mockResolvedValueOnce([
+      { passwordHash: hashAfterpartyPassword("late-secret") },
+    ]);
 
-    await deleteAfterparty("after-1", "갈!");
+    await expect(deleteAfterparty("after-1", "갈!")).rejects.toMatchObject({
+      code: "password-invalid",
+    });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticatedForUnit } from "@/lib/auth";
 import { withSettlementInPath } from "@/lib/navigation-utils";
 import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
 import {
+  getAfterpartyById,
   isAfterpartyPasswordError,
   createAfterparty,
   createAfterpartySettlement,
@@ -27,11 +28,11 @@ import {
   participantFeedbackPath,
   participantFeedbackSourceFromMutation,
   revalidateAfterpartyViews,
-  requireAuthOrRedirect,
+  requireUnitAuthOrRedirect,
+  resolveAfterpartyUnitOrRedirect,
   resolveParticipantRoleEntries,
   safeReturnPath,
   textFrom,
-  unitSlugFromPath,
   withUpdatedSearchParams,
 } from "@/app/actions/shared-action-utils";
 
@@ -40,8 +41,6 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
     date: textFrom(formData, "returnDate"),
   };
   const returnPath = safeReturnPath(formData);
-
-  await requireAuthOrRedirect();
 
   const title = textFrom(formData, "title").trim();
   const eventDate = textFrom(formData, "eventDate").trim();
@@ -52,6 +51,8 @@ export async function createAfterpartyAction(formData: FormData): Promise<void> 
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
   const password = textFrom(formData, "afterpartyPassword").trim();
   const operatingUnitSlug = requireOperatingUnitSlug(textFrom(formData, "unit"));
+
+  await requireUnitAuthOrRedirect(operatingUnitSlug, returnPath);
 
   if (!title || !eventDate || !location) {
     redirect(returnPath ?? afterpartyPath(state));
@@ -89,8 +90,6 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
   const mutationSource = textFrom(formData, "mutationSource").trim();
   const feedbackSource = participantFeedbackSourceFromMutation(mutationSource);
 
-  await requireAuthOrRedirect();
-
   const namesRaw = textFrom(formData, "names");
   const roleRaw = textFrom(formData, "role").trim();
   const fallbackPath = returnPath ?? (afterpartyId ? `/afterparty/${afterpartyId}` : afterpartyPath({ date }));
@@ -103,6 +102,9 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
     redirect(participantFeedbackPath(fallbackPath, "invalid-input", feedbackSource, namesRaw));
   }
 
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+
   const participantInputs =
     feedbackSource === "manual"
       ? names.map((name) => ({
@@ -111,12 +113,13 @@ export async function bulkCreateAfterpartyParticipantsAction(formData: FormData)
         }))
       : isParticipantRole(roleRaw)
         ? names.map((name) => ({ name, role: roleRaw }))
-        : await resolveParticipantRoleEntries(names, unitSlugFromPath(returnPath));
+        : await resolveParticipantRoleEntries(names, targetUnitSlug);
 
   const insertedCount = await createAfterpartyParticipantsBulk(
     afterpartyId,
     participantInputs,
-    settlementId || undefined
+    settlementId || undefined,
+    { operatingUnitSlug: targetUnitSlug }
   );
 
   if (insertedCount === 0) {
@@ -136,16 +139,18 @@ export async function deleteAfterpartyParticipantAction(formData: FormData): Pro
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
 
-  await requireAuthOrRedirect();
-
   if (!afterpartyId || !participantId) {
     redirect(afterpartyPath({ date }));
   }
 
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+
   if (settlementId) {
-    await deleteAfterpartySettlementParticipant(participantId, settlementId, afterpartyId);
+    await deleteAfterpartySettlementParticipant(participantId, settlementId, afterpartyId, targetUnitSlug);
   } else {
-    await deleteAfterpartyParticipant(participantId, afterpartyId);
+    await deleteAfterpartyParticipant(participantId, afterpartyId, targetUnitSlug);
   }
 
   revalidateAfterpartyViews(afterpartyId, returnPath);
@@ -158,16 +163,21 @@ export async function updateSettlementAction(
   settlementId: string | undefined,
   isSettled: boolean
 ): Promise<{ ok: boolean }> {
-  const authenticated = await isAuthenticated();
-  if (!authenticated) {
+  const afterparty = afterpartyId ? await getAfterpartyById(afterpartyId) : null;
+  if (!afterparty) {
     return { ok: false };
   }
+  const targetUnitSlug = requireOperatingUnitSlug(afterparty.operatingUnitSlug);
+  const authenticated = await isAuthenticatedForUnit(targetUnitSlug);
+  if (!authenticated) return { ok: false };
+
   try {
     await updateAfterpartyParticipantSettlement(
       participantId,
       afterpartyId,
       settlementId,
-      isSettled
+      isSettled,
+      targetUnitSlug
     );
     revalidateAfterpartyViews(afterpartyId, null);
     return { ok: true };
@@ -184,17 +194,20 @@ export async function updateAfterpartyParticipantSettlementAction(formData: Form
   const returnPath = safeReturnPath(formData);
   const settledValue = textFrom(formData, "isSettled").trim();
 
-  await requireAuthOrRedirect();
-
   if (!afterpartyId || !settlementId || !participantId) {
     redirect(afterpartyPath({ date }));
   }
+
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
 
   await updateAfterpartyParticipantSettlement(
     participantId,
     afterpartyId,
     settlementId,
-    settledValue === "true"
+    settledValue === "true",
+    targetUnitSlug
   );
 
   revalidateAfterpartyViews(afterpartyId, returnPath);
@@ -207,14 +220,16 @@ export async function deleteAfterpartyAction(formData: FormData): Promise<void> 
   const returnPath = safeReturnPath(formData);
   const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
-  await requireAuthOrRedirect();
-
   if (!afterpartyId) {
     redirect(afterpartyPath({ date }));
   }
 
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+
   try {
-    await deleteAfterparty(afterpartyId, accessPassword);
+    await deleteAfterparty(afterpartyId, accessPassword, targetUnitSlug);
   } catch (error) {
     if (isAfterpartyPasswordError(error)) {
       redirect(afterpartyManagePath(afterpartyId, returnPath, error.code));
@@ -231,8 +246,6 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
   const date = textFrom(formData, "returnDate").trim();
   const returnPath = safeReturnPath(formData);
 
-  await requireAuthOrRedirect();
-
   const title = textFrom(formData, "title").trim();
   const eventDate = textFrom(formData, "eventDate").trim();
   const startTime = textFrom(formData, "startTime").trim();
@@ -245,6 +258,10 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
   if (!afterpartyId || !title || !eventDate || !startTime || !location) {
     redirect(afterpartyPath({ date }));
   }
+
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
     redirect(afterpartyPath({ date }));
@@ -261,6 +278,7 @@ export async function updateAfterpartyAction(formData: FormData): Promise<void> 
       accessPassword,
       nextPassword,
       clearPassword,
+      operatingUnitSlug: targetUnitSlug,
     });
   } catch (error) {
     if (isAfterpartyPasswordError(error)) {
@@ -282,11 +300,13 @@ export async function createAfterpartySettlementAction(formData: FormData): Prom
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
   const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
-  await requireAuthOrRedirect();
-
   if (!afterpartyId || !title) {
     redirect(returnPath ?? afterpartyPath({ date }));
   }
+
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
 
   let created: Awaited<ReturnType<typeof createAfterpartySettlement>>;
   try {
@@ -296,6 +316,7 @@ export async function createAfterpartySettlementAction(formData: FormData): Prom
       settlementManager,
       settlementAccount,
       accessPassword,
+      operatingUnitSlug: targetUnitSlug,
     });
   } catch (error) {
     if (isAfterpartyPasswordError(error)) {
@@ -318,11 +339,13 @@ export async function updateAfterpartySettlementAction(formData: FormData): Prom
   const settlementAccount = textFrom(formData, "settlementAccount").trim();
   const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
-  await requireAuthOrRedirect();
-
   if (!afterpartyId || !settlementId || !title) {
     redirect(returnPath ?? afterpartyPath({ date }));
   }
+
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
 
   try {
     await updateAfterpartySettlement({
@@ -332,6 +355,7 @@ export async function updateAfterpartySettlementAction(formData: FormData): Prom
       settlementManager,
       settlementAccount,
       accessPassword,
+      operatingUnitSlug: targetUnitSlug,
     });
   } catch (error) {
     if (isAfterpartyPasswordError(error)) {
@@ -351,17 +375,20 @@ export async function deleteAfterpartySettlementAction(formData: FormData): Prom
   const returnPath = safeReturnPath(formData);
   const accessPassword = textFrom(formData, "afterpartyPassword").trim();
 
-  await requireAuthOrRedirect();
-
   if (!afterpartyId || !settlementId) {
     redirect(returnPath ?? afterpartyPath({ date }));
   }
+
+  const fallbackPath = returnPath ?? afterpartyPath({ date });
+  const targetUnitSlug = await resolveAfterpartyUnitOrRedirect(afterpartyId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
 
   try {
     const remainingSettlementId = await deleteAfterpartySettlement(
       settlementId,
       afterpartyId,
-      accessPassword
+      accessPassword,
+      targetUnitSlug
     );
     revalidateAfterpartyViews(afterpartyId, returnPath);
     redirect(withSettlementInPath(returnPath, afterpartyId, remainingSettlementId, date));

@@ -77,7 +77,7 @@ export const cachedGetMeetingById = (meetingId: string) =>
 export const cachedListRsvpsForMeetings = (meetingIds: string[], keyword: string) =>
   cacheOrCall(
     () => listRsvpsForMeetings(meetingIds, keyword),
-    ["listRsvpsForMeetings", ...meetingIds.sort(), keyword],
+    ["listRsvpsForMeetings", ...[...meetingIds].sort(), keyword],
     ["meetup-data"]
   );
 
@@ -104,7 +104,7 @@ export const cachedGetAfterpartyById = (afterpartyId: string) =>
 export const cachedListParticipantsForAfterparties = (afterpartyIds: string[], keyword: string) =>
   cacheOrCall(
     () => listParticipantsForAfterparties(afterpartyIds, keyword),
-    ["listParticipantsForAfterparties", ...afterpartyIds.sort(), keyword],
+    ["listParticipantsForAfterparties", ...[...afterpartyIds].sort(), keyword],
     ["afterparty-data"]
   );
 
@@ -118,7 +118,7 @@ export const cachedListSettlementsForAfterparty = (afterpartyId: string) =>
 export const cachedListSettlementsForAfterparties = (afterpartyIds: string[]) =>
   cacheOrCall(
     () => listSettlementsForAfterparties(afterpartyIds),
-    ["listSettlementsForAfterparties", ...afterpartyIds.sort()],
+    ["listSettlementsForAfterparties", ...[...afterpartyIds].sort()],
     ["afterparty-data"]
   );
 

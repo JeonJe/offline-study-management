@@ -1,12 +1,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, isAuthenticatedForUnit } from "@/lib/auth";
 import {
   revalidateAfterpartyData,
   revalidateMeetupData,
 } from "@/lib/cache-invalidation";
-import { cohortAwarePath } from "@/lib/cohort-routes";
-import { getMeetingTitle, type ParticipantRole } from "@/lib/meetup-store";
+import { cohortAwarePath, cohortEntryLoginPath } from "@/lib/cohort-routes";
+import { getAfterpartyById } from "@/lib/afterparty-store";
+import {
+  getMeetingById,
+  getMeetingTitle,
+  type ParticipantRole,
+} from "@/lib/meetup-store";
 import { loadMemberPreset } from "@/lib/member-store";
 import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
 import {
@@ -15,6 +20,8 @@ import {
   PARTICIPANT_ROLE_ORDER,
   resolveRoleByName,
 } from "@/lib/participant-role-utils";
+import type { RolePageRole } from "@/lib/role-page";
+import { getCurrentRolePageRole } from "@/lib/role-session";
 
 export type DashboardState = {
   date?: string;
@@ -148,6 +155,62 @@ export function afterpartyPath(state: DashboardState = {}): string {
 
 export function cohortEntryPath(unitSlug: string): string {
   return unitSlug.trim() ? cohortAwarePath(unitSlug, "/") : dashboardPath();
+}
+
+export async function requireUnitAuthOrRedirect(
+  unitSlug: string,
+  returnPath?: string | null
+): Promise<void> {
+  const operatingUnitSlug = requireOperatingUnitSlug(unitSlug);
+  const authenticated = await isAuthenticatedForUnit(operatingUnitSlug);
+  if (authenticated) return;
+
+  redirect(
+    cohortEntryLoginPath(operatingUnitSlug, {
+      auth: "required",
+      returnPath: returnPath ?? cohortEntryPath(operatingUnitSlug),
+    })
+  );
+}
+
+export async function requireUnitRoleOrRedirect(
+  unitSlug: string,
+  allowedRoles: RolePageRole[],
+  returnPath?: string | null
+): Promise<void> {
+  const operatingUnitSlug = requireOperatingUnitSlug(unitSlug);
+  const fallbackPath = returnPath ?? cohortEntryPath(operatingUnitSlug);
+
+  await requireUnitAuthOrRedirect(operatingUnitSlug, fallbackPath);
+
+  const currentRole = await getCurrentRolePageRole(operatingUnitSlug);
+  if (currentRole && allowedRoles.includes(currentRole)) return;
+
+  redirect(withUpdatedSearchParams(fallbackPath, { access: "required" }));
+}
+
+export async function resolveMeetingUnitOrRedirect(
+  meetingId: string,
+  fallbackPath: string
+): Promise<string> {
+  const meeting = meetingId ? await getMeetingById(meetingId) : null;
+  if (!meeting) {
+    redirect(fallbackPath);
+  }
+
+  return requireOperatingUnitSlug(meeting.operatingUnitSlug);
+}
+
+export async function resolveAfterpartyUnitOrRedirect(
+  afterpartyId: string,
+  fallbackPath: string
+): Promise<string> {
+  const afterparty = afterpartyId ? await getAfterpartyById(afterpartyId) : null;
+  if (!afterparty) {
+    redirect(fallbackPath);
+  }
+
+  return requireOperatingUnitSlug(afterparty.operatingUnitSlug);
 }
 
 export function safeReturnPath(formData: FormData): string | null {

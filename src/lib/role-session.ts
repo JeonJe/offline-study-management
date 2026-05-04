@@ -42,6 +42,14 @@ function safeEquals(left: string, right: string): boolean {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function safeDecodeURIComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 export function getConfiguredRolePages(): ConfiguredRolePages {
   return {
     angel: true,
@@ -112,7 +120,10 @@ export async function getCurrentRolePageRole(unitSlug = ""): Promise<RolePageRol
   const parts = cookieValue.split(".");
   const [roleText, encodedUnitSlugOrToken, maybeToken] = parts;
   const role = normalizeRolePageRole(roleText);
-  const cookieUnitSlug = maybeToken ? decodeURIComponent(encodedUnitSlugOrToken) : "";
+  const cookieUnitSlug = maybeToken
+    ? safeDecodeURIComponent(encodedUnitSlugOrToken)
+    : "";
+  if (cookieUnitSlug === null) return null;
   const token = maybeToken ?? encodedUnitSlugOrToken;
   const password = role ? rolePassword(role) : null;
 

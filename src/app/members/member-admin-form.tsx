@@ -9,6 +9,7 @@ import type {
 } from "@/lib/member-store";
 import { saveMemberPresetAction } from "@/app/members/member-actions";
 import { MemberSaveToolbar } from "@/app/members/member-save-toolbar";
+import { LoadingSpinner } from "@/app/pending-submit-button";
 import { TeamEditModal } from "@/app/members/_components/team-edit-modal";
 import { PARTICIPANT_ROLE_META } from "@/lib/participant-role-utils";
 import { ToastNotice } from "@/app/toast-notice";
@@ -422,6 +423,17 @@ export function MemberAdminForm({
 
   return (
     <div className="mt-4 grid gap-5">
+      {saving ? (
+        <div
+          className="fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-bold shadow-lg"
+          style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}
+          role="status"
+          aria-live="polite"
+        >
+          <LoadingSpinner />
+          저장 중
+        </div>
+      ) : null}
       <section className="app-section order-2 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>

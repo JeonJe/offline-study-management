@@ -1,6 +1,5 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query, withTransaction } from "@/lib/db";
-import { isMasterOverridePassword } from "@/lib/master-password";
 import {
   assertOperatingUnitAcceptsNewData,
   ensureOperatingUnitColumn,
@@ -59,6 +58,7 @@ type CreateAfterpartyInput = {
 
 type UpdateAfterpartyInput = {
   id: string;
+  operatingUnitSlug?: string;
   title: string;
   eventDate: string;
   startTime: string;
@@ -71,6 +71,7 @@ type UpdateAfterpartyInput = {
 
 type CreateAfterpartySettlementInput = {
   afterpartyId: string;
+  operatingUnitSlug?: string;
   title: string;
   settlementManager?: string;
   settlementAccount?: string;
@@ -80,6 +81,7 @@ type CreateAfterpartySettlementInput = {
 type UpdateAfterpartySettlementInput = {
   id: string;
   afterpartyId: string;
+  operatingUnitSlug?: string;
   title: string;
   settlementManager?: string;
   settlementAccount?: string;
@@ -719,6 +721,28 @@ export async function getAfterpartyById(afterpartyId: string): Promise<Afterpart
   return row ?? null;
 }
 
+async function assertAfterpartyBelongsToUnit(
+  afterpartyId: string,
+  operatingUnitSlug?: string
+): Promise<void> {
+  const normalizedUnitSlug = operatingUnitSlug?.trim() ?? "";
+  if (!normalizedUnitSlug) return;
+
+  const [row] = await query<{ exists: boolean }>(
+    `select exists(
+       select 1
+       from public.afterparties
+       where id = $1
+         and operating_unit_slug = $2
+     ) as exists`,
+    [afterpartyId, normalizedUnitSlug]
+  );
+
+  if (!row?.exists) {
+    throw new Error("Afterparty does not belong to the requested operating unit.");
+  }
+}
+
 export async function listParticipantsForAfterparties(
   afterpartyIds: string[],
   keyword: string
@@ -917,6 +941,8 @@ export async function updateAfterparty(input: UpdateAfterpartyInput): Promise<vo
   await ensureAfterpartySchema();
   const currentPasswordHash = await getAfterpartyPasswordHash(input.id);
   assertAfterpartyPasswordAccess(currentPasswordHash, input.accessPassword);
+  const operatingUnitSlug = input.operatingUnitSlug?.trim() ?? "";
+  await assertAfterpartyBelongsToUnit(input.id, operatingUnitSlug);
   const nextPassword = normalizeAfterpartyPassword(input.nextPassword);
   const nextPasswordHash = input.clearPassword
     ? null
@@ -933,7 +959,8 @@ export async function updateAfterparty(input: UpdateAfterpartyInput): Promise<vo
          description = nullif($6, ''),
          password_hash = $7,
          updated_at = now()
-     where id = $1`,
+     where id = $1
+       and ($8 = '' or operating_unit_slug = $8)`,
     [
       input.id,
       input.title.trim(),
@@ -942,6 +969,7 @@ export async function updateAfterparty(input: UpdateAfterpartyInput): Promise<vo
       input.location.trim(),
       input.description?.trim() ?? "",
       nextPasswordHash,
+      operatingUnitSlug,
     ]
   );
 }
@@ -952,13 +980,24 @@ export async function createAfterpartySettlement(
   await ensureAfterpartySchema();
   const currentPasswordHash = await getAfterpartyPasswordHash(input.afterpartyId);
   assertAfterpartyPasswordAccess(currentPasswordHash, input.accessPassword);
+  const operatingUnitSlug = input.operatingUnitSlug?.trim() ?? "";
+  await assertAfterpartyBelongsToUnit(input.afterpartyId, operatingUnitSlug);
 
   return withTransaction(async (tq) => {
     const [orderRow] = await tq<{ nextOrder: number }>(
       `select coalesce(max(sort_order), -1) + 1 as "nextOrder"
        from public.afterparty_settlements
-       where afterparty_id = $1`,
-      [input.afterpartyId]
+       where afterparty_id = $1
+         and (
+           $2 = ''
+           or exists (
+             select 1
+             from public.afterparties a
+             where a.id = $1
+               and a.operating_unit_slug = $2
+           )
+         )`,
+      [input.afterpartyId, operatingUnitSlug]
     );
 
     const nextOrder = orderRow?.nextOrder ?? 0;
@@ -1019,6 +1058,7 @@ export async function updateAfterpartySettlement(
   await ensureAfterpartySchema();
   const currentPasswordHash = await getAfterpartyPasswordHash(input.afterpartyId);
   assertAfterpartyPasswordAccess(currentPasswordHash, input.accessPassword);
+  await assertAfterpartyBelongsToUnit(input.afterpartyId, input.operatingUnitSlug);
 
   await withTransaction(async (tq) => {
     const manager = input.settlementManager?.trim() ?? "";
@@ -1059,11 +1099,13 @@ export async function updateAfterpartySettlement(
 export async function deleteAfterpartySettlement(
   settlementId: string,
   afterpartyId: string,
-  accessPassword?: string
+  accessPassword?: string,
+  operatingUnitSlug = ""
 ): Promise<string> {
   await ensureAfterpartySchema();
   const currentPasswordHash = await getAfterpartyPasswordHash(afterpartyId);
   assertAfterpartyPasswordAccess(currentPasswordHash, accessPassword);
+  await assertAfterpartyBelongsToUnit(afterpartyId, operatingUnitSlug);
 
   return withTransaction(async (tq) => {
     const [countRow] = await tq<{ count: number }>(
@@ -1138,9 +1180,11 @@ export async function deleteAfterpartySettlement(
 export async function createAfterpartyParticipantsBulk(
   afterpartyId: string,
   participants: Array<string | CreateAfterpartyParticipantInput>,
-  settlementId?: string
+  settlementId?: string,
+  options: { operatingUnitSlug?: string } = {}
 ): Promise<number> {
   await ensureAfterpartySchema();
+  await assertAfterpartyBelongsToUnit(afterpartyId, options.operatingUnitSlug);
 
   const normalized = Array.from(
     new Map(
@@ -1258,9 +1302,11 @@ export async function createAfterpartyParticipantsBulk(
 
 export async function deleteAfterpartyParticipant(
   participantId: string,
-  afterpartyId: string
+  afterpartyId: string,
+  operatingUnitSlug = ""
 ): Promise<void> {
   await ensureAfterpartySchema();
+  await assertAfterpartyBelongsToUnit(afterpartyId, operatingUnitSlug);
 
   await query(
     `delete from public.afterparty_participants
@@ -1273,9 +1319,11 @@ export async function deleteAfterpartyParticipant(
 export async function deleteAfterpartySettlementParticipant(
   participantId: string,
   settlementId: string,
-  afterpartyId: string
+  afterpartyId: string,
+  operatingUnitSlug = ""
 ): Promise<void> {
   await ensureAfterpartySchema();
+  await assertAfterpartyBelongsToUnit(afterpartyId, operatingUnitSlug);
 
   await withTransaction(async (tq) => {
     await tq(
@@ -1308,9 +1356,11 @@ export async function updateAfterpartyParticipantSettlement(
   participantId: string,
   afterpartyId: string,
   settlementId: string | undefined,
-  isSettled: boolean
+  isSettled: boolean,
+  operatingUnitSlug = ""
 ): Promise<void> {
   await ensureAfterpartySchema();
+  await assertAfterpartyBelongsToUnit(afterpartyId, operatingUnitSlug);
 
   if (settlementId) {
     await query(
@@ -1356,7 +1406,6 @@ function assertAfterpartyPasswordAccess(
   accessPassword?: string
 ): void {
   if (!passwordHash) return;
-  if (isMasterOverridePassword(accessPassword)) return;
 
   const normalizedAccessPassword = normalizeAfterpartyPassword(accessPassword);
   if (!normalizedAccessPassword) {
@@ -1371,15 +1420,18 @@ function assertAfterpartyPasswordAccess(
 
 export async function deleteAfterparty(
   afterpartyId: string,
-  accessPassword?: string
+  accessPassword?: string,
+  operatingUnitSlug = ""
 ): Promise<void> {
   await ensureAfterpartySchema();
   const currentPasswordHash = await getAfterpartyPasswordHash(afterpartyId);
   assertAfterpartyPasswordAccess(currentPasswordHash, accessPassword);
+  await assertAfterpartyBelongsToUnit(afterpartyId, operatingUnitSlug);
 
   await query(
     `delete from public.afterparties
-     where id = $1`,
-    [afterpartyId]
+     where id = $1
+       and ($2 = '' or operating_unit_slug = $2)`,
+    [afterpartyId, operatingUnitSlug.trim()]
   );
 }

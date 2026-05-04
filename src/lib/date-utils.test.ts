@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatReadableDateTime,
   formatShortDateTime,
   pickNearestUpcomingIsoDate,
   toKstIsoDate,
@@ -49,5 +50,12 @@ describe("pickNearestUpcomingIsoDate", () => {
 describe("date formatters", () => {
   it("returns empty string for invalid datetime values", () => {
     expect(formatShortDateTime("not-a-date")).toBe("");
+    expect(formatReadableDateTime("not-a-date")).toBe("");
+  });
+
+  it("formats full datetime values in the app timezone", () => {
+    expect(formatReadableDateTime("2026-05-03 09:38:12.424484+00")).toBe(
+      "2026. 5. 3. 18:38"
+    );
   });
 });

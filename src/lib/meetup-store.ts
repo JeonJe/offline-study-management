@@ -1,7 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { query } from "@/lib/db";
 import { MEETING_KIND, normalizeMeetingKind, type MeetingKind } from "@/lib/meeting-kind";
-import { isMasterOverridePassword } from "@/lib/master-password";
 import {
   assertOperatingUnitAcceptsNewData,
   ensureOperatingUnitColumn,
@@ -99,10 +98,12 @@ type CreateRsvpInput = {
   name: string;
   role: ParticipantRole;
   note?: string;
+  operatingUnitSlug?: string;
 };
 
 type UpdateMeetingInput = {
   id: string;
+  operatingUnitSlug?: string;
   title: string;
   meetingDate: string;
   startTime: string;
@@ -752,14 +753,17 @@ export async function listRsvpsForMeetings(
 }
 
 export async function createRsvp(input: CreateRsvpInput): Promise<void> {
-  await createRsvpsBulk(input.meetingId, input.role, [input.name], input.note);
+  await createRsvpsBulk(input.meetingId, input.role, [input.name], input.note, {
+    operatingUnitSlug: input.operatingUnitSlug,
+  });
 }
 
 export async function createRsvpsBulk(
   meetingId: string,
   role: ParticipantRole,
   names: string[],
-  note?: string
+  note?: string,
+  options: { operatingUnitSlug?: string } = {}
 ): Promise<number> {
   await ensureSchema();
 
@@ -779,12 +783,14 @@ export async function createRsvpsBulk(
   const ids = normalized.map(() => randomUUID());
   const roles = normalized.map(() => role);
   const trimmedNote = note?.trim() ?? "";
+  const operatingUnitSlug = options.operatingUnitSlug?.trim() ?? "";
 
   const [row] = await query<{ changedCount: number }>(
     `with meeting_lock as (
        select id, capacity
        from public.meetings
        where id = $4
+         and ($6 = '' or operating_unit_slug = $6)
        for update
      ),
      incoming as (
@@ -843,7 +849,7 @@ export async function createRsvpsBulk(
        union
        select normalized_name from upgraded
      ) changed`,
-    [normalized, roles, ids, meetingId, trimmedNote]
+    [normalized, roles, ids, meetingId, trimmedNote, operatingUnitSlug]
   );
 
   return row?.changedCount ?? 0;
@@ -851,12 +857,14 @@ export async function createRsvpsBulk(
 
 export async function promoteWaitlistedRsvp(
   meetingId: string,
-  rsvpId: string
+  rsvpId: string,
+  operatingUnitSlug = ""
 ): Promise<boolean> {
   await ensureSchema();
 
   const normalizedMeetingId = meetingId.trim();
   const normalizedRsvpId = rsvpId.trim();
+  const normalizedUnitSlug = operatingUnitSlug.trim();
   if (!normalizedMeetingId || !normalizedRsvpId) {
     return false;
   }
@@ -866,6 +874,7 @@ export async function promoteWaitlistedRsvp(
        select id, capacity
        from public.meetings
        where id = $1
+         and ($3 = '' or operating_unit_slug = $3)
        for update
      ),
      confirmed_count as (
@@ -886,7 +895,7 @@ export async function promoteWaitlistedRsvp(
        returning r.id
      )
      select exists(select 1 from promoted) as promoted`,
-    [normalizedMeetingId, normalizedRsvpId]
+    [normalizedMeetingId, normalizedRsvpId, normalizedUnitSlug]
   );
 
   return Boolean(row?.promoted);
@@ -894,12 +903,14 @@ export async function promoteWaitlistedRsvp(
 
 export async function moveRsvpToWaitlist(
   meetingId: string,
-  rsvpId: string
+  rsvpId: string,
+  operatingUnitSlug = ""
 ): Promise<boolean> {
   await ensureSchema();
 
   const normalizedMeetingId = meetingId.trim();
   const normalizedRsvpId = rsvpId.trim();
+  const normalizedUnitSlug = operatingUnitSlug.trim();
   if (!normalizedMeetingId || !normalizedRsvpId) {
     return false;
   }
@@ -910,11 +921,20 @@ export async function moveRsvpToWaitlist(
        set status = 'waitlist'
        where id = $2
          and meeting_id = $1
+         and (
+           $3 = ''
+           or exists (
+             select 1
+             from public.meetings m
+             where m.id = $1
+               and m.operating_unit_slug = $3
+           )
+         )
          and coalesce(status, 'confirmed') = 'confirmed'
        returning id
      )
      select exists(select 1 from moved) as moved`,
-    [normalizedMeetingId, normalizedRsvpId]
+    [normalizedMeetingId, normalizedRsvpId, normalizedUnitSlug]
   );
 
   return Boolean(row?.moved);
@@ -937,7 +957,6 @@ function assertMeetingPasswordAccess(
   accessPassword?: string
 ): void {
   if (!passwordHash) return;
-  if (isMasterOverridePassword(accessPassword)) return;
 
   const normalizedAccessPassword = normalizeMeetingPassword(accessPassword);
   if (!normalizedAccessPassword) {
@@ -955,6 +974,7 @@ export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
   const leaders = normalizeLeaders(input.leaders);
   const currentPasswordHash = await getMeetingPasswordHash(input.id);
   assertMeetingPasswordAccess(currentPasswordHash, input.accessPassword);
+  const operatingUnitSlug = input.operatingUnitSlug?.trim() ?? "";
 
   const nextPassword = normalizeMeetingPassword(input.nextPassword);
   const nextPasswordHash = input.clearPassword
@@ -974,7 +994,8 @@ export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
          password_hash = $8,
          capacity = $9,
          updated_at = now()
-     where id = $1`,
+     where id = $1
+       and ($10 = '' or operating_unit_slug = $10)`,
     [
       input.id,
       input.title.trim(),
@@ -985,13 +1006,15 @@ export async function updateMeeting(input: UpdateMeetingInput): Promise<void> {
       leaders,
       nextPasswordHash,
       input.capacity,
+      operatingUnitSlug,
     ]
   );
 }
 
 export async function deleteMeeting(
   meetingId: string,
-  accessPassword?: string
+  accessPassword?: string,
+  operatingUnitSlug = ""
 ): Promise<void> {
   await ensureSchema();
   const currentPasswordHash = await getMeetingPasswordHash(meetingId);
@@ -999,20 +1022,32 @@ export async function deleteMeeting(
 
   await query(
     `delete from public.meetings
-     where id = $1`,
-    [meetingId]
+     where id = $1
+       and ($2 = '' or operating_unit_slug = $2)`,
+    [meetingId, operatingUnitSlug.trim()]
   );
 }
 
 export async function deleteRsvp(
   rsvpId: string,
-  meetingId: string
+  meetingId: string,
+  operatingUnitSlug = ""
 ): Promise<void> {
   await ensureSchema();
   await query(
     `delete from public.rsvps
-     where id = $1 and meeting_id = $2`,
-    [rsvpId, meetingId]
+     where id = $1
+       and meeting_id = $2
+       and (
+         $3 = ''
+         or exists (
+           select 1
+           from public.meetings m
+           where m.id = $2
+             and m.operating_unit_slug = $3
+         )
+       )`,
+    [rsvpId, meetingId, operatingUnitSlug.trim()]
   );
 }
 
@@ -1022,8 +1057,10 @@ export async function updateRsvp(input: {
   name: string;
   role: ParticipantRole;
   note?: string;
+  operatingUnitSlug?: string;
 }): Promise<void> {
   await ensureSchema();
+  const operatingUnitSlug = input.operatingUnitSlug?.trim() ?? "";
 
   await query(
     `update public.rsvps
@@ -1032,6 +1069,15 @@ export async function updateRsvp(input: {
          note = nullif($5, '')
      where id = $1
        and meeting_id = $2
+       and (
+         $6 = ''
+         or exists (
+           select 1
+           from public.meetings m
+           where m.id = $2
+             and m.operating_unit_slug = $6
+         )
+       )
        and not exists (
          select 1 from public.rsvps
          where meeting_id = $2
@@ -1045,6 +1091,7 @@ export async function updateRsvp(input: {
       input.name.trim(),
       input.role,
       input.note?.trim() ?? "",
+      operatingUnitSlug,
     ]
   );
 }

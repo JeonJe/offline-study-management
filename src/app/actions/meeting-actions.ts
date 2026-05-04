@@ -3,9 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { normalizeMeetingKind } from "@/lib/meeting-kind";
-import { cohortEntryLoginPath } from "@/lib/cohort-routes";
 import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
-import { getCurrentRolePageRole } from "@/lib/role-session";
 import {
   createMeeting,
   createRsvp,
@@ -34,31 +32,14 @@ import {
   participantFeedbackPath,
   participantFeedbackSourceFromMutation,
   revalidateMeetupViews,
-  requireAuthOrRedirect,
+  requireUnitAuthOrRedirect,
+  requireUnitRoleOrRedirect,
   resolveMeetingLabel,
+  resolveMeetingUnitOrRedirect,
   resolveParticipantRoleEntries,
   safeReturnPath,
   textFrom,
-  unitSlugFromPath,
 } from "@/app/actions/shared-action-utils";
-
-async function requireMeetingManagementRole(returnPath: string | null): Promise<void> {
-  let unitSlug = "";
-  try {
-    unitSlug = unitSlugFromPath(returnPath);
-  } catch {
-    redirect("/?auth=required");
-  }
-  const currentRole = await getCurrentRolePageRole(unitSlug);
-  if (currentRole === "admin" || currentRole === "angel") return;
-
-  redirect(
-    cohortEntryLoginPath(unitSlug, {
-      auth: "required",
-      returnPath: returnPath ?? "/",
-    })
-  );
-}
 
 export async function createMeetingAction(formData: FormData): Promise<void> {
   const state: DashboardState = {
@@ -66,8 +47,6 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
     keyword: textFrom(formData, "returnKeyword"),
   };
   const returnPath = safeReturnPath(formData);
-
-  await requireAuthOrRedirect();
 
   const title = textFrom(formData, "title").trim();
   const meetingDate = textFrom(formData, "meetingDate").trim();
@@ -78,6 +57,8 @@ export async function createMeetingAction(formData: FormData): Promise<void> {
   const password = textFrom(formData, "meetingPassword").trim();
   const meetingKind = normalizeMeetingKind(textFrom(formData, "meetingKind").trim());
   const operatingUnitSlug = requireOperatingUnitSlug(textFrom(formData, "unit"));
+
+  await requireUnitAuthOrRedirect(operatingUnitSlug, returnPath);
 
   if (!title || !meetingDate || !location) {
     redirect(returnPath ?? dashboardPath(state));
@@ -111,21 +92,24 @@ export async function createRsvpAction(formData: FormData): Promise<void> {
   const keyword = textFrom(formData, "returnKeyword").trim();
   const returnPath = safeReturnPath(formData);
 
-  await requireAuthOrRedirect();
-
   const name = textFrom(formData, "name").trim();
   const roleRaw = textFrom(formData, "role").trim();
-  const meetingLabel = await resolveMeetingLabel(meetingId);
 
   if (!meetingId || !name || !isParticipantRole(roleRaw)) {
     redirect(dashboardPath({ date, keyword }));
   }
+
+  const fallbackPath = returnPath ?? dashboardPath({ date, keyword });
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+  const meetingLabel = await resolveMeetingLabel(meetingId);
 
   await createRsvp({
     meetingId,
     name,
     role: roleRaw,
     note: meetingLabel,
+    operatingUnitSlug: targetUnitSlug,
   });
 
   revalidateMeetupViews(meetingId, returnPath);
@@ -139,14 +123,15 @@ export async function deleteRsvpAction(formData: FormData): Promise<void> {
   const rsvpId = textFrom(formData, "rsvpId").trim();
   const returnPath = safeReturnPath(formData);
 
-  await requireAuthOrRedirect();
-  await requireMeetingManagementRole(returnPath);
-
   if (!meetingId || !rsvpId) {
     redirect(dashboardPath({ date, keyword }));
   }
 
-  await deleteRsvp(rsvpId, meetingId);
+  const fallbackPath = returnPath ?? dashboardPath({ date, keyword });
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitRoleOrRedirect(targetUnitSlug, ["admin", "angel"], fallbackPath);
+
+  await deleteRsvp(rsvpId, meetingId, targetUnitSlug);
 
   revalidateMeetupViews(meetingId, returnPath);
   redirect(returnPath ?? dashboardPath({ date, keyword }));
@@ -158,14 +143,14 @@ export async function promoteWaitlistedRsvpAction(formData: FormData): Promise<v
   const returnPath = safeReturnPath(formData);
   const fallbackPath = returnPath ?? (meetingId ? `/meetings/${meetingId}` : "/");
 
-  await requireAuthOrRedirect();
-  await requireMeetingManagementRole(returnPath);
-
   if (!meetingId || !rsvpId) {
     redirect(fallbackPath);
   }
 
-  const promoted = await promoteWaitlistedRsvp(meetingId, rsvpId);
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitRoleOrRedirect(targetUnitSlug, ["admin", "angel"], fallbackPath);
+
+  const promoted = await promoteWaitlistedRsvp(meetingId, rsvpId, targetUnitSlug);
   if (!promoted) {
     redirect(participantFeedbackPath(fallbackPath, "waitlist-full", "manual"));
   }
@@ -180,14 +165,14 @@ export async function moveRsvpToWaitlistAction(formData: FormData): Promise<void
   const returnPath = safeReturnPath(formData);
   const fallbackPath = returnPath ?? (meetingId ? `/meetings/${meetingId}` : "/");
 
-  await requireAuthOrRedirect();
-  await requireMeetingManagementRole(returnPath);
-
   if (!meetingId || !rsvpId) {
     redirect(fallbackPath);
   }
 
-  await moveRsvpToWaitlist(meetingId, rsvpId);
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitRoleOrRedirect(targetUnitSlug, ["admin", "angel"], fallbackPath);
+
+  await moveRsvpToWaitlist(meetingId, rsvpId, targetUnitSlug);
 
   revalidateMeetupViews(meetingId, returnPath);
   redirect(fallbackPath);
@@ -201,17 +186,18 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
   const mutationSource = textFrom(formData, "mutationSource").trim();
   const feedbackSource = participantFeedbackSourceFromMutation(mutationSource);
 
-  await requireAuthOrRedirect();
-
   const namesRaw = textFrom(formData, "names");
   const roleRaw = textFrom(formData, "role").trim();
   const note = textFrom(formData, "note").trim();
-  const meetingLabel = note || (await resolveMeetingLabel(meetingId));
   const fallbackPath = returnPath ?? (meetingId ? `/meetings/${meetingId}` : dashboardPath({ date, keyword }));
 
   if (!meetingId) {
     redirect(dashboardPath({ date, keyword }));
   }
+
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+  const meetingLabel = note || (await resolveMeetingLabel(meetingId));
 
   const names =
     feedbackSource === "manual"
@@ -223,9 +209,11 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
 
   let insertedCount = 0;
   if (isParticipantRole(roleRaw)) {
-    insertedCount = await createRsvpsBulk(meetingId, roleRaw, names, meetingLabel);
+    insertedCount = await createRsvpsBulk(meetingId, roleRaw, names, meetingLabel, {
+      operatingUnitSlug: targetUnitSlug,
+    });
   } else {
-    const roleEntries = await resolveParticipantRoleEntries(names, unitSlugFromPath(returnPath));
+    const roleEntries = await resolveParticipantRoleEntries(names, targetUnitSlug);
 
     const roleBuckets = new Map<ParticipantRole, string[]>();
     for (const role of PARTICIPANT_ROLE_ORDER) {
@@ -241,7 +229,9 @@ export async function bulkCreateRsvpsAction(formData: FormData): Promise<void> {
     for (const role of PARTICIPANT_ROLE_ORDER) {
       const namesByRole = roleBuckets.get(role) ?? [];
       if (namesByRole.length > 0) {
-        insertedCount += await createRsvpsBulk(meetingId, role, namesByRole, meetingLabel);
+        insertedCount += await createRsvpsBulk(meetingId, role, namesByRole, meetingLabel, {
+          operatingUnitSlug: targetUnitSlug,
+        });
       }
     }
   }
@@ -262,8 +252,6 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
   const keyword = textFrom(formData, "returnKeyword").trim();
   const returnPath = safeReturnPath(formData);
 
-  await requireAuthOrRedirect();
-
   const title = textFrom(formData, "title").trim();
   const meetingDate = textFrom(formData, "meetingDate").trim();
   const startTime = textFrom(formData, "startTime").trim();
@@ -278,6 +266,10 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
   if (!meetingId || !title || !meetingDate || !startTime || !location) {
     redirect(dashboardPath({ date, keyword }));
   }
+
+  const fallbackPath = returnPath ?? dashboardPath({ date, keyword });
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
 
   if (capacityResult.kind === "invalid") {
     redirect(meetingManagePath(meetingId, returnPath, "capacity-invalid"));
@@ -298,6 +290,7 @@ export async function updateMeetingAction(formData: FormData): Promise<void> {
       nextPassword,
       clearPassword,
       capacity,
+      operatingUnitSlug: targetUnitSlug,
     });
   } catch (error) {
     if (isMeetingPasswordError(error)) {
@@ -316,14 +309,16 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
   const returnPath = safeReturnPath(formData);
   const accessPassword = textFrom(formData, "meetingPassword").trim();
 
-  await requireAuthOrRedirect();
-
   if (!meetingId) {
     redirect(dashboardPath({ date }));
   }
 
+  const fallbackPath = returnPath ?? dashboardPath({ date });
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+
   try {
-    await deleteMeeting(meetingId, accessPassword);
+    await deleteMeeting(meetingId, accessPassword, targetUnitSlug);
   } catch (error) {
     if (isMeetingPasswordError(error)) {
       redirect(meetingManagePath(meetingId, returnPath, error.code));
@@ -342,8 +337,6 @@ export async function updateRsvpAction(formData: FormData): Promise<void> {
   const keyword = textFrom(formData, "returnKeyword").trim();
   const returnPath = safeReturnPath(formData);
 
-  await requireAuthOrRedirect();
-
   const name = textFrom(formData, "name").trim();
   const roleRaw = textFrom(formData, "role").trim();
   const note = textFrom(formData, "note").trim();
@@ -352,12 +345,17 @@ export async function updateRsvpAction(formData: FormData): Promise<void> {
     redirect(dashboardPath({ date, keyword }));
   }
 
+  const fallbackPath = returnPath ?? dashboardPath({ date, keyword });
+  const targetUnitSlug = await resolveMeetingUnitOrRedirect(meetingId, fallbackPath);
+  await requireUnitAuthOrRedirect(targetUnitSlug, fallbackPath);
+
   await updateRsvp({
     id: rsvpId,
     meetingId,
     name,
     role: roleRaw,
     note,
+    operatingUnitSlug: targetUnitSlug,
   });
 
   revalidateMeetupViews(meetingId, returnPath);

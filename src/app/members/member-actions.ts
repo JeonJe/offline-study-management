@@ -1,8 +1,9 @@
 "use server";
 
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticatedForUnit } from "@/lib/auth";
 import { revalidateMemberData } from "@/lib/cache-invalidation";
 import { requireOperatingUnitSlug } from "@/lib/operating-unit-store";
+import { getCurrentRolePageRole } from "@/lib/role-session";
 import {
   saveMemberPresetToDb,
   SPECIAL_PARTICIPANT_ROLES,
@@ -130,8 +131,19 @@ function parsePayload(
 export async function saveMemberPresetAction(
   payload: SaveMemberPresetInput
 ): Promise<SaveMemberPresetResult> {
-  const authed = await isAuthenticated();
+  const operatingUnitSlug =
+    typeof payload.operatingUnitSlug === "string"
+      ? requireOperatingUnitSlug(payload.operatingUnitSlug)
+      : "";
+  const authed = operatingUnitSlug
+    ? await isAuthenticatedForUnit(operatingUnitSlug)
+    : false;
   if (!authed) {
+    return { ok: false, error: "unauthorized" };
+  }
+
+  const currentRole = await getCurrentRolePageRole(operatingUnitSlug);
+  if (currentRole !== "admin") {
     return { ok: false, error: "unauthorized" };
   }
 
@@ -139,14 +151,10 @@ export async function saveMemberPresetAction(
   if (!parsed) {
     return { ok: false, error: "invalid" };
   }
-  const operatingUnitSlug =
-    typeof payload.operatingUnitSlug === "string"
-      ? payload.operatingUnitSlug
-      : "";
 
   try {
     await saveMemberPresetToDb(
-      requireOperatingUnitSlug(operatingUnitSlug),
+      operatingUnitSlug,
       parsed.teamGroups,
       parsed.fixedAngels,
       parsed.specialRoles

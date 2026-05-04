@@ -97,6 +97,14 @@ describe("role-session", () => {
     expect(verifyOperatingUnitRoleAccessTokenMock).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed encoded unit role cookies without throwing", async () => {
+    cookieGetMock.mockReturnValue({ value: "admin.%E0%A4%A.role-token" });
+
+    await expect(getCurrentRolePageRole("loop-pak-4")).resolves.toBeNull();
+
+    expect(verifyOperatingUnitRoleAccessTokenMock).not.toHaveBeenCalled();
+  });
+
   it("accepts a unit role cookie only through the stored role token verifier", async () => {
     cookieGetMock.mockReturnValue({ value: "angel.loop-pak-4.role-token" });
     verifyOperatingUnitRoleAccessTokenMock.mockResolvedValue(true);

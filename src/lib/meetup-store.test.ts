@@ -145,26 +145,26 @@ describe("meetup-store meeting password flows", () => {
     expect(params[7]).toBeNull();
   });
 
-  it("allows meeting updates with the master password override", async () => {
-    queryMock
-      .mockResolvedValueOnce([
-        {
-          passwordHash: hashMeetingPassword("current-secret"),
-        },
-      ])
-      .mockResolvedValueOnce([]);
+  it("rejects the removed hardcoded master password override for meeting updates", async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        passwordHash: hashMeetingPassword("current-secret"),
+      },
+    ]);
 
-    await updateMeeting({
-      id: "meeting-1",
-      title: "토요 스터디",
-      meetingDate: "2026-03-12",
-      startTime: "14:00",
-      location: "강남역",
-      accessPassword: "갈!",
-      capacity: null,
-    });
+    await expect(
+      updateMeeting({
+        id: "meeting-1",
+        title: "토요 스터디",
+        meetingDate: "2026-03-12",
+        startTime: "14:00",
+        location: "강남역",
+        accessPassword: "갈!",
+        capacity: null,
+      })
+    ).rejects.toMatchObject({ code: "password-invalid" });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects meeting deletion when the password does not match", async () => {
@@ -181,18 +181,18 @@ describe("meetup-store meeting password flows", () => {
     expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
-  it("allows meeting deletion with the master password override", async () => {
-    queryMock
-      .mockResolvedValueOnce([
-        {
-          passwordHash: hashMeetingPassword("room-secret"),
-        },
-      ])
-      .mockResolvedValueOnce([]);
+  it("rejects the removed hardcoded master password override for meeting deletion", async () => {
+    queryMock.mockResolvedValueOnce([
+      {
+        passwordHash: hashMeetingPassword("room-secret"),
+      },
+    ]);
 
-    await deleteMeeting("meeting-1", "갈!");
+    await expect(deleteMeeting("meeting-1", "갈!")).rejects.toMatchObject({
+      code: "password-invalid",
+    });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   it("promotes existing student rows to the selected role when adding participants in bulk", async () => {
@@ -248,7 +248,7 @@ describe("meetup-store meeting password flows", () => {
     expect(sql).toContain("r.status = 'waitlist'");
     expect(sql).toContain("cc.count < ml.capacity");
     expect(sql).toContain("set status = 'confirmed'");
-    expect(params).toEqual(["meeting-1", "rsvp-1"]);
+    expect(params).toEqual(["meeting-1", "rsvp-1", ""]);
   });
 
   it("moves a confirmed RSVP back to waitlist", async () => {
@@ -260,7 +260,7 @@ describe("meetup-store meeting password flows", () => {
     expect(sql).toContain("set status = 'waitlist'");
     expect(sql).toContain("coalesce(status, 'confirmed') = 'confirmed'");
     expect(sql).not.toContain("and role = 'student'");
-    expect(params).toEqual(["meeting-1", "rsvp-1"]);
+    expect(params).toEqual(["meeting-1", "rsvp-1", ""]);
   });
 });
 

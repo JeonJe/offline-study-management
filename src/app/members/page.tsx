@@ -4,6 +4,7 @@ import { cachedLoadMemberPreset } from "@/lib/cached-queries";
 import { MemberAdminForm } from "@/app/members/member-admin-form";
 import { DashboardHeader } from "@/app/dashboard-header";
 import { cohortAwarePath, cohortEntryLoginPath } from "@/lib/cohort-routes";
+import { getCurrentRolePageRole } from "@/lib/role-session";
 
 type MembersPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -23,6 +24,10 @@ export default async function MembersPage({ searchParams }: MembersPageProps) {
   const authenticated = await isAuthenticatedForUnit(unitSlug);
   if (!authenticated) {
     redirect(cohortEntryLoginPath(unitSlug, { auth: "required", returnPath: cohortAwarePath(unitSlug, "/members") }));
+  }
+  const currentRole = await getCurrentRolePageRole(unitSlug);
+  if (currentRole !== "admin") {
+    redirect(`${cohortAwarePath(unitSlug, "/members")}?access=required`);
   }
 
   const preset = await cachedLoadMemberPreset(unitSlug);

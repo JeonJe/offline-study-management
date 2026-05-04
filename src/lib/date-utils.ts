@@ -22,6 +22,21 @@ export function formatShortDateTime(value: string): string {
   });
 }
 
+export function formatReadableDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString(APP_LOCALE, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: APP_TIME_ZONE,
+  });
+}
+
 export function pickNearestUpcomingIsoDate(
   dates: string[],
   todayIsoDate: string

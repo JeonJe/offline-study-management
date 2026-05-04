@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  isAuthenticatedMock,
+  isAuthenticatedForUnitMock,
+  getCurrentRolePageRoleMock,
   revalidateMemberDataMock,
   saveMemberPresetToDbMock,
 } = vi.hoisted(() => ({
-  isAuthenticatedMock: vi.fn(),
+  isAuthenticatedForUnitMock: vi.fn(),
+  getCurrentRolePageRoleMock: vi.fn(),
   revalidateMemberDataMock: vi.fn(),
   saveMemberPresetToDbMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
-  isAuthenticated: isAuthenticatedMock,
+  isAuthenticatedForUnit: isAuthenticatedForUnitMock,
+}));
+
+vi.mock("@/lib/role-session", () => ({
+  getCurrentRolePageRole: getCurrentRolePageRoleMock,
 }));
 
 vi.mock("@/lib/cache-invalidation", () => ({
@@ -27,15 +33,17 @@ import { saveMemberPresetAction } from "@/app/members/member-actions";
 
 describe("saveMemberPresetAction", () => {
   beforeEach(() => {
-    isAuthenticatedMock.mockReset();
+    isAuthenticatedForUnitMock.mockReset();
+    getCurrentRolePageRoleMock.mockReset();
     revalidateMemberDataMock.mockClear();
     saveMemberPresetToDbMock.mockReset();
   });
 
   it("인증되지 않은 사용자는 저장하지 않는다", async () => {
-    isAuthenticatedMock.mockResolvedValue(false);
+    isAuthenticatedForUnitMock.mockResolvedValue(false);
 
     const result = await saveMemberPresetAction({
+      operatingUnitSlug: "loop-pak-3",
       fixedAngels: ["오현직"],
       teamGroups: [{ teamName: "1팀", angels: ["오현직"], members: ["김루퍼"] }],
     });
@@ -46,7 +54,8 @@ describe("saveMemberPresetAction", () => {
   });
 
   it("멤버 seq id를 보존해서 저장하고 관련 캐시를 무효화한다", async () => {
-    isAuthenticatedMock.mockResolvedValue(true);
+    isAuthenticatedForUnitMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("admin");
     saveMemberPresetToDbMock.mockResolvedValue(undefined);
 
     const result = await saveMemberPresetAction({
@@ -89,7 +98,8 @@ describe("saveMemberPresetAction", () => {
   });
 
   it("필수 입력이 비어 있으면 저장하지 않는다", async () => {
-    isAuthenticatedMock.mockResolvedValue(true);
+    isAuthenticatedForUnitMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("admin");
 
     const result = await saveMemberPresetAction({
       operatingUnitSlug: "loop-pak-3",
@@ -98,6 +108,20 @@ describe("saveMemberPresetAction", () => {
     });
 
     expect(result).toEqual({ ok: false, error: "invalid" });
+    expect(saveMemberPresetToDbMock).not.toHaveBeenCalled();
+  });
+
+  it("admin role이 아니면 멤버 명단을 저장하지 않는다", async () => {
+    isAuthenticatedForUnitMock.mockResolvedValue(true);
+    getCurrentRolePageRoleMock.mockResolvedValue("angel");
+
+    const result = await saveMemberPresetAction({
+      operatingUnitSlug: "loop-pak-3",
+      fixedAngels: ["오현직"],
+      teamGroups: [{ teamName: "1팀", angels: ["오현직"], members: ["김루퍼"] }],
+    });
+
+    expect(result).toEqual({ ok: false, error: "unauthorized" });
     expect(saveMemberPresetToDbMock).not.toHaveBeenCalled();
   });
 });
