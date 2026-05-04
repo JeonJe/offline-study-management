@@ -5,7 +5,7 @@ import path from "node:path";
 import { Pool } from "pg";
 import { loadEnvFile, maskDatabaseUrl, resolvePsql } from "./lib/env-utils.mjs";
 
-const DEFAULT_ENV_FILE = ".env.staging";
+const DEFAULT_ENV_FILE = ".env.prod";
 const DEFAULT_SCHEMA_FILE = "docs/db/01_init_schema.sql";
 
 function parseArgs(argv) {
@@ -54,8 +54,8 @@ function printHelp() {
   -h, --help         도움말 출력
 
 예:
-  node scripts/apply-schema.mjs --env-file .env.staging
-  node scripts/apply-schema.mjs --env-file .env.staging --verify-only`);
+  node scripts/apply-schema.mjs --env-file .env.prod
+  node scripts/apply-schema.mjs --env-file .env.prod --verify-only`);
 }
 
 function readSchema(schemaFile) {

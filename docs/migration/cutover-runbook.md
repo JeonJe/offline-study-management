@@ -7,8 +7,8 @@
 | 항목 | 확인 |
 |------|------|
 | 운영 백업 | `npm run db:backup`으로 `.sql`과 `.counts.json` 생성 |
-| 새 DB 스키마 | `node scripts/apply-schema.mjs --env-file .env.staging` 성공 |
-| 리허설 env | `.env.staging`에 새 DB `DATABASE_URL`만 저장 |
+| 새 DB 스키마 | `node scripts/apply-schema.mjs --env-file .env.prod` 성공 |
+| 대상 DB env | `.env.prod`에 새 DB `DATABASE_URL`만 저장 |
 | 운영 env 보존 | 기존 `.env.local`과 Vercel 운영 `DATABASE_URL`은 아직 변경하지 않음 |
 
 ## 2. 데이터 이관
@@ -17,7 +17,7 @@
 
 ```bash
 node scripts/migrate-data.mjs \
-  --target-env-file .env.staging \
+  --target-env-file .env.prod \
   --backup-sql backups/saturday-meetup-YYYYMMDD-HHmmss.sql \
   --source-counts backups/saturday-meetup-YYYYMMDD-HHmmss.counts.json
 ```

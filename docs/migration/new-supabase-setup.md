@@ -15,33 +15,33 @@ SM-7A의 목적은 운영 DB를 건드리지 않고 새 Supabase 프로젝트에
 
 ## 2. 리허설 환경 파일 분리
 
-레포 루트에 `.env.staging`을 만들고 새 프로젝트 연결 문자열만 넣는다. 이 파일은 커밋하지 않는다.
+레포 루트에 `.env.prod`를 만들고 새 프로젝트 연결 문자열만 넣는다. 이 파일은 커밋하지 않는다.
 
 ```dotenv
 DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
 ```
 
-`DATABASE_URL is not set` 또는 DNS 오류가 나면 `.env.staging`의 host/ref/password를 먼저 확인한다.
+`DATABASE_URL is not set` 또는 DNS 오류가 나면 `.env.prod`의 host/ref/password를 먼저 확인한다.
 
 ## 3. 스키마 적용
 
 최신 스키마 파일은 `docs/db/01_init_schema.sql`이다. 새 프로젝트에 다음 명령으로 적용한다.
 
 ```bash
-node scripts/apply-schema.mjs --env-file .env.staging
+node scripts/apply-schema.mjs --env-file .env.prod
 ```
 
 적용 후 다시 검증만 돌릴 때는 다음 명령을 쓴다.
 
 ```bash
-node scripts/apply-schema.mjs --env-file .env.staging --verify-only
+node scripts/apply-schema.mjs --env-file .env.prod --verify-only
 ```
 
 스크립트는 다음 순서로 동작한다.
 
 | 단계 | 내용 |
 |------|------|
-| 1 | `.env.staging`에서 `DATABASE_URL` 로드. 셸에 남아 있는 같은 이름의 환경변수보다 env 파일 값이 우선 |
+| 1 | `.env.prod`에서 `DATABASE_URL` 로드. 셸에 남아 있는 같은 이름의 환경변수보다 env 파일 값이 우선 |
 | 2 | `psql --set ON_ERROR_STOP=1`로 `docs/db/01_init_schema.sql` 적용 |
 | 3 | SQL 파일에 선언된 `public` 테이블과 인덱스 목록 추출 |
 | 4 | DB의 실제 테이블, 인덱스, RLS 활성화 상태 조회 |

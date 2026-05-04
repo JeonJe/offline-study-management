@@ -6,7 +6,7 @@ import path from "node:path";
 import { Pool } from "pg";
 import { loadEnvFile, maskDatabaseUrl, resolvePsql } from "./lib/env-utils.mjs";
 
-const DEFAULT_TARGET_ENV_FILE = ".env.staging";
+const DEFAULT_TARGET_ENV_FILE = ".env.prod";
 const DEFAULT_SCHEMA_FILE = "docs/db/01_init_schema.sql";
 
 const PREFERRED_IMPORT_ORDER = [
@@ -24,7 +24,6 @@ const PREFERRED_IMPORT_ORDER = [
   "weekly_report_templates",
   "weekly_report_cycles",
   "angel_weekly_reports",
-  "weekly_report_comments",
 ];
 
 function parseArgs(argv) {
@@ -88,7 +87,7 @@ function printHelp() {
 
 예:
   node scripts/migrate-data.mjs --backup-sql backups/saturday-meetup-20260501-154037.sql --source-counts backups/saturday-meetup-20260501-154037.counts.json --dry-run
-  node scripts/migrate-data.mjs --target-env-file .env.staging --backup-sql backups/saturday-meetup-20260501-154037.sql --source-counts backups/saturday-meetup-20260501-154037.counts.json`);
+  node scripts/migrate-data.mjs --target-env-file .env.prod --backup-sql backups/saturday-meetup-20260501-154037.sql --source-counts backups/saturday-meetup-20260501-154037.counts.json`);
 }
 
 function resolveInputFiles(args) {
