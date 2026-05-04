@@ -430,13 +430,17 @@ export function LoginScreen({
   );
 }
 
-function AdminLoginScreen({
+function UnitSelectionScreen({
+  units,
+  basePath,
   adminAuthStatus,
 }: {
+  units: EntryOperatingUnit[];
+  basePath: "/" | "/loop-pak";
   adminAuthStatus: string;
 }) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 py-10 sm:px-6 lg:px-8">
       <style>{`
         .login-field {
           width: 100%;
@@ -474,6 +478,51 @@ function AdminLoginScreen({
         .login-submit:hover { opacity: 0.9; }
         .login-submit:active { transform: scale(0.98); }
       `}</style>
+      <section className="w-full">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em]" style={{ color: "var(--ink-muted)" }}>
+              LOOPERS MEETUP
+            </p>
+          </div>
+          <Link
+            href="/?adminAuth=open"
+            className="inline-flex shrink-0 items-center border-b pb-0.5 text-sm font-bold transition hover:opacity-70"
+            style={{ borderColor: "var(--ink-muted)", color: "var(--ink-muted)" }}
+          >
+            전체관리자
+          </Link>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {units.map((unit) => {
+            const returnPath = cohortAwarePath(unit.slug, basePath);
+            return (
+              <Link
+                key={unit.slug}
+                href={cohortEntryLoginPath(unit.slug, { returnPath })}
+                className="group flex min-h-44 flex-col justify-between rounded-3xl border bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <div>
+                  <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: "var(--ink)" }}>
+                    {unit.name}
+                  </h2>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6" style={{ color: "var(--ink-muted)" }}>
+                    {unit.description || "Loopers Meetup"}
+                  </p>
+                </div>
+                <span
+                  className="mt-8 inline-flex h-10 w-fit items-center rounded-full px-4 text-sm font-extrabold text-white transition group-hover:opacity-90"
+                  style={{ backgroundColor: "var(--accent)" }}
+                >
+                  입장하기
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
       <AdminLoginModal adminAuthStatus={adminAuthStatus} />
     </main>
   );
@@ -804,16 +853,13 @@ export async function MeetupDashboard({
 
   if (!selectedUnitSlug) {
     const units = await safeListEntryOperatingUnits();
-    if (adminAuthStatus === "open" || adminAuthStatus === "invalid") {
-      return <AdminLoginScreen adminAuthStatus={adminAuthStatus} />;
-    }
-
-    const defaultUnit = units[0] ?? {
-      slug: MIGRATED_OPERATING_UNIT_SLUG,
-      name: MIGRATED_OPERATING_UNIT_NAME,
-      description: null,
-    };
-    redirect(cohortAwarePath(defaultUnit.slug, basePath));
+    return (
+      <UnitSelectionScreen
+        units={units}
+        basePath={basePath}
+        adminAuthStatus={adminAuthStatus}
+      />
+    );
   }
 
   const authenticatedForUnit = await isAuthenticatedForUnit(selectedUnitSlug);
